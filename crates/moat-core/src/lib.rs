@@ -9,6 +9,7 @@
 //! - [`normalize`]: the canonical forms values are compared in.
 //! - [`extract`]: pulling leaves out of a tool result.
 //! - [`session`]: per-session intents, observed values and the event log.
+//! - [`provenance`]: resolving where a payment argument came from.
 //! - [`hash`]: canonical JSON and SHA-256.
 
 #![forbid(unsafe_code)]
@@ -16,9 +17,11 @@
 pub mod extract;
 pub mod hash;
 pub mod normalize;
+pub mod provenance;
 pub mod session;
 pub mod source;
 
+pub use provenance::{resolve, MatchKind, Resolution};
 pub use session::{Session, SessionStore};
 pub use source::{Source, SourceKind};
 

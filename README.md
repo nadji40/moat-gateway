@@ -23,7 +23,7 @@ Early. Follow the work order below for what is actually built.
 - [x] 2. `moat-mcp`: JSON-RPC types and stdio framing (ADR 0002)
 - [x] 3. `moat-gateway`: transparent stdio passthrough
 - [x] 4. `moat-core`: sources, normalization, session store
-- [ ] 5. `moat-core`: provenance resolution
+- [x] 5. `moat-core`: provenance resolution
 - [ ] 6. `moat-core`: policy loading and rule evaluation
 - [ ] 7. `moat-gateway`: interception, step-up, intent API, resume
 - [ ] 8. `moat-core`: evidence records, hash chain, signing; `keygen` and `verify`
