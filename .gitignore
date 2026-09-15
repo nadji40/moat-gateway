@@ -1,0 +1,20 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Node / arena
+node_modules/
+arena/**/dist/
+arena/results/
+
+# Runtime artifacts: never commit signing keys or evidence
+/keys/
+*.jsonl
+!arena/attacks/**/*.jsonl
+moat_ed25519
+moat_ed25519.pub
+
+# Local config and secrets
+.env
+.env.*
+moat.local.yaml

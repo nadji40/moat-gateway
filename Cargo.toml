@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/moat-core",
+    "crates/moat-mcp",
+    "crates/moat-gateway",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+license = "Apache-2.0"
+repository = "https://github.com/nadji40/moat"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+
+[workspace.dependencies]
+moat-core = { path = "crates/moat-core" }
+moat-mcp = { path = "crates/moat-mcp" }
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"
