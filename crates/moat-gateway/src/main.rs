@@ -2,9 +2,13 @@
 //! its MCP servers so that one process sees both the untrusted content arriving
 //! as tool results and the payment leaving as a tool call.
 
+mod config;
+mod proxy;
+mod upstream;
+
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 /// Command line surface. See the README for the config reference.
@@ -39,10 +43,11 @@ enum Command {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    // stdout is the MCP channel; every log line goes to stderr.
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                tracing_subscriber::EnvFilter::new("moat_gateway=info,moat_core=info")
+                tracing_subscriber::EnvFilter::new("moat_gateway=info,moat_core=info,moat_mcp=info")
             }),
         )
         .with_writer(std::io::stderr)
@@ -62,13 +67,29 @@ fn main() -> Result<()> {
             )
         }
         None => {
-            let config = cli
+            let path = cli
                 .config
                 .ok_or_else(|| anyhow::anyhow!("--config is required to run the proxy"))?;
-            anyhow::bail!(
-                "the proxy is not implemented yet (work order step 3); would load {}",
-                config.display()
-            )
+            let cfg = config::Config::load(&path)?;
+            tracing::info!(config = %path.display(), upstreams = cfg.upstreams.len(), "starting");
+            match cfg.listen {
+                config::Listen::Stdio => run_stdio(cfg),
+                config::Listen::Http { ref addr } => {
+                    anyhow::bail!("listen transport http ({addr}) is not implemented yet (work order step 11)")
+                }
+            }
         }
     }
+}
+
+fn run_stdio(cfg: config::Config) -> Result<()> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("starting tokio runtime")?;
+    rt.block_on(async move {
+        let stdin = tokio::io::BufReader::new(tokio::io::stdin());
+        let stdout = tokio::io::stdout();
+        proxy::Gateway::run(cfg, stdin, stdout).await
+    })
 }

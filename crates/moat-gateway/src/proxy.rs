@@ -1,0 +1,563 @@
+//! The proxy session: one MCP client on one side, N upstreams on the other.
+//!
+//! Everything the gateway does not explicitly understand is forwarded raw.
+//! What it understands, it understands only enough to present N servers as
+//! one: `initialize` and `server/discover` are fanned out and merged,
+//! `tools/list` is fanned out and the names are namespaced, `tools/call` is
+//! routed by namespace. The reply to a `tools/call` is relayed byte for byte.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
+use anyhow::Result;
+use moat_mcp::jsonrpc::code;
+use moat_mcp::stdio::{Frame, FrameReader, FrameWriter};
+use moat_mcp::types::{
+    method, CallToolParams, DiscoverResult, Implementation, InitializeResult, ListToolsResult,
+};
+use moat_mcp::{ErrorObject, ErrorResponse, Message, Request, RequestId, Response};
+use serde_json::{json, Map, Value};
+use tokio::io::{AsyncBufRead, AsyncWrite};
+use tokio::sync::{mpsc, Mutex};
+
+use crate::config::Config;
+use crate::upstream::{Upstream, UpstreamEvent};
+
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
+
+/// A running proxy session.
+pub struct Gateway {
+    upstreams: Vec<Arc<Upstream>>,
+    separator: String,
+    /// Raw lines destined for the client. One writer task drains this so
+    /// concurrent handlers never interleave bytes on stdout.
+    out: mpsc::Sender<String>,
+    /// Upstream-originated request ids (legacy sampling/elicitation) mapped
+    /// to the upstream index, so the client's reply can be routed back.
+    upstream_requests: Mutex<HashMap<RequestId, usize>>,
+}
+
+impl Gateway {
+    /// Start all upstreams and run the session over the given client streams
+    /// until the client closes its side.
+    pub async fn run<R, W>(cfg: Config, client_in: R, client_out: W) -> Result<()>
+    where
+        R: AsyncBufRead + Unpin + Send + 'static,
+        W: AsyncWrite + Unpin + Send + 'static,
+    {
+        let (events_tx, mut events_rx) = mpsc::channel(256);
+        let mut upstreams = Vec::with_capacity(cfg.upstreams.len());
+        for u in &cfg.upstreams {
+            upstreams.push(Upstream::spawn(u, events_tx.clone()).await?);
+        }
+        drop(events_tx);
+
+        let (out_tx, mut out_rx) = mpsc::channel::<String>(256);
+        let writer_task = tokio::spawn(async move {
+            let mut w = FrameWriter::new(client_out);
+            while let Some(line) = out_rx.recv().await {
+                if let Err(e) = w.write_raw(&line).await {
+                    tracing::error!(error = %e, "writing to client failed");
+                    break;
+                }
+            }
+        });
+
+        let gw = Arc::new(Gateway {
+            upstreams,
+            separator: cfg.separator.clone(),
+            out: out_tx,
+            upstream_requests: Mutex::new(HashMap::new()),
+        });
+
+        // Relay unsolicited upstream traffic to the client.
+        let relay_gw = Arc::clone(&gw);
+        let relay_task = tokio::spawn(async move {
+            while let Some((name, ev)) = events_rx.recv().await {
+                match ev {
+                    UpstreamEvent::Notification(frame) => relay_gw.emit_raw(frame.raw).await,
+                    UpstreamEvent::Request(frame) => {
+                        if let Some(idx) = relay_gw.index_of(&name) {
+                            if let Some(id) = frame.message.id() {
+                                relay_gw
+                                    .upstream_requests
+                                    .lock()
+                                    .await
+                                    .insert(id.clone(), idx);
+                            }
+                        }
+                        relay_gw.emit_raw(frame.raw).await;
+                    }
+                    UpstreamEvent::Closed => {
+                        tracing::error!(upstream = %name, "upstream is gone; its tools will fail until restart");
+                    }
+                }
+            }
+        });
+
+        let mut reader = FrameReader::new(client_in);
+        loop {
+            match reader.next_frame().await {
+                Ok(Some(frame)) => {
+                    let gw = Arc::clone(&gw);
+                    tokio::spawn(async move { gw.handle(frame).await });
+                }
+                Ok(None) => {
+                    tracing::info!("client closed stdin; shutting down");
+                    break;
+                }
+                Err(moat_mcp::Error::Json { .. }) => {
+                    gw.emit(
+                        ErrorResponse::new(
+                            None,
+                            ErrorObject::new(code::PARSE_ERROR, "Parse error", None),
+                        )
+                        .into(),
+                    )
+                    .await;
+                }
+                Err(moat_mcp::Error::Malformed(m)) => {
+                    gw.emit(
+                        ErrorResponse::new(None, ErrorObject::new(code::INVALID_REQUEST, m, None))
+                            .into(),
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "reading from client failed");
+                    break;
+                }
+            }
+        }
+
+        for u in &gw.upstreams {
+            u.shutdown(SHUTDOWN_GRACE).await;
+        }
+        relay_task.abort();
+        drop(gw);
+        let _ = writer_task.await;
+        Ok(())
+    }
+
+    fn index_of(&self, name: &str) -> Option<usize> {
+        self.upstreams.iter().position(|u| u.name == name)
+    }
+
+    async fn emit_raw(&self, line: String) {
+        if self.out.send(line).await.is_err() {
+            tracing::error!("client writer is gone");
+        }
+    }
+
+    async fn emit(&self, msg: Message) {
+        match msg.to_line() {
+            Ok(line) => self.emit_raw(line).await,
+            Err(e) => tracing::error!(error = %e, "could not serialize reply"),
+        }
+    }
+
+    async fn emit_error(
+        &self,
+        id: RequestId,
+        code: i64,
+        message: impl Into<String>,
+        data: Option<Value>,
+    ) {
+        self.emit(ErrorResponse::new(Some(id), ErrorObject::new(code, message, data)).into())
+            .await;
+    }
+
+    async fn handle(&self, frame: Frame) {
+        match frame.message {
+            Message::Request(ref req) => {
+                let req = req.clone();
+                match req.method.as_str() {
+                    method::INITIALIZE => self.fan_out_initialize(req).await,
+                    method::SERVER_DISCOVER => self.fan_out_discover(req).await,
+                    method::TOOLS_LIST => self.fan_out_tools_list(req).await,
+                    method::TOOLS_CALL => self.route_tools_call(req, &frame.raw).await,
+                    method::PING => self.emit(Response::new(req.id, json!({})).into()).await,
+                    _ => self.forward_other_request(req, &frame.raw).await,
+                }
+            }
+            Message::Notification(_) => {
+                // Notifications fan out to every upstream. `notifications/cancelled`
+                // for a request only one upstream saw is ignored by the others.
+                for u in &self.upstreams {
+                    if u.is_alive() {
+                        if let Err(e) = u.send_raw(&frame.raw).await {
+                            tracing::warn!(upstream = %u.name, error = %e, "notification not delivered");
+                        }
+                    }
+                }
+            }
+            Message::Response(_) | Message::Error(_) => {
+                // The client answering a legacy upstream-originated request.
+                let target = match frame.message.id() {
+                    Some(id) => self.upstream_requests.lock().await.remove(id),
+                    None => None,
+                };
+                match target.and_then(|i| self.upstreams.get(i)) {
+                    Some(u) => {
+                        if let Err(e) = u.send_raw(&frame.raw).await {
+                            tracing::warn!(upstream = %u.name, error = %e, "client response not delivered");
+                        }
+                    }
+                    None => {
+                        tracing::warn!(id = ?frame.message.id(), "client response matches no upstream request; dropped")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Send the client's request to every live upstream under a gateway id
+    /// and collect `(upstream, reply)` pairs.
+    async fn fan_out(&self, req: &Request) -> Vec<(Arc<Upstream>, Result<Frame>)> {
+        let futures = self.upstreams.iter().filter(|u| u.is_alive()).map(|u| {
+            let u = Arc::clone(u);
+            let forwarded = Request::new(u.own_id(), req.method.clone(), req.params.clone());
+            async move {
+                let r = u.request(forwarded).await;
+                (u, r)
+            }
+        });
+        futures::future::join_all(futures).await
+    }
+
+    async fn fan_out_initialize(&self, req: Request) {
+        let replies = self.fan_out(&req).await;
+        let mut results: Vec<(String, InitializeResult)> = Vec::new();
+        let mut first_error: Option<ErrorObject> = None;
+        for (u, r) in replies {
+            match r {
+                Ok(Frame {
+                    message: Message::Response(resp),
+                    ..
+                }) => match serde_json::from_value::<InitializeResult>(resp.result) {
+                    Ok(init) => results.push((u.name.clone(), init)),
+                    Err(e) => {
+                        tracing::error!(upstream = %u.name, error = %e, "initialize result has an unexpected shape")
+                    }
+                },
+                Ok(Frame {
+                    message: Message::Error(e),
+                    ..
+                }) => {
+                    tracing::error!(upstream = %u.name, code = e.error.code, message = %e.error.message, "initialize rejected");
+                    first_error.get_or_insert(e.error);
+                }
+                Ok(_) => {}
+                Err(e) => tracing::error!(upstream = %u.name, error = %e, "initialize failed"),
+            }
+        }
+        if results.is_empty() {
+            let err = first_error.unwrap_or_else(|| {
+                ErrorObject::new(
+                    code::INTERNAL_ERROR,
+                    "no upstream completed initialize",
+                    None,
+                )
+            });
+            self.emit(ErrorResponse::new(Some(req.id), err).into())
+                .await;
+            return;
+        }
+
+        let version = results[0].1.protocol_version.clone();
+        for (name, r) in &results[1..] {
+            if r.protocol_version != version {
+                tracing::warn!(
+                    upstream = %name, theirs = %r.protocol_version, chosen = %version,
+                    "upstreams negotiated different protocol versions; using the first"
+                );
+            }
+        }
+        let list_changed = results
+            .iter()
+            .any(|(_, r)| r.capabilities.pointer("/tools/listChanged") == Some(&Value::Bool(true)));
+        let instructions = join_instructions(
+            results
+                .iter()
+                .map(|(n, r)| (n.as_str(), r.instructions.as_deref())),
+        );
+
+        let merged = InitializeResult {
+            protocol_version: version,
+            capabilities: json!({ "tools": { "listChanged": list_changed } }),
+            server_info: gateway_info(),
+            instructions,
+            extra: Map::new(),
+        };
+        match serde_json::to_value(merged) {
+            Ok(v) => self.emit(Response::new(req.id, v).into()).await,
+            Err(e) => {
+                self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
+                    .await
+            }
+        }
+    }
+
+    async fn fan_out_discover(&self, req: Request) {
+        let replies = self.fan_out(&req).await;
+        let mut results: Vec<(String, DiscoverResult)> = Vec::new();
+        let mut first_error: Option<ErrorObject> = None;
+        for (u, r) in replies {
+            match r {
+                Ok(Frame {
+                    message: Message::Response(resp),
+                    ..
+                }) => match serde_json::from_value::<DiscoverResult>(resp.result) {
+                    Ok(d) => results.push((u.name.clone(), d)),
+                    Err(e) => {
+                        tracing::error!(upstream = %u.name, error = %e, "discover result has an unexpected shape")
+                    }
+                },
+                Ok(Frame {
+                    message: Message::Error(e),
+                    ..
+                }) => {
+                    first_error.get_or_insert(e.error);
+                }
+                Ok(_) => {}
+                Err(e) => tracing::error!(upstream = %u.name, error = %e, "discover failed"),
+            }
+        }
+        if results.is_empty() {
+            // A legacy-only upstream answers server/discover with some error;
+            // relay the first one so a dual-era client falls back correctly.
+            let err = first_error.unwrap_or_else(|| {
+                ErrorObject::new(
+                    code::METHOD_NOT_FOUND,
+                    "Method not found: server/discover",
+                    None,
+                )
+            });
+            self.emit(ErrorResponse::new(Some(req.id), err).into())
+                .await;
+            return;
+        }
+        // Versions every upstream supports; fall back to the first's list.
+        let mut versions = results[0].1.supported_versions.clone();
+        for (_, r) in &results[1..] {
+            versions.retain(|v| r.supported_versions.contains(v));
+        }
+        if versions.is_empty() {
+            versions = results[0].1.supported_versions.clone();
+            tracing::warn!("upstreams share no protocol version; advertising the first upstream's");
+        }
+        let instructions = join_instructions(
+            results
+                .iter()
+                .map(|(n, r)| (n.as_str(), r.instructions.as_deref())),
+        );
+        let merged = DiscoverResult {
+            result_type: Some("complete".to_owned()),
+            supported_versions: versions,
+            capabilities: json!({ "tools": {} }),
+            instructions,
+            extra: {
+                let mut m = Map::new();
+                m.insert(
+                    "_meta".to_owned(),
+                    json!({ moat_mcp::types::meta::SERVER_INFO: gateway_info() }),
+                );
+                m
+            },
+        };
+        match serde_json::to_value(merged) {
+            Ok(v) => self.emit(Response::new(req.id, v).into()).await,
+            Err(e) => {
+                self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
+                    .await
+            }
+        }
+    }
+
+    async fn fan_out_tools_list(&self, req: Request) {
+        // Cursors are per-upstream and cannot be aggregated; the merged list
+        // is always the first page of every upstream.
+        let mut params = req.params_object();
+        if params.remove("cursor").is_some() {
+            tracing::warn!(
+                "tools/list cursor ignored: pagination is not aggregated across upstreams"
+            );
+        }
+        let stripped = Request::new(
+            req.id.clone(),
+            req.method.clone(),
+            Some(Value::Object(params)),
+        );
+        let replies = self.fan_out(&stripped).await;
+
+        let mut tools = Vec::new();
+        let mut any_ok = false;
+        let mut first_error: Option<ErrorObject> = None;
+        for (u, r) in replies {
+            match r {
+                Ok(Frame {
+                    message: Message::Response(resp),
+                    ..
+                }) => match serde_json::from_value::<ListToolsResult>(resp.result) {
+                    Ok(list) => {
+                        any_ok = true;
+                        if list.next_cursor.is_some() {
+                            tracing::warn!(upstream = %u.name, "upstream has more tool pages; only the first is exposed");
+                        }
+                        for mut t in list.tools {
+                            t.name = format!("{}{}{}", u.name, self.separator, t.name);
+                            tools.push(t);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(upstream = %u.name, error = %e, "tools/list result has an unexpected shape")
+                    }
+                },
+                Ok(Frame {
+                    message: Message::Error(e),
+                    ..
+                }) => {
+                    tracing::error!(upstream = %u.name, code = e.error.code, message = %e.error.message, "tools/list rejected");
+                    first_error.get_or_insert(e.error);
+                }
+                Ok(_) => {}
+                Err(e) => tracing::error!(upstream = %u.name, error = %e, "tools/list failed"),
+            }
+        }
+        if !any_ok {
+            let err = first_error.unwrap_or_else(|| {
+                ErrorObject::new(
+                    code::INTERNAL_ERROR,
+                    "no upstream answered tools/list",
+                    None,
+                )
+            });
+            self.emit(ErrorResponse::new(Some(req.id), err).into())
+                .await;
+            return;
+        }
+        let merged = ListToolsResult {
+            tools,
+            next_cursor: None,
+            extra: Map::new(),
+        };
+        match serde_json::to_value(merged) {
+            Ok(v) => self.emit(Response::new(req.id, v).into()).await,
+            Err(e) => {
+                self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
+                    .await
+            }
+        }
+    }
+
+    /// Split `upstream__tool` into its parts.
+    fn resolve_tool<'a>(&self, namespaced: &'a str) -> Option<(Arc<Upstream>, &'a str)> {
+        let (prefix, tool) = namespaced.split_once(self.separator.as_str())?;
+        let u = self.upstreams.iter().find(|u| u.name == prefix)?;
+        Some((Arc::clone(u), tool))
+    }
+
+    async fn route_tools_call(&self, req: Request, _raw: &str) {
+        let params: CallToolParams = match req.params.clone().map(serde_json::from_value) {
+            Some(Ok(p)) => p,
+            Some(Err(e)) => {
+                self.emit_error(
+                    req.id,
+                    code::INVALID_PARAMS,
+                    format!("invalid tools/call params: {e}"),
+                    None,
+                )
+                .await;
+                return;
+            }
+            None => {
+                self.emit_error(
+                    req.id,
+                    code::INVALID_PARAMS,
+                    "tools/call requires params",
+                    None,
+                )
+                .await;
+                return;
+            }
+        };
+        let Some((upstream, tool)) = self
+            .resolve_tool(&params.name)
+            .map(|(u, t)| (u, t.to_owned()))
+        else {
+            self.emit_error(
+                req.id,
+                code::INVALID_PARAMS,
+                format!("Unknown tool: {}", params.name),
+                None,
+            )
+            .await;
+            return;
+        };
+
+        let mut forwarded = params;
+        forwarded.name = tool;
+        let line = match serde_json::to_value(&forwarded)
+            .map_err(anyhow::Error::from)
+            .and_then(|p| {
+                Message::Request(Request::new(req.id.clone(), req.method.clone(), Some(p)))
+                    .to_line()
+                    .map_err(anyhow::Error::from)
+            }) {
+            Ok(l) => l,
+            Err(e) => {
+                self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
+                    .await;
+                return;
+            }
+        };
+
+        // The reply is relayed exactly as the upstream wrote it.
+        match upstream.request_raw(req.id.clone(), &line).await {
+            Ok(frame) => self.emit_raw(frame.raw).await,
+            Err(e) => {
+                self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
+                    .await;
+            }
+        }
+    }
+
+    /// Anything not understood goes to the first live upstream, raw, and its
+    /// reply comes back raw. With several upstreams this is a guess, and the
+    /// log says so.
+    async fn forward_other_request(&self, req: Request, raw: &str) {
+        let Some(u) = self.upstreams.iter().find(|u| u.is_alive()) else {
+            self.emit_error(req.id, code::INTERNAL_ERROR, "no live upstream", None)
+                .await;
+            return;
+        };
+        if self.upstreams.len() > 1 {
+            tracing::warn!(method = %req.method, upstream = %u.name, "method is not aggregated; forwarded to the first upstream");
+        }
+        match u.request_raw(req.id.clone(), raw).await {
+            Ok(frame) => self.emit_raw(frame.raw).await,
+            Err(e) => {
+                self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
+                    .await
+            }
+        }
+    }
+}
+
+fn gateway_info() -> Implementation {
+    Implementation::new("moat-gateway", env!("CARGO_PKG_VERSION"))
+}
+
+fn join_instructions<'a>(
+    parts: impl Iterator<Item = (&'a str, Option<&'a str>)>,
+) -> Option<String> {
+    let joined: Vec<String> = parts
+        .filter_map(|(name, text)| text.map(|t| format!("[{name}] {t}")))
+        .collect();
+    if joined.is_empty() {
+        None
+    } else {
+        Some(joined.join("\n\n"))
+    }
+}
