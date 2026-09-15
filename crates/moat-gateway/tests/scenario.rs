@@ -222,6 +222,35 @@ intent_api: {{ addr: "{api}" }}
 
     let status = gw.close_and_wait().await;
     assert!(status.success());
+
+    // 9. The evidence file verifies with the key the gateway generated.
+    let keys_dir = cfg.parent().unwrap().join("keys");
+    let out = std::process::Command::new(gateway_path())
+        .args(["verify", "--evidence"])
+        .arg(&evidence_path)
+        .arg("--keys")
+        .arg(&keys_dir)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "verify failed:\n{stdout}");
+    assert!(stdout.contains("OK: 5 records, 0 problems"), "{stdout}");
+
+    // Tamper with one byte and verify again: must fail and say where.
+    let tampered = file.replacen("\"verdict\":\"allow\"", "\"verdict\":\"deny\"", 1);
+    assert_ne!(tampered, file);
+    std::fs::write(&evidence_path, tampered).unwrap();
+    let out = std::process::Command::new(gateway_path())
+        .args(["verify", "--evidence"])
+        .arg(&evidence_path)
+        .arg("--keys")
+        .arg(&keys_dir)
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(!out.status.success());
+    assert!(stdout.contains("line 1 (ev_"), "{stdout}");
+    assert!(stdout.contains("signature"), "{stdout}");
 }
 
 #[tokio::test]

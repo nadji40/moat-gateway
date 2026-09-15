@@ -7,6 +7,7 @@ use std::sync::{Mutex, PoisonError};
 
 use anyhow::{Context, Result};
 use moat_core::evidence::Record;
+use moat_core::keys::Keys;
 use moat_core::policy::{Evaluation, Policy, PolicyError};
 use moat_core::session::{lock, Event, Session, SessionStore};
 use serde_json::Value;
@@ -89,23 +90,41 @@ pub struct Shared {
     pub store: SessionStore,
     /// The policy, or why there is none.
     pub policy: PolicyState,
+    keys: Keys,
     resumes: Mutex<HashMap<String, PendingResume>>,
     evidence: Mutex<EvidenceLog>,
 }
 
 impl Shared {
     /// Build shared state. The evidence file is opened lazily on first write.
-    pub fn new(policy: PolicyState, evidence_path: PathBuf) -> Shared {
-        Shared {
+    /// If the file already has records, the chain continues from its last
+    /// line.
+    pub fn new(policy: PolicyState, keys: Keys, evidence_path: PathBuf) -> Result<Shared> {
+        let last_hash = match std::fs::read_to_string(&evidence_path) {
+            Ok(text) => text
+                .lines()
+                .rev()
+                .find(|l| !l.trim().is_empty())
+                .map(|l| moat_core::hash::sha256_hex(l.as_bytes())),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => {
+                return Err(e).with_context(|| format!("reading {}", evidence_path.display()))
+            }
+        };
+        if last_hash.is_some() {
+            tracing::info!(evidence = %evidence_path.display(), "continuing existing evidence chain");
+        }
+        Ok(Shared {
             store: SessionStore::new(),
             policy,
+            keys,
             resumes: Mutex::new(HashMap::new()),
             evidence: Mutex::new(EvidenceLog {
                 path: evidence_path,
                 records: Vec::new(),
-                last_hash: None,
+                last_hash,
             }),
-        }
+        })
     }
 
     /// Append the evidence record for an evaluation and log the evaluation
@@ -114,10 +133,11 @@ impl Shared {
     /// The session lock must not be held by the caller.
     pub fn record(&self, session: &Mutex<Session>, eval: &Evaluation) -> Result<Record> {
         let mut log = self.evidence.lock().unwrap_or_else(PoisonError::into_inner);
-        let record = {
+        let mut record = {
             let s = lock(session);
             Record::from_evaluation(&s, eval, log.last_hash.clone())
         };
+        record.sign(&self.keys);
         let line = record.to_line();
         if let Some(dir) = log.path.parent() {
             if !dir.as_os_str().is_empty() {

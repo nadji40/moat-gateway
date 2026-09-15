@@ -40,6 +40,17 @@ enum Command {
         /// Path to the evidence JSONL file.
         #[arg(long, value_name = "FILE")]
         evidence: PathBuf,
+        /// Directory holding `moat_ed25519.pub`.
+        #[arg(
+            long,
+            value_name = "DIR",
+            default_value = "./keys",
+            conflicts_with = "pubkey"
+        )]
+        keys: PathBuf,
+        /// Public key as 64 hex characters, instead of `--keys`.
+        #[arg(long, value_name = "HEX")]
+        pubkey: Option<String>,
     },
 }
 
@@ -58,16 +69,52 @@ fn main() -> Result<()> {
 
     match cli.command {
         Some(Command::Keygen { out }) => {
-            anyhow::bail!(
-                "keygen is not implemented yet (work order step 8); would write to {}",
-                out.display()
-            )
+            let keys = moat_core::keys::Keys::generate().context("generating keypair")?;
+            keys.save(&out)
+                .with_context(|| format!("writing keys to {}", out.display()))?;
+            println!(
+                "wrote {} and {}\npublic key: {}",
+                out.join(moat_core::keys::SECRET_FILE).display(),
+                out.join(moat_core::keys::PUBLIC_FILE).display(),
+                keys.public_hex()
+            );
+            Ok(())
         }
-        Some(Command::Verify { evidence }) => {
-            anyhow::bail!(
-                "verify is not implemented yet (work order step 8); would read {}",
-                evidence.display()
-            )
+        Some(Command::Verify {
+            evidence,
+            keys,
+            pubkey,
+        }) => {
+            let public = match pubkey {
+                Some(hex) => moat_core::keys::Public::from_hex(&hex).context("--pubkey")?,
+                None => moat_core::keys::Public::load(&keys)
+                    .with_context(|| format!("loading public key from {}", keys.display()))?,
+            };
+            let text = std::fs::read_to_string(&evidence)
+                .with_context(|| format!("reading {}", evidence.display()))?;
+            let report = moat_core::evidence::verify_file(&text, &public);
+            for p in &report.problems {
+                println!(
+                    "line {}{}: {}",
+                    p.line,
+                    p.id.as_deref()
+                        .map(|i| format!(" ({i})"))
+                        .unwrap_or_default(),
+                    p.problem
+                );
+            }
+            println!(
+                "{}: {} records, {} problems, head {}",
+                if report.ok() { "OK" } else { "FAILED" },
+                report.records,
+                report.problems.len(),
+                report.head.as_deref().unwrap_or("none")
+            );
+            if report.ok() {
+                Ok(())
+            } else {
+                std::process::exit(1)
+            }
         }
         None => {
             let path = cli
@@ -92,7 +139,13 @@ fn run_stdio(cfg: config::Config) -> Result<()> {
         .context("starting tokio runtime")?;
     rt.block_on(async move {
         let policy = state::PolicyState::load(cfg.policy.as_deref());
-        let shared = Arc::new(state::Shared::new(policy, cfg.evidence.clone()));
+        let (keys, created) = moat_core::keys::Keys::load_or_create(&cfg.keys)
+            .with_context(|| format!("signing keys in {}", cfg.keys.display()))?;
+        tracing::info!(
+            keys = %cfg.keys.display(), public = %keys.public_hex(), created,
+            "evidence signing key ready"
+        );
+        let shared = Arc::new(state::Shared::new(policy, keys, cfg.evidence.clone())?);
 
         let session_id = cfg.session_id.clone().unwrap_or_else(generate_session_id);
         match &cfg.intent_api {
