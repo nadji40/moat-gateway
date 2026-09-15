@@ -185,12 +185,19 @@ impl Session {
         self.headless
     }
 
-    /// Append an event to the log.
+    /// Append an event to the log, stamped with the current time.
     pub fn log(&mut self, event: Event) {
+        self.log_at(event, now_unix_ms());
+    }
+
+    /// Append an event to the log with an explicit timestamp, so callers
+    /// that already chose a "now" (the policy evaluator) stay consistent
+    /// with it.
+    pub fn log_at(&mut self, event: Event, unix_ms: u64) {
         let seq = u64::try_from(self.events.len()).unwrap_or(u64::MAX);
         self.events.push(EventRecord {
             seq,
-            unix_ms: now_unix_ms(),
+            unix_ms,
             event,
         });
     }

@@ -10,6 +10,8 @@
 //! - [`extract`]: pulling leaves out of a tool result.
 //! - [`session`]: per-session intents, observed values and the event log.
 //! - [`provenance`]: resolving where a payment argument came from.
+//! - [`policy`]: the YAML policy and its evaluation.
+//! - [`verdict`]: what the evaluation produces.
 //! - [`hash`]: canonical JSON and SHA-256.
 
 #![forbid(unsafe_code)]
@@ -17,13 +19,17 @@
 pub mod extract;
 pub mod hash;
 pub mod normalize;
+pub mod policy;
 pub mod provenance;
 pub mod session;
 pub mod source;
+pub mod verdict;
 
+pub use policy::{evaluate, Evaluation, PaymentCall, Policy, PolicyError};
 pub use provenance::{resolve, MatchKind, Resolution};
 pub use session::{Session, SessionStore};
 pub use source::{Source, SourceKind};
+pub use verdict::{Decision, RuleOutcome, Verdict};
 
 /// The version of this crate, for evidence records and handshakes.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
