@@ -26,7 +26,7 @@ Early. Follow the work order below for what is actually built.
 - [x] 5. `moat-core`: provenance resolution
 - [x] 6. `moat-core`: policy loading and rule evaluation
 - [x] 7. `moat-gateway`: interception, step-up, intent API, resume (ADR 0003, 0004)
-- [ ] 8. `moat-core`: evidence records, hash chain, signing; `keygen` and `verify`
+- [x] 8. `moat-core`: evidence records, hash chain, signing; `keygen` and `verify` (ADR 0005)
 - [ ] 9. `arena`: mock servers, first ten attacks, null-agent runner
 - [ ] 10. `arena`: OpenAI Agents SDK backend, first results against a real model
 - [ ] 11. Streamable HTTP transport on the listen side
@@ -153,15 +153,32 @@ work, tracked before any deployment where localhost is not a trust boundary.
 ## Evidence
 
 Every verdict appends a record to the evidence file — there is no verdict without
-one. Records are hash-chained and signed with an ed25519 key:
+one; if the record cannot be written the payment is refused. Records are
+canonical JSON, hash-chained (`prev` is the SHA-256 of the previous line) and
+signed with ed25519 over everything but `sig`.
+
+The gateway generates a keypair into the `keys` directory on first run, or
+you create one yourself:
 
 ```bash
 moat-gateway keygen --out ./keys
-moat-gateway verify --evidence ./evidence.jsonl
 ```
 
-The record format is specified in [`docs/evidence-format.md`](docs/evidence-format.md),
-written alongside step 8.
+Verification is offline and needs only the file and the public key:
+
+```bash
+moat-gateway verify --evidence ./evidence.jsonl --keys ./keys
+```
+
+```bash
+moat-gateway verify --evidence ./evidence.jsonl --pubkey 56c776…e839
+```
+
+It prints every problem with its line number and exits non-zero if there is
+any. The record format is specified in [`docs/evidence-format.md`](docs/evidence-format.md);
+the exact bytes are pinned by a golden test. Why chain *and* sign is
+[ADR 0005](docs/adr/0005-evidence-hash-chain.md). One evidence file per
+gateway instance: two writers would interleave and break the chain.
 
 ## Development
 
