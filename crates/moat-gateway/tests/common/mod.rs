@@ -118,3 +118,44 @@ pub fn write_config(name: &str, body: &str) -> PathBuf {
 pub fn gateway_path() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_moat-gateway"))
 }
+
+/// A minimal HTTP/1.1 client for the intent API, so the tests need no
+/// client crate. Returns the status code and the JSON body.
+pub mod http {
+    use serde_json::Value;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    async fn exchange(addr: &str, request: String) -> (u16, Value) {
+        let mut stream = tokio::net::TcpStream::connect(addr).await.expect("connect");
+        stream.write_all(request.as_bytes()).await.expect("send");
+        let mut buf = Vec::new();
+        stream.read_to_end(&mut buf).await.expect("recv");
+        let text = String::from_utf8_lossy(&buf);
+        let (head, body) = text.split_once("\r\n\r\n").expect("http response");
+        let status: u16 = head
+            .split_whitespace()
+            .nth(1)
+            .and_then(|s| s.parse().ok())
+            .expect("status");
+        let body = if body.trim().is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_str(body.trim()).unwrap_or_else(|_| Value::String(body.to_owned()))
+        };
+        (status, body)
+    }
+
+    pub async fn post(addr: &str, path: &str, body: &Value) -> (u16, Value) {
+        let payload = body.to_string();
+        let req = format!(
+            "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+            payload.len()
+        );
+        exchange(addr, req).await
+    }
+
+    pub async fn get(addr: &str, path: &str) -> (u16, Value) {
+        let req = format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+        exchange(addr, req).await
+    }
+}
