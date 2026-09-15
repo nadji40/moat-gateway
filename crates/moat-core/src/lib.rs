@@ -5,7 +5,22 @@
 //! question: *given the values an agent is about to spend money with, where did
 //! each of those values come from, and does policy allow it?*
 //!
-//! Nothing here is wired up yet — see the work order in the README.
+//! - [`source`]: the [`Source`] label every value carries.
+//! - [`normalize`]: the canonical forms values are compared in.
+//! - [`extract`]: pulling leaves out of a tool result.
+//! - [`session`]: per-session intents, observed values and the event log.
+//! - [`hash`]: canonical JSON and SHA-256.
+
+#![forbid(unsafe_code)]
+
+pub mod extract;
+pub mod hash;
+pub mod normalize;
+pub mod session;
+pub mod source;
+
+pub use session::{Session, SessionStore};
+pub use source::{Source, SourceKind};
 
 /// The version of this crate, for evidence records and handshakes.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
