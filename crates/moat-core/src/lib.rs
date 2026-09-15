@@ -20,6 +20,7 @@
 pub mod evidence;
 pub mod extract;
 pub mod hash;
+pub mod keys;
 pub mod normalize;
 pub mod policy;
 pub mod provenance;

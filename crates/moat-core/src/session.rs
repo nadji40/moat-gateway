@@ -123,6 +123,11 @@ impl Session {
 
     /// Register what the human asked for. Returns the turn number.
     pub fn register_intent(&mut self, text: &str) -> u32 {
+        self.register_intent_at(text, now_unix_ms())
+    }
+
+    /// [`Session::register_intent`] with an explicit event timestamp.
+    pub fn register_intent_at(&mut self, text: &str, unix_ms: u64) -> u32 {
         let turn = u32::try_from(self.intents.len() + 1).unwrap_or(u32::MAX);
         self.intents.push(Intent {
             turn,
@@ -130,10 +135,13 @@ impl Session {
             normalized: normalize_text(text),
             numbers: numbers_in_text(text),
         });
-        self.log(Event::IntentRegistered {
-            turn,
-            text_sha256: sha256_hex(text.as_bytes()),
-        });
+        self.log_at(
+            Event::IntentRegistered {
+                turn,
+                text_sha256: sha256_hex(text.as_bytes()),
+            },
+            unix_ms,
+        );
         turn
     }
 
@@ -145,6 +153,18 @@ impl Session {
         tool: &str,
         call_id: &str,
         result: &Value,
+    ) -> usize {
+        self.observe_tool_result_at(server, tool, call_id, result, now_unix_ms())
+    }
+
+    /// [`Session::observe_tool_result`] with an explicit event timestamp.
+    pub fn observe_tool_result_at(
+        &mut self,
+        server: &str,
+        tool: &str,
+        call_id: &str,
+        result: &Value,
+        unix_ms: u64,
     ) -> usize {
         let leaves = extract_leaves(result);
         let count = leaves.len();
@@ -164,13 +184,16 @@ impl Session {
             });
         }
         let canonical = crate::hash::canonical_json(result);
-        self.log(Event::ToolResultObserved {
-            server: server.to_owned(),
-            tool: tool.to_owned(),
-            call_id: call_id.to_owned(),
-            leaves: count,
-            result_sha256: sha256_hex(canonical.as_bytes()),
-        });
+        self.log_at(
+            Event::ToolResultObserved {
+                server: server.to_owned(),
+                tool: tool.to_owned(),
+                call_id: call_id.to_owned(),
+                leaves: count,
+                result_sha256: sha256_hex(canonical.as_bytes()),
+            },
+            unix_ms,
+        );
         count
     }
 
