@@ -80,15 +80,15 @@ impl Verdict {
 
 /// JSON-RPC error codes the gateway uses to refuse a call.
 ///
-/// These are the numbers from the project brief. MCP revision 2026-07-28
-/// reserves `-32020..=-32099` for the specification itself and forbids
-/// implementations from emitting other codes in that range; see ADR 0002 for
-/// the pending decision. Changing them here changes them everywhere.
+/// Deliberately outside the JSON-RPC reserved range (`-32768..=-32000`):
+/// MCP revision 2026-07-28 reserves `-32020..=-32099` for the specification
+/// and forbids other codes there. See ADR 0002. Changing them here changes
+/// them everywhere.
 pub mod code {
     /// The call needs a human's approval.
-    pub const STEP_UP: i64 = -32050;
+    pub const STEP_UP: i64 = -31050;
     /// The call is refused.
-    pub const DENY: i64 = -32051;
+    pub const DENY: i64 = -31051;
 }
 
 #[cfg(test)]

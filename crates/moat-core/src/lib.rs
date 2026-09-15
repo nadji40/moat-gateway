@@ -12,10 +12,12 @@
 //! - [`provenance`]: resolving where a payment argument came from.
 //! - [`policy`]: the YAML policy and its evaluation.
 //! - [`verdict`]: what the evaluation produces.
+//! - [`evidence`]: the record written for every verdict.
 //! - [`hash`]: canonical JSON and SHA-256.
 
 #![forbid(unsafe_code)]
 
+pub mod evidence;
 pub mod extract;
 pub mod hash;
 pub mod normalize;

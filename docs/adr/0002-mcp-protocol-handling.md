@@ -83,26 +83,18 @@ Everything else is bytes with an id.
    stream shape available for legacy clients since those are what today's SDKs
    send. The deprecated 2024-11-05 HTTP+SSE transport is not implemented.
 
-## A conflict with the brief that needs a decision
+## Error codes: `-31050` (step_up) and `-31051` (deny)
 
-The work order assigns Moat's JSON-RPC error codes as `-32050` (step_up) and
-`-32051` (deny). Revision 2026-07-28 reserves `-32020` to `-32099` exclusively
-for the MCP specification: "Implementations **MUST NOT** emit any code from this
-sub-range that is not defined by this specification." It further says
-application codes "SHOULD be allocated outside the JSON-RPC reserved range
-(`-32768` to `-32000`)".
+The original brief assigned `-32050` and `-32051`. Revision 2026-07-28
+reserves `-32020` to `-32099` exclusively for the MCP specification:
+"Implementations **MUST NOT** emit any code from this sub-range that is not
+defined by this specification." It further says application codes "SHOULD be
+allocated outside the JSON-RPC reserved range (`-32768` to `-32000`)".
 
-`-32050` and `-32051` are therefore forbidden by the current spec. They are
-defined in one place (`moat_core::verdict::code`, step 7) so the choice is a
-one-line change. This ADR does not decide it; the options are recorded here:
-
-- **Keep `-32050`/`-32051`** as specified in the brief. Works with legacy SDKs,
-  which do not police the range. Non-compliant with 2026-07-28 and at risk of
-  colliding with a future spec-defined code.
-- **Move outside the reserved range**, e.g. `-31050`/`-31051` (keeps the mnemonic,
-  compliant) or a positive range.
-
-Recommendation: move. The brief's numbers predate the spec's partition.
+Decided 2026-09-15: move to `-31050` / `-31051`. Outside every reserved range,
+so no future spec revision can claim them; still negative, so they read as
+errors; same tail as the brief, so the mnemonic survives. They are defined in
+one place, `moat_core::verdict::code`.
 
 ## Consequences
 
