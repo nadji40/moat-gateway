@@ -25,7 +25,7 @@ Early. Follow the work order below for what is actually built.
 - [x] 4. `moat-core`: sources, normalization, session store
 - [x] 5. `moat-core`: provenance resolution
 - [x] 6. `moat-core`: policy loading and rule evaluation
-- [ ] 7. `moat-gateway`: interception, step-up, intent API, resume
+- [x] 7. `moat-gateway`: interception, step-up, intent API, resume (ADR 0003, 0004)
 - [ ] 8. `moat-core`: evidence records, hash chain, signing; `keygen` and `verify`
 - [ ] 9. `arena`: mock servers, first ten attacks, null-agent runner
 - [ ] 10. `arena`: OpenAI Agents SDK backend, first results against a real model
@@ -77,11 +77,43 @@ keys: ./keys
 intent_api: { addr: "127.0.0.1:7072" }
 ```
 
+| Key | Meaning | Default |
+| --- | --- | --- |
+| `listen` | `{ transport: stdio }` or `{ transport: http, addr }` (step 11) | stdio |
+| `upstreams[].name` | Tool namespace prefix; must be unique | required |
+| `upstreams[].transport` | `stdio` with `command` (and optional `env`), or `http` with `url` | required |
+| `policy` | Path to the policy YAML | none → payments denied |
+| `evidence` | Append-only JSONL file | `./evidence.jsonl` |
+| `keys` | Directory for the ed25519 signing key (step 8) | `./keys` |
+| `intent_api.addr` | Where the intent API listens; keep it loopback | none → no intents can be registered |
+| `separator` | Between upstream name and tool name | `__` |
+| `session_id` | Fixed session id | generated, printed to stderr at start |
+
+Relative paths resolve against the config file's directory.
+
 The gateway presents one MCP server to the client, aggregating every upstream
 tool under a namespaced name (`stripe__pay`). Everything it does not explicitly
 intercept is forwarded unchanged. If a policy file is missing or malformed it
 fails **closed for payment tools and open for everything else**, and says so
-loudly in the log.
+loudly in the log: calls to tools named `pay`, `create_payment`, `charge`,
+`transfer`, `send_money`, `purchase`, `checkout` or `refund` are denied with an
+evidence record saying why, and every other tool passes through.
+
+When a payment tool is called, the verdict comes back as a `tools/call`
+result (allow, the upstream's own reply) or as a JSON-RPC error:
+
+```jsonc
+// step_up: -31050
+{ "code": -31050, "message": "Moat: payment needs human approval",
+  "data": { "moat": { "verdict": "step_up", "prompt": "Approve payment of 480 USD to …?",
+                      "evidence_id": "ev_…", "resume_token": "rt_…", "session": "…" } } }
+// deny: -31051
+{ "code": -31051, "message": "Moat: payment denied",
+  "data": { "moat": { "verdict": "deny", "reasons": [ { "id": "amount-cap", … } ],
+                      "evidence_id": "ev_…", "session": "…" } } }
+```
+
+Why an error rather than a tool result is [ADR 0003](docs/adr/0003-step-up-as-jsonrpc-error.md).
 
 ## Intent API
 
@@ -100,6 +132,20 @@ GET  /v1/session/{id}/evidence
 `ToolResult`, so every payment will step up or be denied.** That is the correct
 default, not a misconfiguration: a Moat that has never been told what the human
 wanted has no basis for believing any payee came from them.
+
+- `intent` registers the human's text for the session; call it once per user
+  turn. Returns the turn number.
+- `resume` answers a step-up. With `approved: true`, every field value the
+  human was shown is registered as an intent, so the **next identical call**
+  resolves to `User` and proceeds. Tokens are single-use and bound to the
+  session. Moat does not replay the original call; the host retries it.
+- `headless` tells Moat no human is present; `step_up` then degrades to the
+  policy's `no_human_available` (deny in the example policy).
+- `evidence` returns the session's records in order.
+
+The session id is whatever `session_id` says in the config, or a generated
+`s_…` printed to stderr at startup. Why the intent is a side channel rather
+than something parsed from the MCP stream is [ADR 0004](docs/adr/0004-intent-api-side-channel.md).
 
 The intent API binds to localhost and has no authentication. Adding it is future
 work, tracked before any deployment where localhost is not a trust boundary.
