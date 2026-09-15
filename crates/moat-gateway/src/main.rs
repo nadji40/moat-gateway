@@ -3,10 +3,13 @@
 //! as tool results and the payment leaving as a tool call.
 
 mod config;
+mod intent_api;
 mod proxy;
+mod state;
 mod upstream;
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -88,8 +91,43 @@ fn run_stdio(cfg: config::Config) -> Result<()> {
         .build()
         .context("starting tokio runtime")?;
     rt.block_on(async move {
+        let policy = state::PolicyState::load(cfg.policy.as_deref());
+        let shared = Arc::new(state::Shared::new(policy, cfg.evidence.clone()));
+
+        let session_id = cfg.session_id.clone().unwrap_or_else(generate_session_id);
+        match &cfg.intent_api {
+            Some(api) => {
+                tracing::info!(
+                    session = %session_id,
+                    "register intents at http://{}/v1/session/{}/intent",
+                    api.addr,
+                    session_id
+                );
+                let addr = api.addr.clone();
+                let api_shared = Arc::clone(&shared);
+                tokio::spawn(async move {
+                    if let Err(e) = intent_api::serve(&addr, api_shared).await {
+                        tracing::error!(error = %e, "intent API stopped");
+                    }
+                });
+            }
+            None => tracing::warn!(
+                session = %session_id,
+                "no intent_api configured: nothing can register intents, so every payee will be untrusted"
+            ),
+        }
+
         let stdin = tokio::io::BufReader::new(tokio::io::stdin());
         let stdout = tokio::io::stdout();
-        proxy::Gateway::run(cfg, stdin, stdout).await
+        proxy::Gateway::run(cfg, shared, session_id, stdin, stdout).await
     })
+}
+
+fn generate_session_id() -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let h = moat_core::hash::sha256_hex(format!("{nanos}|{}", std::process::id()).as_bytes());
+    format!("s_{}", &h[..16])
 }

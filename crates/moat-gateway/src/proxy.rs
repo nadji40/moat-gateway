@@ -22,6 +22,7 @@ use tokio::io::{AsyncBufRead, AsyncWrite};
 use tokio::sync::{mpsc, Mutex};
 
 use crate::config::Config;
+use crate::state::{PendingResume, PolicyState, Shared};
 use crate::upstream::{Upstream, UpstreamEvent};
 
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
@@ -30,6 +31,8 @@ const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 pub struct Gateway {
     upstreams: Vec<Arc<Upstream>>,
     separator: String,
+    shared: Arc<Shared>,
+    session_id: String,
     /// Raw lines destined for the client. One writer task drains this so
     /// concurrent handlers never interleave bytes on stdout.
     out: mpsc::Sender<String>,
@@ -41,7 +44,13 @@ pub struct Gateway {
 impl Gateway {
     /// Start all upstreams and run the session over the given client streams
     /// until the client closes its side.
-    pub async fn run<R, W>(cfg: Config, client_in: R, client_out: W) -> Result<()>
+    pub async fn run<R, W>(
+        cfg: Config,
+        shared: Arc<Shared>,
+        session_id: String,
+        client_in: R,
+        client_out: W,
+    ) -> Result<()>
     where
         R: AsyncBufRead + Unpin + Send + 'static,
         W: AsyncWrite + Unpin + Send + 'static,
@@ -64,9 +73,14 @@ impl Gateway {
             }
         });
 
+        // Create the session up front so the intent API can find it even
+        // before the first message arrives.
+        shared.store.get_or_create(&session_id);
         let gw = Arc::new(Gateway {
             upstreams,
             separator: cfg.separator.clone(),
+            shared,
+            session_id,
             out: out_tx,
             upstream_requests: Mutex::new(HashMap::new()),
         });
@@ -497,7 +511,16 @@ impl Gateway {
         };
 
         let mut forwarded = params;
-        forwarded.name = tool;
+        forwarded.name = tool.clone();
+
+        // Payment tools go through policy before anything is forwarded.
+        if self.shared.policy.is_payment_tool(&upstream.name, &tool) {
+            let args = forwarded.arguments.clone().unwrap_or_default();
+            if !self.authorize(&req.id, &upstream.name, &tool, args).await {
+                return;
+            }
+        }
+
         let line = match serde_json::to_value(&forwarded)
             .map_err(anyhow::Error::from)
             .and_then(|p| {
@@ -513,12 +536,141 @@ impl Gateway {
             }
         };
 
-        // The reply is relayed exactly as the upstream wrote it.
+        // The reply is relayed exactly as the upstream wrote it, after every
+        // value in it has been registered as observed.
         match upstream.request_raw(req.id.clone(), &line).await {
-            Ok(frame) => self.emit_raw(frame.raw).await,
+            Ok(frame) => {
+                if let Message::Response(resp) = &frame.message {
+                    self.observe(&upstream.name, &tool, &req.id, &resp.result);
+                }
+                self.emit_raw(frame.raw).await
+            }
             Err(e) => {
                 self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
                     .await;
+            }
+        }
+    }
+
+    /// Register every string and number in a tool result as observed.
+    fn observe(&self, server: &str, tool: &str, call_id: &RequestId, result: &Value) {
+        let session = self.shared.store.get_or_create(&self.session_id);
+        let leaves = moat_core::session::lock(&session).observe_tool_result(
+            server,
+            tool,
+            &call_id.to_string(),
+            result,
+        );
+        let sha = moat_core::hash::sha256_hex(moat_core::hash::canonical_json(result).as_bytes());
+        tracing::info!(
+            session = %self.session_id, server, tool, call_id = %call_id, leaves,
+            result_sha256 = %sha, "tool result observed"
+        );
+    }
+
+    /// Evaluate a payment call. Returns `true` if it may be forwarded; on
+    /// `step_up` or `deny` the error has already been sent to the client.
+    async fn authorize(
+        &self,
+        id: &RequestId,
+        server: &str,
+        tool: &str,
+        args: Map<String, Value>,
+    ) -> bool {
+        use moat_core::policy::{evaluate, PaymentCall};
+        use moat_core::verdict::{code as moat_code, Decision};
+
+        let call = PaymentCall {
+            server: server.to_owned(),
+            tool: tool.to_owned(),
+            call_id: id.to_string(),
+            args,
+        };
+        let session = self.shared.store.get_or_create(&self.session_id);
+        let now = now_unix_ms();
+
+        let eval = match &self.shared.policy {
+            PolicyState::Loaded(policy) => {
+                let s = moat_core::session::lock(&session);
+                evaluate(policy, &s, call, now)
+            }
+            PolicyState::Missing(why) => {
+                tracing::error!(
+                    server,
+                    tool,
+                    "payment tool called with no usable policy: DENIED ({why})"
+                );
+                policy_missing_evaluation(call, why, now)
+            }
+        };
+
+        let record = match self.shared.record(&session, &eval) {
+            Ok(r) => r,
+            Err(e) => {
+                // No verdict without evidence: if evidence cannot be written,
+                // the payment does not happen.
+                tracing::error!(error = %e, "evidence write failed; denying");
+                self.emit_error(
+                    id.clone(),
+                    moat_code::DENY,
+                    "Moat could not write evidence; payment refused",
+                    Some(json!({"moat": {"verdict": "deny", "reasons": [format!("evidence: {e}")], "evidence_id": null}})),
+                )
+                .await;
+                return false;
+            }
+        };
+
+        let verdict = &eval.verdict;
+        let failing: Vec<&str> = verdict.failures().map(|r| r.message.as_str()).collect();
+        tracing::info!(
+            session = %self.session_id, server, tool, call_id = %id,
+            verdict = %verdict.decision, evidence_id = %record.id,
+            failing = ?failing, "payment evaluated"
+        );
+
+        match verdict.decision {
+            Decision::Allow => true,
+            Decision::StepUp => {
+                let values: Vec<(String, Value)> = eval
+                    .provenance
+                    .iter()
+                    .map(|(field, p)| (field.clone(), p.resolution.value.clone()))
+                    .collect();
+                let token = self.shared.new_resume(PendingResume {
+                    session: self.session_id.clone(),
+                    evidence_id: record.id.clone(),
+                    values,
+                });
+                self.emit_error(
+                    id.clone(),
+                    moat_code::STEP_UP,
+                    "Moat: payment needs human approval",
+                    Some(json!({"moat": {
+                        "verdict": "step_up",
+                        "prompt": verdict.step_up_prompt,
+                        "evidence_id": record.id,
+                        "resume_token": token,
+                        "session": self.session_id,
+                    }})),
+                )
+                .await;
+                false
+            }
+            Decision::Deny => {
+                self.emit_error(
+                    id.clone(),
+                    moat_code::DENY,
+                    "Moat: payment denied",
+                    Some(json!({"moat": {
+                        "verdict": "deny",
+                        "reasons": verdict.failures().collect::<Vec<_>>(),
+                        "evidence_id": record.id,
+                        "session": self.session_id,
+                    }})),
+                )
+                .await;
+                false
             }
         }
     }
@@ -547,6 +699,44 @@ impl Gateway {
 
 fn gateway_info() -> Implementation {
     Implementation::new("moat-gateway", env!("CARGO_PKG_VERSION"))
+}
+
+fn now_unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+        .unwrap_or(0)
+}
+
+/// The evaluation recorded when a payment tool is called and no policy could
+/// be loaded: a single failing rule, verdict deny, so the refusal still has
+/// evidence behind it.
+fn policy_missing_evaluation(
+    call: moat_core::policy::PaymentCall,
+    why: &str,
+    now: u64,
+) -> moat_core::policy::Evaluation {
+    use moat_core::verdict::{Decision, RuleOutcome, Verdict};
+    let seed = format!("{}|{}|{}|{now}", call.server, call.tool, call.call_id);
+    let evidence_id = format!("ev_{}", &moat_core::hash::sha256_hex(seed.as_bytes())[..24]);
+    moat_core::policy::Evaluation {
+        call,
+        provenance: std::collections::BTreeMap::new(),
+        verdict: Verdict {
+            decision: Decision::Deny,
+            reasons: vec![RuleOutcome {
+                id: "policy-unavailable".to_owned(),
+                field: None,
+                passed: false,
+                source: None,
+                on_fail: Decision::Deny,
+                message: format!("no usable policy: {why}"),
+            }],
+            step_up_prompt: None,
+            evidence_id,
+        },
+        unix_ms: now,
+    }
 }
 
 fn join_instructions<'a>(
