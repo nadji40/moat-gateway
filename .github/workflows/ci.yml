@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  rust:
+    name: rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: rustup component add rustfmt clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+  arena:
+    name: arena
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for arena workspace
+        id: arena
+        run: |
+          if [ -f arena/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "arena/package.json not present yet (work order step 9); skipping"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.arena.outputs.present == 'true'
+
+      # pnpm 11 requires Node >= 22.13; the repo is pinned to 22 everywhere.
+      - uses: actions/setup-node@v4
+        if: steps.arena.outputs.present == 'true'
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: arena/pnpm-lock.yaml
+
+      - name: Install
+        if: steps.arena.outputs.present == 'true'
+        working-directory: arena
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        if: steps.arena.outputs.present == 'true'
+        working-directory: arena
+        run: pnpm test
