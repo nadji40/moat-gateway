@@ -22,17 +22,18 @@ Early. Follow the work order below for what is actually built.
 - [x] 1. Workspace, CI, ADR 0001
 - [x] 2. `moat-mcp`: JSON-RPC types and stdio framing (ADR 0002)
 - [x] 3. `moat-gateway`: transparent stdio passthrough
-- [ ] 4. `moat-core`: sources, normalization, session store
+- [x] 4. `moat-core`: sources, normalization, session store
 - [ ] 5. `moat-core`: provenance resolution
 - [ ] 6. `moat-core`: policy loading and rule evaluation
 - [ ] 7. `moat-gateway`: interception, step-up, intent API, resume
 - [ ] 8. `moat-core`: evidence records, hash chain, signing; `keygen` and `verify`
 - [ ] 9. `arena`: mock servers, first ten attacks, null-agent runner
-- [ ] 10. `arena`: Claude Agent SDK backend, first results
-- [ ] 11. HTTP+SSE transport on the listen side
+- [ ] 10. `arena`: OpenAI Agents SDK backend, first results against a real model
+- [ ] 11. Streamable HTTP transport on the listen side
 
-Until step 3 lands, the binary parses its CLI and exits with a "not implemented"
-error naming the step that will implement it.
+The proxy runs today as a pure passthrough: `moat-gateway --config moat.yaml`
+with stdio upstreams. `keygen` and `verify` exit with a "not implemented"
+error naming the step that will implement them.
 
 ## Quickstart
 
