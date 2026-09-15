@@ -20,7 +20,7 @@ that information still exists.
 Early. Follow the work order below for what is actually built.
 
 - [x] 1. Workspace, CI, ADR 0001
-- [ ] 2. `moat-mcp`: JSON-RPC types and stdio framing
+- [x] 2. `moat-mcp`: JSON-RPC types and stdio framing (ADR 0002)
 - [ ] 3. `moat-gateway`: transparent stdio passthrough
 - [ ] 4. `moat-core`: sources, normalization, session store
 - [ ] 5. `moat-core`: provenance resolution
