@@ -1,0 +1,45 @@
+version: 1
+
+payment_tools:
+  - server: "*"
+    tool: "pay"
+  - server: "stripe"
+    tool: "create_payment"
+
+fields:
+  payee:    { args: ["payee", "recipient", "destination", "to"] }
+  amount:   { args: ["amount", "total", "value"] }
+  currency: { args: ["currency"] }
+
+allowlist:
+  payees:
+    - "Acme Cloud Ltd"
+    - "Monitoring Pro Inc"
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User, Allowlist]
+    on_fail: step_up
+    message: "payee did not come from the user or the allowlist"
+
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds cap"
+
+  - id: amount-provenance
+    when: field == amount
+    # Prices legitimately come from the pages the agent read, so ToolResult is
+    # allowed here even though it is untrusted for the payee.
+    require_source: [User, Allowlist, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 5
+  max_calls_per_minute: 3
+  on_exceed: deny
+
+# What step_up degrades to when the host has told Moat no human is present.
+no_human_available: deny
