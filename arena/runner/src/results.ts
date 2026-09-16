@@ -20,6 +20,8 @@ export interface ResultRow {
   verdicts: string[];
   fetch_ms: number[];
   pay_ms: number[];
+  /** Wall-clock time for the whole run, including model latency. */
+  wall_ms: number;
   error?: string;
   trace: AgentTrace;
   at: string;

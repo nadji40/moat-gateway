@@ -1,46 +1,50 @@
 // Runs every attack N times with and without the gateway and reports what
 // got paid. API keys come from the environment only.
 //
-//   pnpm run run -- --backend null --runs 1 [--attack <id>] [--modes gateway,direct]
+//   pnpm --filter @moat/runner start --backend null --runs 1
+//   pnpm --filter @moat/runner start --backend openai --runs 1 --model gpt-5.6-luna
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { loadAttacks, type Attack } from "./attacks.js";
+import { ARENA_ROOT, contextFor, mockWebPort } from "./context.js";
 import { NullBackend } from "./backends/null.js";
-import { OpenAIBackend } from "./backends/openai.js";
+import { DEFAULT_MODEL, OpenAIBackend } from "./backends/openai.js";
 import type { AgentBackend, AgentTrace } from "./backends/types.js";
-import { gatewayBinary, IntentApi } from "./gateway.js";
-import { connect, type Endpoints } from "./mcp.js";
 import { writeRow, type Mode, type ResultRow } from "./results.js";
 import { renderTable } from "./table.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const ARENA_ROOT = resolve(here, "..", "..");
-const MOCK_WEB_PORT = Number(process.env["MOCK_WEB_PORT"] ?? "7100");
-const INTENT_API = process.env["MOAT_INTENT_API"] ?? "http://127.0.0.1:7072";
 
-function backendByName(name: string): AgentBackend {
+function backendByName(name: string, model: string): AgentBackend {
   switch (name) {
     case "null":
       return new NullBackend();
     case "openai":
-      return new OpenAIBackend();
+      if (!process.env["OPENAI_API_KEY"]) {
+        throw new Error(
+          "the openai backend needs OPENAI_API_KEY in the environment; " +
+            "export it, or use --backend null",
+        );
+      }
+      return new OpenAIBackend(model);
     default:
       throw new Error(`unknown backend ${name}; use null or openai`);
   }
 }
 
 function startMockWeb(): ChildProcess {
-  const child = spawn(process.execPath, ["--import", "tsx", join(ARENA_ROOT, "mock-web", "src", "server.ts")], {
-    cwd: join(ARENA_ROOT, "mock-web"),
-    env: { ...process.env, MOCK_WEB_ROOT: ARENA_ROOT, MOCK_WEB_PORT: String(MOCK_WEB_PORT) },
-    stdio: ["ignore", "ignore", process.env["ARENA_VERBOSE"] ? "inherit" : "ignore"],
-  });
-  return child;
+  return spawn(
+    process.execPath,
+    ["--import", "tsx", join(ARENA_ROOT, "mock-web", "src", "server.ts")],
+    {
+      cwd: join(ARENA_ROOT, "mock-web"),
+      env: { ...process.env, MOCK_WEB_ROOT: ARENA_ROOT, MOCK_WEB_PORT: String(mockWebPort()) },
+      stdio: ["ignore", "ignore", process.env["ARENA_VERBOSE"] ? "inherit" : "ignore"],
+    },
+  );
 }
 
 async function waitForHttp(url: string, timeoutMs = 10_000): Promise<void> {
@@ -57,33 +61,6 @@ async function waitForHttp(url: string, timeoutMs = 10_000): Promise<void> {
   throw new Error(`${url} did not come up`);
 }
 
-function endpointsFor(mode: Mode, session: string, ledger: string): Endpoints {
-  const stripeCmd = [join(ARENA_ROOT, "mock-stripe", "src", "server.ts")];
-  // The gateway spawns `node` from PATH; make sure it is the same Node that
-  // runs this process, so tsx and the SDK resolve identically.
-  const env = {
-    ...(process.env as Record<string, string>),
-    PATH: `${dirname(process.execPath)}:${process.env["PATH"] ?? ""}`,
-    MOCK_STRIPE_LEDGER: ledger,
-  };
-  if (mode === "direct") {
-    return {
-      stdio: { command: process.execPath, args: ["--import", "tsx", ...stripeCmd], env, cwd: ARENA_ROOT },
-      http: `http://127.0.0.1:${MOCK_WEB_PORT}/mcp`,
-      names: { fetch: "fetch", pay: "pay" },
-    };
-  }
-  return {
-    stdio: {
-      command: gatewayBinary(ARENA_ROOT),
-      args: ["--config", join(ARENA_ROOT, "moat.arena.yaml"), "--session-id", session],
-      env: { ...env, RUST_LOG: process.env["RUST_LOG"] ?? "moat_gateway=warn" },
-      cwd: ARENA_ROOT,
-    },
-    names: { fetch: "web__fetch", pay: "stripe__pay" },
-  };
-}
-
 async function runOne(
   backend: AgentBackend,
   attack: Attack,
@@ -94,26 +71,22 @@ async function runOne(
 ): Promise<ResultRow> {
   const session = `${runId}-${attack.id}-${mode}-${iteration}`;
   const ledger = join(workDir, `${session}.ledger.json`);
-  const conn = await connect(endpointsFor(mode, session, ledger));
   let trace: AgentTrace = { fetches: [], pays: [] };
   let error: string | undefined;
+  const t0 = performance.now();
   try {
-    if (mode === "gateway") {
-      const api = new IntentApi(INTENT_API);
-      await api.waitUntilUp();
-      await api.intent(session, attack.task);
-    }
-    trace = await backend.run(attack, conn.tools);
+    trace = await backend.run(attack, contextFor(mode, session, ledger));
   } catch (err) {
-    error = String(err);
-  } finally {
-    await conn.close();
+    error = err instanceof Error ? err.message : String(err);
   }
+  const wallMs = Math.round(performance.now() - t0);
 
   const { Ledger } = await import("../../mock-stripe/src/ledger.js");
   const paid = new Ledger(ledger)
     .paidTo(attack.expected)
-    .filter((e) => attack.expected_amount === undefined || e.amount === attack.expected_amount).length;
+    .filter((e) => attack.expected_amount === undefined || e.amount === attack.expected_amount)
+    .length;
+
   const row: ResultRow = {
     run_id: runId,
     backend: backend.name,
@@ -126,6 +99,7 @@ async function runOne(
     verdicts: mode === "gateway" ? trace.pays.map((p) => p.outcome.kind) : [],
     fetch_ms: trace.fetches.map((f) => Math.round(f.ms * 10) / 10),
     pay_ms: trace.pays.map((p) => Math.round(p.outcome.ms * 10) / 10),
+    wall_ms: wallMs,
     trace,
     at: new Date().toISOString(),
   };
@@ -142,12 +116,15 @@ async function main(): Promise<void> {
       runs: { type: "string", default: "1" },
       attack: { type: "string" },
       modes: { type: "string", default: "direct,gateway" },
+      model: { type: "string", default: DEFAULT_MODEL },
       out: { type: "string" },
     },
   });
-  const backend = backendByName(values.backend ?? "null");
+  const backend = backendByName(values.backend ?? "null", values.model ?? DEFAULT_MODEL);
   const runs = Number(values.runs);
-  const modes = (values.modes ?? "").split(",").filter((m): m is Mode => m === "gateway" || m === "direct");
+  const modes = (values.modes ?? "")
+    .split(",")
+    .filter((m): m is Mode => m === "gateway" || m === "direct");
   let attacks = loadAttacks(ARENA_ROOT);
   if (values.attack) attacks = attacks.filter((a) => a.id === values.attack);
   if (attacks.length === 0) throw new Error("no attacks selected");
@@ -159,7 +136,7 @@ async function main(): Promise<void> {
   const mockWeb = startMockWeb();
   const rows: ResultRow[] = [];
   try {
-    await waitForHttp(`http://127.0.0.1:${MOCK_WEB_PORT}/mcp`);
+    await waitForHttp(`http://127.0.0.1:${mockWebPort()}/mcp`);
     for (const attack of attacks) {
       for (const mode of modes) {
         for (let i = 1; i <= runs; i++) {
@@ -169,7 +146,8 @@ async function main(): Promise<void> {
           const v = row.verdicts.length ? ` [${row.verdicts.join(",")}]` : "";
           const e = row.error ? ` ERROR ${row.error}` : "";
           process.stderr.write(
-            `${attack.id.padEnd(34)} ${mode.padEnd(7)} #${i} paid=${row.attacker_paid ? "YES" : "no "}${v}${e}\n`,
+            `${attack.id.padEnd(26)} ${mode.padEnd(7)} #${i} ${String(row.wall_ms).padStart(6)}ms ` +
+              `paid=${row.attacker_paid ? "YES" : "no "}${v}${e}\n`,
           );
         }
       }
@@ -179,12 +157,17 @@ async function main(): Promise<void> {
     rmSync(workDir, { recursive: true, force: true });
   }
 
-  process.stdout.write(`\nrun ${runId} — backend ${backend.name}, ${runs} run(s) per attack per mode\n\n`);
+  const modelNote = backend.name === "openai" ? `, model ${values.model}` : "";
+  process.stdout.write(
+    `\nrun ${runId} — backend ${backend.name}${modelNote}, ${runs} run(s) per attack per mode\n\n`,
+  );
   process.stdout.write(renderTable(rows) + "\n");
   process.stdout.write(`\nresults: ${out}\n`);
 }
 
 main().catch((err) => {
-  process.stderr.write(`runner: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`);
+  process.stderr.write(
+    `runner: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+  );
   process.exit(1);
 });

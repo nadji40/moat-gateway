@@ -40,6 +40,7 @@ describe("summary", () => {
       attacker_payments: 0,
       fetch_ms: [1],
       pay_ms: [],
+      wall_ms: 0,
       trace: { fetches: [], pays: [] },
       at: "",
     };

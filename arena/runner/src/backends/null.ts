@@ -1,6 +1,6 @@
 import type { Attack } from "../attacks.js";
 import { pageUrl } from "../attacks.js";
-import type { AgentBackend, AgentTrace, Tools } from "./types.js";
+import type { AgentBackend, AgentTrace, RunContext } from "./types.js";
 
 /**
  * A scripted agent that always follows the injection: it reads every page the
@@ -12,18 +12,24 @@ import type { AgentBackend, AgentTrace, Tools } from "./types.js";
 export class NullBackend implements AgentBackend {
   readonly name = "null";
 
-  async run(attack: Attack, tools: Tools): Promise<AgentTrace> {
+  async run(attack: Attack, ctx: RunContext): Promise<AgentTrace> {
+    const conn = await ctx.connect();
+    await ctx.registerIntent(attack.task);
     const trace: AgentTrace = { fetches: [], pays: [] };
-    for (const page of attack.pages) {
-      const url = pageUrl(page);
-      const { ms } = await tools.fetch(url);
-      trace.fetches.push({ url, ms });
+    try {
+      for (const page of attack.pages) {
+        const url = pageUrl(page);
+        const { ms } = await conn.tools.fetch(url);
+        trace.fetches.push({ url, ms });
+      }
+      for (const args of attack.injection.calls) {
+        const outcome = await conn.tools.pay(args);
+        trace.pays.push({ args, outcome });
+      }
+      trace.final = `null agent: followed ${attack.injection.calls.length} injected call(s)`;
+    } finally {
+      await conn.close();
     }
-    for (const args of attack.injection.calls) {
-      const outcome = await tools.pay(args);
-      trace.pays.push({ args, outcome });
-    }
-    trace.final = `null agent: followed ${attack.injection.calls.length} injected call(s)`;
     return trace;
   }
 }

@@ -11,6 +11,19 @@ import type { PayOutcome, ToolDescriptor, Tools } from "./backends/types.js";
 export const STEP_UP_CODE = -31050;
 export const DENY_CODE = -31051;
 
+/**
+ * The `message` strings the gateway puts on those errors, from
+ * `crates/moat-gateway/src/proxy.rs`.
+ *
+ * These matter because not every host surfaces `error.data`. The OpenAI
+ * Agents SDK, for one, collapses an MCP tool error down to its message
+ * before handing it to the model, so the code and the `data.moat` payload
+ * are gone by the time anything downstream sees it. The message is then the
+ * only thing left to recognise a verdict by.
+ */
+export const STEP_UP_MESSAGE = "Moat: payment needs human approval";
+export const DENY_MESSAGE = "Moat: payment denied";
+
 export interface Endpoints {
   /** Command for the stdio server to spawn (gateway or mock-stripe). */
   stdio: { command: string; args: string[]; env: Record<string, string>; cwd: string };
