@@ -19,7 +19,7 @@ use moat_mcp::types::{
 use moat_mcp::{ErrorObject, ErrorResponse, Message, Request, RequestId, Response};
 use serde_json::{json, Map, Value};
 use tokio::io::{AsyncBufRead, AsyncWrite};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, oneshot, Mutex};
 
 use crate::config::Config;
 use crate::state::{PendingResume, PolicyState, Shared};
@@ -27,34 +27,39 @@ use crate::upstream::{Upstream, UpstreamEvent};
 
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 
+/// How long an HTTP caller waits for the reply to one request before the
+/// gateway gives up on it. Upstream tool calls can be slow; this is a
+/// backstop, not a budget.
+pub const REPLY_TIMEOUT: Duration = Duration::from_secs(300);
+
 /// A running proxy session.
 pub struct Gateway {
     upstreams: Vec<Arc<Upstream>>,
     separator: String,
     shared: Arc<Shared>,
     session_id: String,
-    /// Raw lines destined for the client. One writer task drains this so
-    /// concurrent handlers never interleave bytes on stdout.
+    /// Raw lines destined for the client that no caller is waiting on: on
+    /// stdio, everything; on HTTP, server notifications for the GET stream.
+    /// One consumer drains this so concurrent handlers never interleave.
     out: mpsc::Sender<String>,
+    /// Replies a transport caller is waiting for by id. Used by the HTTP
+    /// listener, where each request is its own HTTP exchange. Empty on stdio.
+    pending: Mutex<HashMap<RequestId, oneshot::Sender<String>>>,
     /// Upstream-originated request ids (legacy sampling/elicitation) mapped
     /// to the upstream index, so the client's reply can be routed back.
     upstream_requests: Mutex<HashMap<RequestId, usize>>,
+    relay_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl Gateway {
-    /// Start all upstreams and run the session over the given client streams
-    /// until the client closes its side.
-    pub async fn run<R, W>(
-        cfg: Config,
+    /// Start every upstream for one session. Returns the gateway and the
+    /// receiver for lines the transport must deliver to the client on its
+    /// own initiative (everything on stdio; notifications on HTTP).
+    pub async fn start(
+        cfg: &Config,
         shared: Arc<Shared>,
         session_id: String,
-        client_in: R,
-        client_out: W,
-    ) -> Result<()>
-    where
-        R: AsyncBufRead + Unpin + Send + 'static,
-        W: AsyncWrite + Unpin + Send + 'static,
-    {
+    ) -> Result<(Arc<Gateway>, mpsc::Receiver<String>)> {
         let (events_tx, mut events_rx) = mpsc::channel(256);
         let mut upstreams = Vec::with_capacity(cfg.upstreams.len());
         for u in &cfg.upstreams {
@@ -62,16 +67,7 @@ impl Gateway {
         }
         drop(events_tx);
 
-        let (out_tx, mut out_rx) = mpsc::channel::<String>(256);
-        let writer_task = tokio::spawn(async move {
-            let mut w = FrameWriter::new(client_out);
-            while let Some(line) = out_rx.recv().await {
-                if let Err(e) = w.write_raw(&line).await {
-                    tracing::error!(error = %e, "writing to client failed");
-                    break;
-                }
-            }
-        });
+        let (out_tx, out_rx) = mpsc::channel::<String>(256);
 
         // Create the session up front so the intent API can find it even
         // before the first message arrives.
@@ -82,12 +78,14 @@ impl Gateway {
             shared,
             session_id,
             out: out_tx,
+            pending: Mutex::new(HashMap::new()),
             upstream_requests: Mutex::new(HashMap::new()),
+            relay_task: Mutex::new(None),
         });
 
         // Relay unsolicited upstream traffic to the client.
         let relay_gw = Arc::clone(&gw);
-        let relay_task = tokio::spawn(async move {
+        let relay = tokio::spawn(async move {
             while let Some((name, ev)) = events_rx.recv().await {
                 match ev {
                     UpstreamEvent::Notification(frame) => relay_gw.emit_raw(frame.raw).await,
@@ -106,6 +104,38 @@ impl Gateway {
                     UpstreamEvent::Closed => {
                         tracing::error!(upstream = %name, "upstream is gone; its tools will fail until restart");
                     }
+                }
+            }
+        });
+        *gw.relay_task.lock().await = Some(relay);
+        Ok((gw, out_rx))
+    }
+
+    /// The session id this gateway serves.
+    pub fn session_id(&self) -> &str {
+        &self.session_id
+    }
+
+    /// Run a session over stdio-style streams until the client closes its
+    /// side, then shut the upstreams down.
+    pub async fn run<R, W>(
+        cfg: Config,
+        shared: Arc<Shared>,
+        session_id: String,
+        client_in: R,
+        client_out: W,
+    ) -> Result<()>
+    where
+        R: AsyncBufRead + Unpin + Send + 'static,
+        W: AsyncWrite + Unpin + Send + 'static,
+    {
+        let (gw, mut out_rx) = Gateway::start(&cfg, shared, session_id).await?;
+        let writer_task = tokio::spawn(async move {
+            let mut w = FrameWriter::new(client_out);
+            while let Some(line) = out_rx.recv().await {
+                if let Err(e) = w.write_raw(&line).await {
+                    tracing::error!(error = %e, "writing to client failed");
+                    break;
                 }
             }
         });
@@ -145,22 +175,75 @@ impl Gateway {
             }
         }
 
-        for u in &gw.upstreams {
-            u.shutdown(SHUTDOWN_GRACE).await;
-        }
-        relay_task.abort();
+        gw.shutdown().await;
         drop(gw);
         let _ = writer_task.await;
         Ok(())
+    }
+
+    /// Handle one message from an HTTP caller. For a request, waits for and
+    /// returns its reply line; for anything else, returns `None` once it has
+    /// been dispatched. A request whose reply never comes gets an error
+    /// response after [`REPLY_TIMEOUT`].
+    pub async fn call(self: &Arc<Self>, frame: Frame) -> Option<String> {
+        let Message::Request(req) = &frame.message else {
+            self.handle(frame).await;
+            return None;
+        };
+        let id = req.id.clone();
+        let (tx, rx) = oneshot::channel();
+        self.pending.lock().await.insert(id.clone(), tx);
+
+        let gw = Arc::clone(self);
+        tokio::spawn(async move { gw.handle(frame).await });
+
+        match tokio::time::timeout(REPLY_TIMEOUT, rx).await {
+            Ok(Ok(line)) => Some(line),
+            _ => {
+                self.pending.lock().await.remove(&id);
+                let err = ErrorResponse::new(
+                    Some(id),
+                    ErrorObject::new(code::INTERNAL_ERROR, "no reply from gateway", None),
+                );
+                Message::from(err).to_line().ok()
+            }
+        }
+    }
+
+    /// Stop every upstream and the relay. Idempotent.
+    pub async fn shutdown(&self) {
+        for u in &self.upstreams {
+            u.shutdown(SHUTDOWN_GRACE).await;
+        }
+        if let Some(t) = self.relay_task.lock().await.take() {
+            t.abort();
+        }
     }
 
     fn index_of(&self, name: &str) -> Option<usize> {
         self.upstreams.iter().position(|u| u.name == name)
     }
 
+    /// Deliver a line to the client: to a caller waiting on that reply id if
+    /// there is one, otherwise to the transport's own channel.
     async fn emit_raw(&self, line: String) {
+        {
+            let mut pending = self.pending.lock().await;
+            if !pending.is_empty() {
+                if let Ok(msg) = Message::parse(&line) {
+                    if let Some(id) = msg.id() {
+                        if matches!(msg, Message::Response(_) | Message::Error(_)) {
+                            if let Some(tx) = pending.remove(id) {
+                                let _ = tx.send(line);
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if self.out.send(line).await.is_err() {
-            tracing::error!("client writer is gone");
+            tracing::debug!("no client consumer for a server-initiated line; dropped");
         }
     }
 

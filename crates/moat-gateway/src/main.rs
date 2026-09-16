@@ -3,6 +3,7 @@
 //! as tool results and the payment leaving as a tool call.
 
 mod config;
+mod http_listen;
 mod intent_api;
 mod proxy;
 mod state;
@@ -129,58 +130,67 @@ fn main() -> Result<()> {
                 cfg.session_id = cli.session_id;
             }
             tracing::info!(config = %path.display(), upstreams = cfg.upstreams.len(), "starting");
-            match cfg.listen {
-                config::Listen::Stdio => run_stdio(cfg),
-                config::Listen::Http { ref addr } => {
-                    anyhow::bail!("listen transport http ({addr}) is not implemented yet (work order step 11)")
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .context("starting tokio runtime")?;
+            rt.block_on(async move {
+                let shared = build_shared(&cfg)?;
+                start_intent_api(&cfg, &shared);
+                match cfg.listen.clone() {
+                    config::Listen::Stdio => {
+                        let session_id = cfg.session_id.clone().unwrap_or_else(generate_session_id);
+                        tracing::info!(session = %session_id, "stdio session");
+                        let stdin = tokio::io::BufReader::new(tokio::io::stdin());
+                        let stdout = tokio::io::stdout();
+                        proxy::Gateway::run(cfg, shared, session_id, stdin, stdout).await
+                    }
+                    config::Listen::Http { addr } => {
+                        tracing::info!(
+                            "each MCP session's id is returned in the Mcp-Session-Id header; use it with the intent API"
+                        );
+                        http_listen::serve(&addr, cfg, shared).await
+                    }
                 }
-            }
+            })
         }
     }
 }
 
-fn run_stdio(cfg: config::Config) -> Result<()> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .context("starting tokio runtime")?;
-    rt.block_on(async move {
-        let policy = state::PolicyState::load(cfg.policy.as_deref());
-        let (keys, created) = moat_core::keys::Keys::load_or_create(&cfg.keys)
-            .with_context(|| format!("signing keys in {}", cfg.keys.display()))?;
-        tracing::info!(
-            keys = %cfg.keys.display(), public = %keys.public_hex(), created,
-            "evidence signing key ready"
-        );
-        let shared = Arc::new(state::Shared::new(policy, keys, cfg.evidence.clone())?);
+fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
+    let policy = state::PolicyState::load(cfg.policy.as_deref());
+    let (keys, created) = moat_core::keys::Keys::load_or_create(&cfg.keys)
+        .with_context(|| format!("signing keys in {}", cfg.keys.display()))?;
+    tracing::info!(
+        keys = %cfg.keys.display(), public = %keys.public_hex(), created,
+        "evidence signing key ready"
+    );
+    Ok(Arc::new(state::Shared::new(
+        policy,
+        keys,
+        cfg.evidence.clone(),
+    )?))
+}
 
-        let session_id = cfg.session_id.clone().unwrap_or_else(generate_session_id);
-        match &cfg.intent_api {
-            Some(api) => {
-                tracing::info!(
-                    session = %session_id,
-                    "register intents at http://{}/v1/session/{}/intent",
-                    api.addr,
-                    session_id
-                );
-                let addr = api.addr.clone();
-                let api_shared = Arc::clone(&shared);
-                tokio::spawn(async move {
-                    if let Err(e) = intent_api::serve(&addr, api_shared).await {
-                        tracing::error!(error = %e, "intent API stopped");
-                    }
-                });
-            }
-            None => tracing::warn!(
-                session = %session_id,
-                "no intent_api configured: nothing can register intents, so every payee will be untrusted"
-            ),
+fn start_intent_api(cfg: &config::Config, shared: &Arc<state::Shared>) {
+    match &cfg.intent_api {
+        Some(api) => {
+            tracing::info!(
+                "register intents at http://{}/v1/session/{{session}}/intent",
+                api.addr
+            );
+            let addr = api.addr.clone();
+            let api_shared = Arc::clone(shared);
+            tokio::spawn(async move {
+                if let Err(e) = intent_api::serve(&addr, api_shared).await {
+                    tracing::error!(error = %e, "intent API stopped");
+                }
+            });
         }
-
-        let stdin = tokio::io::BufReader::new(tokio::io::stdin());
-        let stdout = tokio::io::stdout();
-        proxy::Gateway::run(cfg, shared, session_id, stdin, stdout).await
-    })
+        None => tracing::warn!(
+            "no intent_api configured: nothing can register intents, so every payee will be untrusted"
+        ),
+    }
 }
 
 fn generate_session_id() -> String {
