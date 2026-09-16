@@ -28,7 +28,7 @@ Early. Follow the work order below for what is actually built.
 - [x] 7. `moat-gateway`: interception, step-up, intent API, resume (ADR 0003, 0004)
 - [x] 8. `moat-core`: evidence records, hash chain, signing; `keygen` and `verify` (ADR 0005)
 - [x] 9. `arena`: mock servers, first ten attacks, null-agent runner
-- [ ] 10. `arena`: OpenAI Agents SDK backend, first results against a real model
+- [x] 10. `arena`: OpenAI Agents SDK backend (ADR 0006) — real-model run pending an API key
 - [ ] 11. Streamable HTTP transport on the listen side
 
 The proxy runs today as a pure passthrough: `moat-gateway --config moat.yaml`
