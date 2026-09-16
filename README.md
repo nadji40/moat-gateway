@@ -29,11 +29,9 @@ Early. Follow the work order below for what is actually built.
 - [x] 8. `moat-core`: evidence records, hash chain, signing; `keygen` and `verify` (ADR 0005)
 - [x] 9. `arena`: mock servers, first ten attacks, null-agent runner
 - [x] 10. `arena`: OpenAI Agents SDK backend, first results against gpt-5 and gpt-5-mini (ADR 0006)
-- [ ] 11. Streamable HTTP transport on the listen side
+- [x] 11. Streamable HTTP transport on the listen side
 
-The proxy runs today as a pure passthrough: `moat-gateway --config moat.yaml`
-with stdio upstreams. `keygen` and `verify` exit with a "not implemented"
-error naming the step that will implement them.
+All eleven steps of the first phase are built.
 
 ## Quickstart
 
@@ -98,7 +96,7 @@ intent_api: { addr: "127.0.0.1:7072" }
 
 | Key | Meaning | Default |
 | --- | --- | --- |
-| `listen` | `{ transport: stdio }` or `{ transport: http, addr }` (step 11) | stdio |
+| `listen` | `{ transport: stdio }` or `{ transport: http, addr }` | stdio |
 | `upstreams[].name` | Tool namespace prefix; must be unique | required |
 | `upstreams[].transport` | `stdio` with `command` (and optional `env`), or `http` with `url` | required |
 | `policy` | Path to the policy YAML | none → payments denied |
@@ -109,6 +107,33 @@ intent_api: { addr: "127.0.0.1:7072" }
 | `session_id` | Fixed session id | generated, printed to stderr at start |
 
 Relative paths resolve against the config file's directory.
+
+### Listening over HTTP
+
+For hosts that cannot spawn a process, `listen: { transport: http, addr:
+"127.0.0.1:7071" }` serves Streamable HTTP at `/mcp` in the `2025-11-25`
+shape the MCP TypeScript SDK's `StreamableHTTPClientTransport` speaks:
+
+- `POST /mcp` with one JSON-RPC message. A request gets its reply as a JSON
+  body (a Moat verdict error is still HTTP 200); a notification gets `202`.
+- `initialize` starts a new session — its own upstream processes, its own Moat
+  session — and returns the id in `Mcp-Session-Id`. Later requests echo it.
+  **That id is the one to use with the intent API.**
+- `GET /mcp` with the session header opens the SSE stream for server-initiated
+  notifications; one per session.
+- `DELETE /mcp` ends the session and stops its upstreams.
+- `Origin`, if present, must be loopback; anything else is `403`. Bind to
+  loopback: there is no authentication.
+
+A request with no session header that is not `initialize` is served by a
+lazily created default session, so a client without a handshake still works,
+in a single-session way.
+
+`arena/moat.arena-http.yaml` is a working example. The SDK's own HTTP client
+is tested against it in `arena/runner/test/http-listen.test.ts`; over that
+path the client receives `McpError` with the code and the full `data.moat`
+payload, resume token included — the `error.data` loss in ADR 0006 is the
+Agents SDK's tool-error wrapping, not the MCP transport.
 
 The gateway presents one MCP server to the client, aggregating every upstream
 tool under a namespaced name (`stripe__pay`). Everything it does not explicitly

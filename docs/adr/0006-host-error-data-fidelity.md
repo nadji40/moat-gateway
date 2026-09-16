@@ -71,6 +71,17 @@ instruction.
    than refusal must read `error.data.moat`. The README says so, and says
    what happens if it does not.
 
+## Addendum (2026-09-16, step 11)
+
+The loss is in the Agents SDK's tool-error wrapping, not in MCP or its SDK.
+The MCP TypeScript SDK's own `StreamableHTTPClientTransport`, tested against
+the gateway's HTTP listener, throws `McpError` with `code` and the full
+`data.moat` payload — resume token included. A host that uses the MCP SDK
+directly, or any client that surfaces the JSON-RPC error object, gets the
+complete step-up flow. The degradation described above applies to hosts that
+put an agent framework between the MCP client and their own code and let it
+flatten errors on the way through.
+
 ## Consequences
 
 - Moat's usefulness is bounded by the host's error fidelity, and we cannot
