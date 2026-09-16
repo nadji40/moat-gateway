@@ -22,6 +22,10 @@ struct Cli {
     #[arg(short, long, value_name = "FILE", global = true)]
     config: Option<PathBuf>,
 
+    /// Session id for this connection; overrides `session_id` in the config.
+    #[arg(long, value_name = "ID", global = true)]
+    session_id: Option<String>,
+
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -120,7 +124,10 @@ fn main() -> Result<()> {
             let path = cli
                 .config
                 .ok_or_else(|| anyhow::anyhow!("--config is required to run the proxy"))?;
-            let cfg = config::Config::load(&path)?;
+            let mut cfg = config::Config::load(&path)?;
+            if cli.session_id.is_some() {
+                cfg.session_id = cli.session_id;
+            }
             tracing::info!(config = %path.display(), upstreams = cfg.upstreams.len(), "starting");
             match cfg.listen {
                 config::Listen::Stdio => run_stdio(cfg),

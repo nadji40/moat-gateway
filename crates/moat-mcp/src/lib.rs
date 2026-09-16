@@ -13,6 +13,7 @@
 #![forbid(unsafe_code)]
 
 pub mod error;
+pub mod http;
 pub mod jsonrpc;
 pub mod process;
 pub mod stdio;
