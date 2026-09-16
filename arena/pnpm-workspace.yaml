@@ -1,0 +1,6 @@
+packages:
+  - mock-stripe
+  - mock-web
+  - runner
+allowBuilds:
+  esbuild: true

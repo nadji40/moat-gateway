@@ -9,6 +9,7 @@ arena/results/
 
 # Runtime artifacts: never commit signing keys or evidence
 /keys/
+arena/keys/
 *.jsonl
 !arena/attacks/**/*.jsonl
 !crates/moat-core/tests/golden/*.jsonl

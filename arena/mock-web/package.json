@@ -1,0 +1,16 @@
+{
+  "name": "@moat/mock-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fake web MCP server over Streamable HTTP. fetch(url) serves HTML files from the arena directory.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.25.0"
+  }
+}
