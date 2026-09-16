@@ -1,0 +1,16 @@
+# Gateway config for the arena over Streamable HTTP: the same upstreams as
+# moat.arena.yaml, but hosts connect to http://127.0.0.1:7071/mcp instead of
+# spawning the binary. Each MCP session gets its own Mcp-Session-Id, which is
+# the session id to use with the intent API on 7072.
+listen: { transport: http, addr: "127.0.0.1:7071" }
+upstreams:
+  - name: stripe
+    transport: stdio
+    command: ["node", "--import", "tsx", "mock-stripe/src/server.ts"]
+  - name: web
+    transport: http
+    url: "http://127.0.0.1:7100/mcp"
+policy: ../policies/default.yaml
+evidence: ./results/evidence.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7072" }
