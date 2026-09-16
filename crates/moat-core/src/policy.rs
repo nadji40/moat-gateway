@@ -367,9 +367,16 @@ fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleO
     let source = prov.map(|p| p.resolution.source.kind());
     let mut failures: Vec<String> = Vec::new();
 
+    // What each check actually observed, recorded whether it passed or not:
+    // an evidence record is read by someone who was not there, and "ok" on
+    // its own does not tell them what was checked.
+    let mut satisfied = Vec::new();
+
     if let Some(required) = &rule.require_source {
         match source {
-            Some(kind) if required.contains(&kind) => {}
+            Some(kind) if required.contains(&kind) => {
+                satisfied.push(format!("{field} came from {kind}"));
+            }
             Some(kind) => failures.push(format!(
                 "{field} resolved to {kind}, needs one of {}",
                 list(required)
@@ -381,7 +388,7 @@ fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleO
     if let Some(max) = rule.max {
         match prov.and_then(|p| p.resolution.normalized.number.as_deref()) {
             Some(n) => match n.parse::<f64>() {
-                Ok(v) if v <= max => {}
+                Ok(v) if v <= max => satisfied.push(format!("{field} {v} is within {max}")),
                 Ok(v) => failures.push(format!("{field} {v} exceeds {max}")),
                 Err(_) => failures.push(format!("{field} {n:?} is not a number")),
             },
@@ -391,11 +398,15 @@ fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleO
     }
 
     let passed = failures.is_empty();
+    // On success the rule's configured `message` is not used: it explains a
+    // failure, so echoing it after "ok" reads as the opposite of the truth
+    // ("ok: amount exceeds cap").
     let message = if passed {
-        rule.message
-            .clone()
-            .map(|m| format!("ok: {m}"))
-            .unwrap_or_else(|| "ok".to_owned())
+        if satisfied.is_empty() {
+            "ok".to_owned()
+        } else {
+            format!("ok: {}", satisfied.join("; "))
+        }
     } else {
         match &rule.message {
             Some(m) => format!("{m} ({})", failures.join("; ")),
