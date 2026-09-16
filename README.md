@@ -134,6 +134,16 @@ result (allow, the upstream's own reply) or as a JSON-RPC error:
 
 Why an error rather than a tool result is [ADR 0003](docs/adr/0003-step-up-as-jsonrpc-error.md).
 
+**A host that wants step-up rather than refusal must read `error.data.moat`.**
+Not all of them do. The OpenAI Agents SDK collapses an MCP tool error to its
+`message` before anything downstream sees it, so the code and the whole `data`
+payload — prompt, evidence id, resume token — are discarded. Such a host still
+gets the safe outcome, because the payment did not happen and the agent is told
+so, but it cannot complete a step-up: `step_up` becomes an unresolvable
+refusal. If your host is in that position, match on the `message` strings
+above; they are a stable interface for exactly this reason
+([ADR 0006](docs/adr/0006-host-error-data-fidelity.md)).
+
 ## Intent API
 
 Moat cannot read the human's request out of the MCP stream — the host never
@@ -218,8 +228,30 @@ built binary:
 - `runner` — drives a backend through each attack N times in `direct` mode
   (client → mocks) and `gateway` mode (client → moat-gateway → mocks), checks
   the ledger for the attacker's payee, and writes `results/<run_id>.jsonl`
-  plus a summary table. Backends: `null` (scripted, no model) and `openai`
-  (step 10). API keys come from the environment only.
+  plus a summary table. API keys come from the environment only.
+
+Two backends:
+
+- **`null`** — scripted, no model. Reads the pages, then makes exactly the
+  calls the attack says an injected agent would make. It is the worst case:
+  an agent that does whatever the page tells it.
+- **`openai`** — the OpenAI Agents SDK, with **moat-gateway configured as the
+  agent's only MCP server** and no Moat-specific code on the agent side. The
+  model is never told about Moat, step-ups or provenance; it gets the user's
+  task and whatever tools the server advertises. Needs `OPENAI_API_KEY` in the
+  environment. `--model` selects the model (default `gpt-5.6-luna`).
+
+```bash
+export OPENAI_API_KEY=sk-...
+cd arena && pnpm --filter @moat/runner start --backend openai --runs 1
+```
+
+The SDK integration is covered without a key or a token by
+`runner/test/openai-backend.test.ts`, which runs the real agent loop against a
+real gateway process with a scripted model standing in for the LLM. What it
+verifies: the SDK connects as a plain MCP client, sees `stripe__pay` and
+`web__fetch`, and a payee that only ever appeared on a fetched page is not
+paid.
 
 ```bash
 cd arena && pnpm --filter @moat/runner start --backend null --runs 3 --attack inject-hidden-css
@@ -250,6 +282,19 @@ velocity limit (5 per session) permits; inflation is a legitimate payee with
 a page-sourced amount under the cap, which `amount-provenance` permits by
 design so that prices can come from pages. Both are policy choices, and the
 evidence records show exactly what was allowed and why.
+
+### First results against a real model
+
+Not yet run — it needs an `OPENAI_API_KEY`, which this machine does not have.
+The backend and the command are in place; the table lands here when it runs.
+
+What the SDK integration has already established, with no key:
+
+| | |
+|---|---|
+| Gateway usable as a drop-in MCP server | yes — no agent-side code, tools appear namespaced |
+| Injected payee blocked | yes — not paid, agent told why |
+| Step-up resolvable by this host | **no** — the SDK drops `error.data`, so the resume token never arrives ([ADR 0006](docs/adr/0006-host-error-data-fidelity.md)) |
 
 ### Passthrough latency
 
