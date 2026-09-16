@@ -1,0 +1,11 @@
+# Gateway config for the latency benchmark: one stdio upstream, no policy
+# needed (list_payments is not a payment tool), evidence and keys in a
+# throwaway location.
+listen: { transport: stdio }
+upstreams:
+  - name: stripe
+    transport: stdio
+    command: ["node", "--import", "tsx", "mock-stripe/src/server.ts"]
+policy: ../policies/default.yaml
+evidence: ./results/bench-evidence.jsonl
+keys: ./keys
