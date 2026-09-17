@@ -59,6 +59,10 @@ export class IntentApi {
       expires_at: string;
       repeat_payments: boolean;
       max_payments: number;
+      recipient_account_id?: string;
+      invoice_fingerprint?: string;
+      require_invoice_fingerprint: boolean;
+      aggregate_limit?: number;
     },
   ): Promise<void> {
     const res = await fetch(

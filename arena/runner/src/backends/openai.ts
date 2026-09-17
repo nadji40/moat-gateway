@@ -191,6 +191,12 @@ function classify(call: SdkCall, mode: RunContext["mode"], trace: AgentTrace): v
       ? { authorization_id: String(call.args["authorization_id"]) }
       : {}),
     ...(call.args["invoice_id"] ? { invoice_id: String(call.args["invoice_id"]) } : {}),
+    ...(call.args["recipient_account_id"]
+      ? { recipient_account_id: String(call.args["recipient_account_id"]) }
+      : {}),
+    ...(call.args["invoice_fingerprint"]
+      ? { invoice_fingerprint: String(call.args["invoice_fingerprint"]) }
+      : {}),
   };
   trace.pays.push({ args, outcome: outcomeFromToolOutput(call, mode) });
 }

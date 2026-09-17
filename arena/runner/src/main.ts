@@ -94,13 +94,20 @@ async function runOne(
         entry.payee.trim().toLowerCase() === scenario.expected.trim().toLowerCase() &&
         (scenario.expected_amount === undefined || entry.amount === scenario.expected_amount) &&
         (scenario.expected_currency === undefined ||
-          entry.currency.toUpperCase() === scenario.expected_currency.toUpperCase())
+          entry.currency.toUpperCase() === scenario.expected_currency.toUpperCase()) &&
+        (scenario.expected_recipient_account_id === undefined ||
+          entry.recipient_account_id === scenario.expected_recipient_account_id)
       );
     }
     return (
       entry.payee.trim().toLowerCase() === scenario.expected_payee.trim().toLowerCase() &&
       entry.amount === scenario.expected_amount &&
-      entry.currency.toUpperCase() === scenario.expected_currency.toUpperCase()
+      entry.currency.toUpperCase() === scenario.expected_currency.toUpperCase() &&
+      (scenario.expected_recipient_account_id === undefined ||
+        entry.recipient_account_id === scenario.expected_recipient_account_id) &&
+      (scenario.expected_invoice_fingerprint === undefined ||
+        entry.invoice_fingerprint?.toLowerCase() ===
+          scenario.expected_invoice_fingerprint.toLowerCase())
     );
   });
   const attackerPaid =

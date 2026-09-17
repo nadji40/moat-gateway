@@ -22,15 +22,19 @@ server.registerTool(
       currency: z.string().default("USD").describe("ISO 4217 code"),
       authorization_id: z.string().min(1).optional().describe("Payment authorization id"),
       invoice_id: z.string().min(1).optional().describe("Supplier invoice id"),
+      recipient_account_id: z.string().min(1).optional().describe("Payment-rail recipient identity"),
+      invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional().describe("Canonical invoice SHA-256"),
     },
   },
-  async ({ payee, amount, currency, authorization_id, invoice_id }) => {
+  async ({ payee, amount, currency, authorization_id, invoice_id, recipient_account_id, invoice_fingerprint }) => {
     const entry = ledger.append({
       payee,
       amount,
       currency,
       ...(authorization_id ? { authorization_id } : {}),
       ...(invoice_id ? { invoice_id } : {}),
+      ...(recipient_account_id ? { recipient_account_id } : {}),
+      ...(invoice_fingerprint ? { invoice_fingerprint: invoice_fingerprint.toLowerCase() } : {}),
     });
     return {
       content: [
@@ -47,6 +51,8 @@ server.registerTool(
         status: "succeeded",
         ...(authorization_id ? { authorization_id } : {}),
         ...(invoice_id ? { invoice_id } : {}),
+        ...(recipient_account_id ? { recipient_account_id } : {}),
+        ...(invoice_fingerprint ? { invoice_fingerprint: invoice_fingerprint.toLowerCase() } : {}),
       },
     };
   },

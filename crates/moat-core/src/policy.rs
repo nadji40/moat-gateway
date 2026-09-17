@@ -335,9 +335,7 @@ pub fn evaluate(
         // Validated at load; an unparseable `when` cannot reach here.
         let field = rule.field().unwrap_or("");
         let prov = provenance.get(field);
-        let outcome = if has_authorization_id
-            && rule.require_source.is_some()
-            && rule.max.is_none()
+        let outcome = if has_authorization_id && rule.require_source.is_some() && rule.max.is_none()
         {
             RuleOutcome {
                 id: rule.id.clone(),
@@ -475,6 +473,29 @@ fn structured_authorization_checks(
         },
     ));
 
+    let recipient_account_id = call
+        .args
+        .get("recipient_account_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("");
+    let account_matches = authorization
+        .recipient_account_id
+        .as_deref()
+        .is_none_or(|expected| recipient_account_id == expected);
+    outcomes.push(structured_outcome(
+        "authorization-recipient-account",
+        account_matches,
+        Decision::Deny,
+        match &authorization.recipient_account_id {
+            Some(_) if account_matches => {
+                "ok: payment-rail recipient matches authorization".to_owned()
+            }
+            Some(_) => "payment-rail recipient does not match authorization".to_owned(),
+            None => "ok: authorization does not bind a payment-rail recipient".to_owned(),
+        },
+    ));
+
     let currency = mapped
         .get("currency")
         .and_then(|(_, value)| value.as_str())
@@ -502,6 +523,37 @@ fn structured_authorization_checks(
             "ok: invoice is covered by authorization".to_owned()
         } else {
             "invoice does not match authorization".to_owned()
+        },
+    ));
+
+    let invoice_fingerprint = call
+        .args
+        .get("invoice_fingerprint")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let fingerprint_matches = match &authorization.invoice_fingerprint {
+        Some(expected) => !invoice_fingerprint.is_empty() && invoice_fingerprint == *expected,
+        None if authorization.require_invoice_fingerprint => !invoice_fingerprint.is_empty(),
+        None => true,
+    };
+    outcomes.push(structured_outcome(
+        "authorization-invoice-fingerprint",
+        fingerprint_matches,
+        Decision::Deny,
+        match &authorization.invoice_fingerprint {
+            Some(_) if fingerprint_matches => {
+                "ok: invoice content matches authorization".to_owned()
+            }
+            Some(_) => "invoice content does not match authorization".to_owned(),
+            None if authorization.require_invoice_fingerprint && fingerprint_matches => {
+                "ok: invoice content fingerprint is present".to_owned()
+            }
+            None if authorization.require_invoice_fingerprint => {
+                "invoice content fingerprint is required".to_owned()
+            }
+            None => "ok: authorization does not bind invoice content".to_owned(),
         },
     ));
 
@@ -537,16 +589,75 @@ fn structured_authorization_checks(
         amount_message,
     ));
 
+    let settled_minor = session
+        .payment_outcomes()
+        .iter()
+        .filter(|outcome| outcome.authorization_id == authorization.id && outcome.succeeded)
+        .fold(0_u64, |total, outcome| {
+            total.saturating_add(outcome.amount_minor)
+        });
+    let reserved_minor = session
+        .payment_reservations()
+        .iter()
+        .filter(|reservation| reservation.authorization_id == authorization.id)
+        .fold(0_u64, |total, reservation| {
+            total.saturating_add(reservation.amount_minor)
+        });
+    let committed_minor = settled_minor.saturating_add(reserved_minor);
+    let aggregate_limit = authorization
+        .aggregate_limit_minor
+        .unwrap_or_else(|| maximum.saturating_mul(u64::from(authorization.max_payments)));
+    let aggregate_after = proposed_minor.map(|amount| committed_minor.saturating_add(amount));
+    let aggregate_ok =
+        aggregate_after.is_some_and(|total| total <= aggregate_limit) || human_approved;
+    outcomes.push(structured_outcome(
+        "authorization-aggregate",
+        aggregate_ok,
+        if aggregate_after.is_some() {
+            Decision::StepUp
+        } else {
+            Decision::Deny
+        },
+        match aggregate_after {
+            Some(total) if total <= aggregate_limit => format!(
+                "ok: aggregate settled value after proposal is {total} minor units within {aggregate_limit}"
+            ),
+            Some(total) if human_approved => format!(
+                "ok: human approved exact proposal taking aggregate value to {total} above {aggregate_limit}"
+            ),
+            Some(total) => format!(
+                "aggregate settled value {total} exceeds approved limit {aggregate_limit}; exact proposal needs approval"
+            ),
+            None => "payment amount is missing or invalid for aggregate evaluation".to_owned(),
+        },
+    ));
+
     let succeeded_for_authorization = session
         .payment_outcomes()
         .iter()
         .filter(|outcome| outcome.authorization_id == authorization.id && outcome.succeeded)
         .count();
+    let reserved_for_authorization = session
+        .payment_reservations()
+        .iter()
+        .filter(|reservation| reservation.authorization_id == authorization.id)
+        .count();
+    let used_for_authorization =
+        succeeded_for_authorization.saturating_add(reserved_for_authorization);
     let duplicate = session.payment_outcomes().iter().any(|outcome| {
         outcome.authorization_id == authorization.id
             && outcome.invoice_id == invoice_id
             && outcome.succeeded
+    }) || session.payment_reservations().iter().any(|reservation| {
+        reservation.authorization_id == authorization.id && reservation.invoice_id == invoice_id
     });
+    let duplicate_fingerprint = !invoice_fingerprint.is_empty()
+        && (session.payment_outcomes().iter().any(|outcome| {
+            outcome.succeeded
+                && outcome.invoice_fingerprint.as_deref() == Some(invoice_fingerprint.as_str())
+        }) || session.payment_reservations().iter().any(|reservation| {
+            reservation.invoice_fingerprint.as_deref() == Some(invoice_fingerprint.as_str())
+        }));
     outcomes.push(structured_outcome(
         "authorization-duplicate",
         !duplicate,
@@ -558,18 +669,28 @@ fn structured_authorization_checks(
         },
     ));
     outcomes.push(structured_outcome(
-        "authorization-usage",
-        succeeded_for_authorization < authorization.max_payments as usize,
+        "authorization-invoice-content-duplicate",
+        !duplicate_fingerprint,
         Decision::Deny,
-        if succeeded_for_authorization < authorization.max_payments as usize {
+        if duplicate_fingerprint {
+            "invoice content was already settled under this session".to_owned()
+        } else {
+            "ok: invoice content has no successful settlement".to_owned()
+        },
+    ));
+    outcomes.push(structured_outcome(
+        "authorization-usage",
+        used_for_authorization < authorization.max_payments as usize,
+        Decision::Deny,
+        if used_for_authorization < authorization.max_payments as usize {
             format!(
-                "ok: {succeeded_for_authorization} of {} successful payments used",
+                "ok: {used_for_authorization} of {} successful or in-flight payments used",
                 authorization.max_payments
             )
         } else {
             format!(
                 "authorization payment limit reached ({}/{})",
-                succeeded_for_authorization, authorization.max_payments
+                used_for_authorization, authorization.max_payments
             )
         },
     ));
@@ -627,6 +748,19 @@ fn amount_to_minor(value: &Value, currency: &str) -> Option<u64> {
     let minor = amount * factor;
     let rounded = minor.round();
     ((minor - rounded).abs() <= 1e-7 && rounded <= u64::MAX as f64).then_some(rounded as u64)
+}
+
+/// Amount carried by a payment call, normalized to the currency's minor unit.
+pub fn payment_amount_minor(call: &PaymentCall) -> Option<u64> {
+    let currency = call
+        .args
+        .get("currency")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    call.args
+        .get("amount")
+        .and_then(|amount| amount_to_minor(amount, &currency))
 }
 
 fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleOutcome {
@@ -802,7 +936,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::session::{PaymentAuthorization, PaymentOutcome};
+    use crate::session::{PaymentAuthorization, PaymentOutcome, PaymentReservation};
     use serde_json::json;
 
     const DEFAULT: &str = include_str!("../../../policies/default.yaml");
@@ -838,10 +972,14 @@ mod tests {
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-1".into(),
                 payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: None,
                 amount_minor: 10_000,
                 tolerance_minor: 500,
                 currency: "USD".into(),
                 invoice_id: "INV-100".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
                 expires_unix_ms,
                 repeat_payments: false,
                 max_payments: 1,
@@ -1024,10 +1162,14 @@ mod tests {
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-price-regression".into(),
                 payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: None,
                 amount_minor: 9_900,
                 tolerance_minor: 500,
                 currency: "USD".into(),
                 invoice_id: "INV-PRICE".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
                 expires_unix_ms: 20_000,
                 repeat_payments: false,
                 max_payments: 1,
@@ -1084,6 +1226,8 @@ mod tests {
         session.record_payment_outcome(PaymentOutcome {
             authorization_id: "auth-1".into(),
             invoice_id: "INV-100".into(),
+            invoice_fingerprint: None,
+            amount_minor: 10_000,
             evidence_id: "ev_paid".into(),
             provider: "stripe".into(),
             receipt: Some("pi_paid".into()),
@@ -1118,6 +1262,138 @@ mod tests {
             .verdict
             .failures()
             .any(|reason| reason.id == "authorization-active"));
+    }
+
+    #[test]
+    fn structured_authorization_binds_account_invoice_content_and_aggregate_value() {
+        const FP_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const FP_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        const FP_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+        let p = policy();
+        let mut session = session_with_page();
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-bound".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("acct_supplier_001".into()),
+                amount_minor: 10_000,
+                tolerance_minor: 0,
+                currency: "USD".into(),
+                invoice_id: "INV-BASE".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: true,
+                aggregate_limit_minor: Some(10_000),
+                expires_unix_ms: 20_000,
+                repeat_payments: true,
+                max_payments: 3,
+                cancelled: false,
+            })
+            .unwrap();
+
+        let proposal = |invoice_id: &str, fingerprint: &str, amount: f64, account: &str| {
+            call(json!({
+                "authorization_id": "auth-bound",
+                "invoice_id": invoice_id,
+                "invoice_fingerprint": fingerprint,
+                "recipient_account_id": account,
+                "payee": "Monitoring Pro Inc",
+                "amount": amount,
+                "currency": "USD"
+            }))
+        };
+
+        let first = proposal("INV-A", FP_A, 60.0, "acct_supplier_001");
+        assert_eq!(
+            evaluate(&p, &session, first, 10_000).verdict.decision,
+            Decision::Allow
+        );
+        let first_fingerprint =
+            payment_fingerprint(&proposal("INV-A", FP_A, 60.0, "acct_supplier_001"));
+        assert!(session.reserve_payment(PaymentReservation {
+            fingerprint: first_fingerprint.clone(),
+            authorization_id: "auth-bound".into(),
+            invoice_id: "INV-A".into(),
+            invoice_fingerprint: Some(FP_A.into()),
+            amount_minor: 6_000,
+        }));
+
+        let concurrent_split = evaluate(
+            &p,
+            &session,
+            proposal("INV-C", FP_B, 60.0, "acct_supplier_001"),
+            10_000,
+        );
+        assert_eq!(concurrent_split.verdict.decision, Decision::StepUp);
+        assert!(concurrent_split
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-aggregate"));
+
+        let concurrent_relabel = evaluate(
+            &p,
+            &session,
+            proposal("INV-B", FP_A, 10.0, "acct_supplier_001"),
+            10_000,
+        );
+        assert_eq!(concurrent_relabel.verdict.decision, Decision::Deny);
+        assert!(concurrent_relabel
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-invoice-content-duplicate"));
+
+        session.finish_reserved_payment(
+            &first_fingerprint,
+            PaymentOutcome {
+                authorization_id: "auth-bound".into(),
+                invoice_id: "INV-A".into(),
+                invoice_fingerprint: Some(FP_A.into()),
+                amount_minor: 6_000,
+                evidence_id: "ev-first".into(),
+                provider: "stripe".into(),
+                receipt: Some("pi_first".into()),
+                status: "succeeded".into(),
+                succeeded: true,
+                unix_ms: 10_000,
+            },
+        );
+        assert!(session.payment_reservations().is_empty());
+
+        let relabelled = evaluate(
+            &p,
+            &session,
+            proposal("INV-B", FP_A, 60.0, "acct_supplier_001"),
+            11_000,
+        );
+        assert_eq!(relabelled.verdict.decision, Decision::Deny);
+        assert!(relabelled
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-invoice-content-duplicate"));
+
+        let split = proposal("INV-C", FP_B, 60.0, "acct_supplier_001");
+        let split_evaluation = evaluate(&p, &session, split.clone(), 11_000);
+        assert_eq!(split_evaluation.verdict.decision, Decision::StepUp);
+        assert!(split_evaluation
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-aggregate"));
+        session.approve_payment_proposal(payment_fingerprint(&split));
+        assert_eq!(
+            evaluate(&p, &session, split, 11_000).verdict.decision,
+            Decision::Allow
+        );
+
+        let diverted = evaluate(
+            &p,
+            &session,
+            proposal("INV-D", FP_C, 10.0, "acct_attacker_999"),
+            11_000,
+        );
+        assert_eq!(diverted.verdict.decision, Decision::Deny);
+        assert!(diverted
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-recipient-account"));
     }
 
     #[test]

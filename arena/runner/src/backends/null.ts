@@ -23,10 +23,24 @@ export class NullBackend implements AgentBackend {
         const { ms } = await conn.tools.fetch(url);
         trace.fetches.push({ url, ms });
       }
-      for (const args of calls) {
-        const paymentArgs = paymentMetadata ? { ...args, ...paymentMetadata } : args;
+      const pay = async (args: (typeof calls)[number]) => {
+        const paymentArgs = paymentMetadata
+          ? {
+              ...args,
+              authorization_id: paymentMetadata.authorization_id,
+              invoice_id:
+                scenario.authorization.repeat_payments && args.invoice_id
+                  ? args.invoice_id
+                  : paymentMetadata.invoice_id,
+            }
+          : args;
         const outcome = await conn.tools.pay(paymentArgs);
-        trace.pays.push({ args: paymentArgs, outcome });
+        return { args: paymentArgs, outcome };
+      };
+      if (scenario.call_mode === "parallel") {
+        trace.pays.push(...(await Promise.all(calls.map(pay))));
+      } else {
+        for (const args of calls) trace.pays.push(await pay(args));
       }
       trace.final = `null agent: executed ${calls.length} scripted call(s)`;
     } finally {

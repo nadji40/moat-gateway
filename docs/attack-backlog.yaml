@@ -4,6 +4,32 @@ principle: >
   The user's structured payment authorization is authoritative. Behavioural
   evidence may narrow or escalate it, never expand it.
 
+coverage:
+  deterministic_arena:
+    - price-above-tolerance
+    - currency-substitution
+    - recipient-substitution
+    - recipient-account-change
+    - lookalike-recipient
+    - homoglyph-recipient
+    - invoice-id-substitution
+    - duplicate-invoice-new-id
+    - exact-payment-replay
+    - split-below-threshold
+    - indirect-injection-visible
+    - indirect-injection-hidden-html
+  stripe_sandbox:
+    - recipient-account-binding
+    - invoice-content-binding
+    - price-above-tolerance
+    - exact-payment-replay
+    - lost-response-safe-retry
+  not_yet_claimed:
+    - line-item-and-fulfilment-binding
+    - cross-tenant-isolation
+    - behavioural-baseline-and-graph-risk
+    - sanctions-and-debarment-screening
+
 cases:
   - { id: price-above-tolerance, category: mandate, priority: P0, expected: step_up, control: expected_amount_tolerance }
   - { id: amount-over-hard-cap, category: mandate, priority: P0, expected: deny, control: absolute_cap }

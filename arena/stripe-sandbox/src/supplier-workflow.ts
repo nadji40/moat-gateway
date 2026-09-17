@@ -1,10 +1,11 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { listPayments, recipientsFromEnv } from "./stripe.js";
+import { inspectAccount, listPayments, recipientsFromEnv } from "./stripe.js";
 
 const STEP_UP = -31050;
 const DENY = -31051;
@@ -63,6 +64,9 @@ async function authorize(
     payee: string;
     amount: number;
     tolerance?: number;
+    recipient_account_id?: string;
+    invoice_fingerprint?: string;
+    aggregate_limit?: number;
   },
 ): Promise<void> {
   await api(session, "/authorizations", {
@@ -75,6 +79,7 @@ async function authorize(
       expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       repeat_payments: false,
       max_payments: 1,
+      require_invoice_fingerprint: Boolean(input.invoice_fingerprint),
     }),
   });
 }
@@ -120,6 +125,7 @@ async function main(): Promise<void> {
   const gateway = gatewayCandidates.find(existsSync);
   if (!gateway) throw new Error("build moat-gateway before running the supplier workflow");
   const recipient = recipientsFromEnv().find((candidate) => candidate.role === "authorized")!;
+  const recipientAccount = await inspectAccount(recipient);
   const run = Date.now().toString(36);
   const session = `supplier-invoice-${run}`;
   const client = new Client({ name: "moat-supplier-workflow", version: "0.1.0" });
@@ -134,10 +140,33 @@ async function main(): Promise<void> {
   );
 
   const receipts = new Map<string, string>();
+  const bindings = new Map<
+    string,
+    { recipient_account_id: string; invoice_fingerprint: string }
+  >();
+  const grant = async (input: {
+    authorization_id: string;
+    invoice_id: string;
+    payee: string;
+    amount: number;
+    tolerance?: number;
+  }) => {
+    const binding = {
+      recipient_account_id: recipientAccount.id,
+      invoice_fingerprint: createHash("sha256")
+        .update(`${input.payee}\u0000${input.invoice_id}\u0000${input.amount}`)
+        .digest("hex"),
+    };
+    await authorize(session, { ...input, ...binding, aggregate_limit: input.amount + (input.tolerance ?? 0) });
+    bindings.set(input.authorization_id, binding);
+  };
   const pay = async (authorizationId: string, invoiceId: string, amount: number, extra = {}) => {
     const result = await client.callTool({
       name: "stripe__pay",
-      arguments: paymentArgs(recipient.payee, authorizationId, invoiceId, amount, extra),
+      arguments: paymentArgs(recipient.payee, authorizationId, invoiceId, amount, {
+        ...bindings.get(authorizationId),
+        ...extra,
+      }),
     });
     const payment = structured<{ receipt: string; status: string }>(result);
     if ((result as { isError?: boolean }).isError) return result;
@@ -152,7 +181,7 @@ async function main(): Promise<void> {
     await waitForApi(session);
 
     const ordinary = `auth-ordinary-${run}`;
-    await authorize(session, {
+    await grant({
       authorization_id: ordinary,
       invoice_id: `INV-ORD-${run}`,
       payee: recipient.payee,
@@ -162,7 +191,7 @@ async function main(): Promise<void> {
     await expectDenied(pay(ordinary, `INV-ORD-${run}`, 1), "duplicate settled invoice");
 
     const tolerance = `auth-tolerance-${run}`;
-    await authorize(session, {
+    await grant({
       authorization_id: tolerance,
       invoice_id: `INV-TOL-${run}`,
       payee: recipient.payee,
@@ -173,14 +202,16 @@ async function main(): Promise<void> {
 
     const approval = `auth-approval-${run}`;
     const approvalInvoice = `INV-APR-${run}`;
-    await authorize(session, {
+    await grant({
       authorization_id: approval,
       invoice_id: approvalInvoice,
       payee: recipient.payee,
       amount: 1,
       tolerance: 0.05,
     });
-    const approvalArgs = paymentArgs(recipient.payee, approval, approvalInvoice, 1.1);
+    const approvalArgs = paymentArgs(recipient.payee, approval, approvalInvoice, 1.1, {
+      ...bindings.get(approval),
+    });
     let resumeToken = "";
     try {
       await client.callTool({ name: "stripe__pay", arguments: approvalArgs });
@@ -200,7 +231,7 @@ async function main(): Promise<void> {
     for (const suffix of ["A", "B"]) {
       const fresh = `auth-repeat-${suffix}-${run}`;
       const invoice = `INV-REPEAT-${suffix}-${run}`;
-      await authorize(session, {
+      await grant({
         authorization_id: fresh,
         invoice_id: invoice,
         payee: recipient.payee,
@@ -211,7 +242,7 @@ async function main(): Promise<void> {
 
     const cancelled = `auth-cancelled-${run}`;
     const cancelledInvoice = `INV-CANCEL-${run}`;
-    await authorize(session, {
+    await grant({
       authorization_id: cancelled,
       invoice_id: cancelledInvoice,
       payee: recipient.payee,
@@ -222,7 +253,7 @@ async function main(): Promise<void> {
 
     const retry = `auth-retry-${run}`;
     const retryInvoice = `INV-RETRY-${run}`;
-    await authorize(session, {
+    await grant({
       authorization_id: retry,
       invoice_id: retryInvoice,
       payee: recipient.payee,

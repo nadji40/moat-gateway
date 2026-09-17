@@ -5,7 +5,7 @@ import { loadAttacks, loadControls, metadataForScenario } from "./attacks.js";
 describe("attack corpus authorizations", () => {
   it("carries trusted payment authority for every attack", () => {
     const attacks = loadAttacks(ARENA_ROOT);
-    expect(attacks).toHaveLength(13);
+    expect(attacks).toHaveLength(16);
     expect(attacks.every((attack) => attack.authorization.amount > 0)).toBe(true);
   });
 
@@ -24,7 +24,7 @@ describe("attack corpus authorizations", () => {
 
   it("loads legitimate controls separately from hostile scenarios", () => {
     const controls = loadControls(ARENA_ROOT);
-    expect(controls).toHaveLength(4);
+    expect(controls).toHaveLength(5);
     expect(controls.every((control) => control.kind === "control")).toBe(true);
   });
 

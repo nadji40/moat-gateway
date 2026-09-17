@@ -32,6 +32,9 @@ struct AuthorizedPayment {
     evidence_id: String,
     authorization_id: Option<String>,
     invoice_id: Option<String>,
+    invoice_fingerprint: Option<String>,
+    amount_minor: u64,
+    reservation_fingerprint: Option<String>,
 }
 
 /// How long an HTTP caller waits for the reply to one request before the
@@ -624,6 +627,9 @@ impl Gateway {
             }) {
             Ok(l) => l,
             Err(e) => {
+                if let Some(authorization) = &authorization {
+                    self.release_provider_reservation(authorization);
+                }
                 self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
                     .await;
                 return;
@@ -701,18 +707,24 @@ impl Gateway {
             .map(str::to_owned);
         let succeeded = !is_error && status == "succeeded";
         let session = self.shared.store.get_or_create(&self.session_id);
-        moat_core::session::lock(&session).record_payment_outcome(
-            moat_core::session::PaymentOutcome {
-                authorization_id: authorization_id.clone(),
-                invoice_id: invoice_id.clone(),
-                evidence_id: authorized.evidence_id.clone(),
-                provider: provider.to_owned(),
-                receipt,
-                status: status.to_owned(),
-                succeeded,
-                unix_ms: now_unix_ms(),
-            },
-        );
+        let outcome = moat_core::session::PaymentOutcome {
+            authorization_id: authorization_id.clone(),
+            invoice_id: invoice_id.clone(),
+            invoice_fingerprint: authorized.invoice_fingerprint.clone(),
+            amount_minor: authorized.amount_minor,
+            evidence_id: authorized.evidence_id.clone(),
+            provider: provider.to_owned(),
+            receipt,
+            status: status.to_owned(),
+            succeeded,
+            unix_ms: now_unix_ms(),
+        };
+        let mut session = moat_core::session::lock(&session);
+        if let Some(fingerprint) = &authorized.reservation_fingerprint {
+            session.finish_reserved_payment(fingerprint, outcome);
+        } else {
+            session.record_payment_outcome(outcome);
+        }
         tracing::info!(
             session = %self.session_id,
             %authorization_id,
@@ -738,18 +750,24 @@ impl Gateway {
             return;
         };
         let session = self.shared.store.get_or_create(&self.session_id);
-        moat_core::session::lock(&session).record_payment_outcome(
-            moat_core::session::PaymentOutcome {
-                authorization_id: authorization_id.clone(),
-                invoice_id: invoice_id.clone(),
-                evidence_id: authorized.evidence_id.clone(),
-                provider: provider.to_owned(),
-                receipt: None,
-                status: status.to_owned(),
-                succeeded: false,
-                unix_ms: now_unix_ms(),
-            },
-        );
+        let outcome = moat_core::session::PaymentOutcome {
+            authorization_id: authorization_id.clone(),
+            invoice_id: invoice_id.clone(),
+            invoice_fingerprint: authorized.invoice_fingerprint.clone(),
+            amount_minor: authorized.amount_minor,
+            evidence_id: authorized.evidence_id.clone(),
+            provider: provider.to_owned(),
+            receipt: None,
+            status: status.to_owned(),
+            succeeded: false,
+            unix_ms: now_unix_ms(),
+        };
+        let mut session = moat_core::session::lock(&session);
+        if let Some(fingerprint) = &authorized.reservation_fingerprint {
+            session.finish_reserved_payment(fingerprint, outcome);
+        } else {
+            session.record_payment_outcome(outcome);
+        }
         tracing::warn!(
             session = %self.session_id,
             %authorization_id,
@@ -761,6 +779,14 @@ impl Gateway {
         );
     }
 
+    fn release_provider_reservation(&self, authorized: &AuthorizedPayment) {
+        let Some(fingerprint) = &authorized.reservation_fingerprint else {
+            return;
+        };
+        let session = self.shared.store.get_or_create(&self.session_id);
+        moat_core::session::lock(&session).release_payment_reservation(fingerprint);
+    }
+
     /// Evaluate a payment call. Returns its evidence context if it may be forwarded; on
     /// `step_up` or `deny` the error has already been sent to the client.
     async fn authorize(
@@ -770,7 +796,8 @@ impl Gateway {
         tool: &str,
         args: Map<String, Value>,
     ) -> Option<AuthorizedPayment> {
-        use moat_core::policy::{evaluate, PaymentCall};
+        use moat_core::policy::{evaluate, payment_amount_minor, payment_fingerprint, PaymentCall};
+        use moat_core::session::PaymentReservation;
         use moat_core::verdict::{code as moat_code, Decision};
 
         let call = PaymentCall {
@@ -782,10 +809,52 @@ impl Gateway {
         let session = self.shared.store.get_or_create(&self.session_id);
         let now = now_unix_ms();
 
-        let eval = match &self.shared.policy {
+        let (eval, reservation_fingerprint) = match &self.shared.policy {
             PolicyState::Loaded(policy) => {
-                let s = moat_core::session::lock(&session);
-                evaluate(policy, &s, call, now)
+                let mut s = moat_core::session::lock(&session);
+                let mut eval = evaluate(policy, &s, call, now);
+                let mut reservation_fingerprint = None;
+                if eval.verdict.decision == Decision::Allow {
+                    let authorization_id = eval
+                        .call
+                        .args
+                        .get("authorization_id")
+                        .and_then(Value::as_str);
+                    let invoice_id = eval.call.args.get("invoice_id").and_then(Value::as_str);
+                    if let (Some(authorization_id), Some(invoice_id)) =
+                        (authorization_id, invoice_id)
+                    {
+                        let fingerprint = payment_fingerprint(&eval.call);
+                        let reservation = payment_amount_minor(&eval.call).map(|amount_minor| {
+                            PaymentReservation {
+                                fingerprint: fingerprint.clone(),
+                                authorization_id: authorization_id.to_owned(),
+                                invoice_id: invoice_id.to_owned(),
+                                invoice_fingerprint: eval
+                                    .call
+                                    .args
+                                    .get("invoice_fingerprint")
+                                    .and_then(Value::as_str)
+                                    .map(|value| value.trim().to_ascii_lowercase()),
+                                amount_minor,
+                            }
+                        });
+                        if reservation.is_some_and(|reservation| s.reserve_payment(reservation)) {
+                            reservation_fingerprint = Some(fingerprint);
+                        } else {
+                            eval.verdict.decision = Decision::Deny;
+                            eval.verdict.reasons.push(moat_core::verdict::RuleOutcome {
+                                id: "authorization-reservation".to_owned(),
+                                field: None,
+                                passed: false,
+                                source: None,
+                                on_fail: Decision::Deny,
+                                message: "payment could not be reserved atomically".to_owned(),
+                            });
+                        }
+                    }
+                }
+                (eval, reservation_fingerprint)
             }
             PolicyState::Missing(why) => {
                 tracing::error!(
@@ -793,13 +862,16 @@ impl Gateway {
                     tool,
                     "payment tool called with no usable policy: DENIED ({why})"
                 );
-                policy_missing_evaluation(call, why, now)
+                (policy_missing_evaluation(call, why, now), None)
             }
         };
 
         let record = match self.shared.record(&session, &eval) {
             Ok(r) => r,
             Err(e) => {
+                if let Some(fingerprint) = &reservation_fingerprint {
+                    moat_core::session::lock(&session).release_payment_reservation(fingerprint);
+                }
                 // No verdict without evidence: if evidence cannot be written,
                 // the payment does not happen.
                 tracing::error!(error = %e, "evidence write failed; denying");
@@ -837,6 +909,14 @@ impl Gateway {
                     .get("invoice_id")
                     .and_then(Value::as_str)
                     .map(str::to_owned),
+                invoice_fingerprint: eval
+                    .call
+                    .args
+                    .get("invoice_fingerprint")
+                    .and_then(Value::as_str)
+                    .map(|value| value.trim().to_ascii_lowercase()),
+                amount_minor: moat_core::policy::payment_amount_minor(&eval.call).unwrap_or(0),
+                reservation_fingerprint,
             }),
             Decision::StepUp => {
                 let values: Vec<(String, Value)> = eval

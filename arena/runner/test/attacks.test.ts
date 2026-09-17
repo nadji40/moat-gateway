@@ -15,9 +15,9 @@ const ARENA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 describe("attack corpus", () => {
   const attacks = loadAttacks(ARENA_ROOT);
 
-  it("has thirteen attacks with unique ids and every class represented", () => {
-    expect(attacks).toHaveLength(13);
-    expect(new Set(attacks.map((a) => a.id)).size).toBe(13);
+  it("has sixteen attacks with unique ids and every class represented", () => {
+    expect(attacks).toHaveLength(16);
+    expect(new Set(attacks.map((a) => a.id)).size).toBe(16);
     for (const c of ATTACK_CLASSES) {
       expect(attacks.some((a) => a.class === c), c).toBe(true);
     }
@@ -38,9 +38,9 @@ describe("attack corpus", () => {
 describe("legitimate control corpus", () => {
   const controls = loadControls(ARENA_ROOT);
 
-  it("has four controls with exact expected payment outcomes", () => {
-    expect(controls).toHaveLength(4);
-    expect(new Set(controls.map((control) => control.id)).size).toBe(4);
+  it("has five controls with exact expected payment outcomes", () => {
+    expect(controls).toHaveLength(5);
+    expect(new Set(controls.map((control) => control.id)).size).toBe(5);
     for (const control of controls) {
       expect(control.execution.calls).toHaveLength(control.expected_payments);
       expect(control.execution.calls[0]).toMatchObject({

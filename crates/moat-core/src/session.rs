@@ -46,6 +46,9 @@ pub struct PaymentAuthorization {
     pub id: String,
     /// Supplier name exactly as approved by the user.
     pub payee: String,
+    /// Stable payment-rail account or merchant identity, when the host knows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipient_account_id: Option<String>,
     /// Expected amount in the currency's minor unit.
     pub amount_minor: u64,
     /// Permitted increase above `amount_minor`.
@@ -54,6 +57,15 @@ pub struct PaymentAuthorization {
     pub currency: String,
     /// Invoice that this authorization covers when repeats are disabled.
     pub invoice_id: String,
+    /// SHA-256 of canonical invoice content, independent of the supplier's id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invoice_fingerprint: Option<String>,
+    /// Require every proposal under a repeat mandate to identify invoice content.
+    #[serde(default)]
+    pub require_invoice_fingerprint: bool,
+    /// Maximum settled value across every payment using this authorization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aggregate_limit_minor: Option<u64>,
     /// Milliseconds since Unix epoch after which the authorization is invalid.
     pub expires_unix_ms: u64,
     /// Whether multiple, uniquely identified invoices may use this mandate.
@@ -71,6 +83,12 @@ pub struct PaymentOutcome {
     pub authorization_id: String,
     /// Supplier invoice carried to the provider.
     pub invoice_id: String,
+    /// Canonical invoice fingerprint carried by the successful proposal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invoice_fingerprint: Option<String>,
+    /// Settled value in the authorization currency's minor unit.
+    #[serde(default)]
+    pub amount_minor: u64,
     /// Signed verdict that allowed the attempt.
     pub evidence_id: String,
     /// Upstream provider name.
@@ -84,6 +102,22 @@ pub struct PaymentOutcome {
     pub succeeded: bool,
     /// Milliseconds since Unix epoch when Moat observed the outcome.
     pub unix_ms: u64,
+}
+
+/// A payment that passed policy and is currently in flight to its provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PaymentReservation {
+    /// Stable identity of the exact server, tool and argument payload.
+    pub fingerprint: String,
+    /// Authorization that permitted the proposal.
+    pub authorization_id: String,
+    /// Supplier invoice carried by the proposal.
+    pub invoice_id: String,
+    /// Canonical invoice content identity, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invoice_fingerprint: Option<String>,
+    /// Proposed value in the authorization currency's minor unit.
+    pub amount_minor: u64,
 }
 
 /// Something that happened in a session. The evidence `context_hash` is
@@ -153,6 +187,12 @@ pub enum Event {
         authorization_id: String,
         /// Supplier invoice carried to the provider.
         invoice_id: String,
+        /// Canonical invoice fingerprint, when present.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        invoice_fingerprint: Option<String>,
+        /// Settled value in the authorization currency's minor unit.
+        #[serde(default)]
+        amount_minor: u64,
         /// Signed verdict that allowed the attempt.
         evidence_id: String,
         /// Upstream provider name.
@@ -185,6 +225,8 @@ pub struct Session {
     observed: Vec<Observed>,
     authorizations: Vec<PaymentAuthorization>,
     payment_outcomes: Vec<PaymentOutcome>,
+    #[serde(default)]
+    payment_reservations: Vec<PaymentReservation>,
     approved_payment_fingerprints: Vec<String>,
     events: Vec<EventRecord>,
     headless: bool,
@@ -200,6 +242,7 @@ impl Session {
             observed: Vec::new(),
             authorizations: Vec::new(),
             payment_outcomes: Vec::new(),
+            payment_reservations: Vec::new(),
             approved_payment_fingerprints: Vec::new(),
             events: Vec::new(),
             headless: false,
@@ -344,12 +387,46 @@ impl Session {
         &self.payment_outcomes
     }
 
+    /// Payments that passed policy but have not produced a provider outcome.
+    pub fn payment_reservations(&self) -> &[PaymentReservation] {
+        &self.payment_reservations
+    }
+
+    /// Reserve a proposal before forwarding it to the provider.
+    pub fn reserve_payment(&mut self, reservation: PaymentReservation) -> bool {
+        if self
+            .payment_reservations
+            .iter()
+            .any(|existing| existing.fingerprint == reservation.fingerprint)
+        {
+            return false;
+        }
+        self.payment_reservations.push(reservation);
+        true
+    }
+
+    /// Release an in-flight proposal that never produced a settled outcome.
+    pub fn release_payment_reservation(&mut self, fingerprint: &str) -> bool {
+        let before = self.payment_reservations.len();
+        self.payment_reservations
+            .retain(|reservation| reservation.fingerprint != fingerprint);
+        self.payment_reservations.len() != before
+    }
+
+    /// Atomically replace an in-flight reservation with its provider outcome.
+    pub fn finish_reserved_payment(&mut self, fingerprint: &str, outcome: PaymentOutcome) {
+        self.release_payment_reservation(fingerprint);
+        self.record_payment_outcome(outcome);
+    }
+
     /// Record a provider outcome and append its audit event.
     pub fn record_payment_outcome(&mut self, outcome: PaymentOutcome) {
         self.log_at(
             Event::PaymentOutcomeObserved {
                 authorization_id: outcome.authorization_id.clone(),
                 invoice_id: outcome.invoice_id.clone(),
+                invoice_fingerprint: outcome.invoice_fingerprint.clone(),
+                amount_minor: outcome.amount_minor,
                 evidence_id: outcome.evidence_id.clone(),
                 provider: outcome.provider.clone(),
                 status: outcome.status.clone(),

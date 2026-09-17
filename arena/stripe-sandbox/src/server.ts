@@ -22,12 +22,17 @@ server.registerTool(
       currency: z.string().length(3).default("USD").describe("ISO 4217 currency code"),
       authorization_id: z.string().min(1).describe("Moat payment authorization id"),
       invoice_id: z.string().min(1).describe("Supplier invoice id"),
+      recipient_account_id: z.string().min(1).optional().describe("Expected Stripe account id"),
+      invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional().describe("Canonical invoice SHA-256"),
       simulate_response_loss: z.boolean().default(false).describe("Test-only failure after Stripe accepts the payment"),
     },
   },
-  async ({ payee, amount, currency, authorization_id, invoice_id, simulate_response_loss }) => {
+  async ({ payee, amount, currency, authorization_id, invoice_id, recipient_account_id, invoice_fingerprint, simulate_response_loss }) => {
     const recipient = recipientFor(payee, recipients);
-    const payment = await createPayment(recipient, amount, currency, authorization_id, invoice_id);
+    const payment = await createPayment(recipient, amount, currency, authorization_id, invoice_id, {
+      ...(recipient_account_id ? { recipientAccountId: recipient_account_id } : {}),
+      ...(invoice_fingerprint ? { invoiceFingerprint: invoice_fingerprint } : {}),
+    });
     if (simulate_response_loss) {
       throw new Error("simulated response loss after Stripe accepted the idempotent payment");
     }
@@ -48,6 +53,7 @@ server.registerTool(
         recipient_role: payment.role,
         authorization_id: payment.authorization_id,
         invoice_id: payment.invoice_id,
+        invoice_fingerprint: payment.invoice_fingerprint,
       },
     };
   },

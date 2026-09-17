@@ -27,6 +27,7 @@ export interface PaymentSummary {
   created: string;
   authorization_id: string;
   invoice_id: string;
+  invoice_fingerprint: string;
 }
 
 interface StripeAccount {
@@ -166,6 +167,7 @@ function paymentSummary(intent: StripePaymentIntent, recipient: Recipient): Paym
     created: new Date(intent.created * 1000).toISOString(),
     authorization_id: intent.metadata?.["moat_authorization_id"] ?? "",
     invoice_id: intent.metadata?.["moat_invoice_id"] ?? "",
+    invoice_fingerprint: intent.metadata?.["moat_invoice_fingerprint"] ?? "",
   };
 }
 
@@ -175,10 +177,14 @@ export async function createPayment(
   currency: string,
   authorizationId: string,
   invoiceId: string,
+  binding: { recipientAccountId?: string; invoiceFingerprint?: string } = {},
 ): Promise<PaymentSummary> {
   if (!authorizationId.trim()) throw new Error("authorization_id is required");
   if (!invoiceId.trim()) throw new Error("invoice_id is required");
   const account = await inspectAccount(recipient);
+  if (binding.recipientAccountId && binding.recipientAccountId !== account.id) {
+    throw new Error("recipient_account_id does not match the configured Stripe account");
+  }
   const params = new URLSearchParams();
   params.set("amount", String(majorToMinor(amount, currency)));
   params.set("currency", currency.toLowerCase());
@@ -192,6 +198,9 @@ export async function createPayment(
   params.set("metadata[moat_account]", account.id);
   params.set("metadata[moat_authorization_id]", authorizationId);
   params.set("metadata[moat_invoice_id]", invoiceId);
+  if (binding.invoiceFingerprint) {
+    params.set("metadata[moat_invoice_fingerprint]", binding.invoiceFingerprint.toLowerCase());
+  }
   const idempotencyKey = `moat-${createHash("sha256")
     .update(`${account.id}\u0000${authorizationId}\u0000${invoiceId}`)
     .digest("hex")}`;

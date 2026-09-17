@@ -38,10 +38,18 @@ struct AuthorizationBody {
     authorization_id: String,
     invoice_id: String,
     payee: String,
+    #[serde(default)]
+    recipient_account_id: Option<String>,
     amount: f64,
     #[serde(default)]
     tolerance: f64,
     currency: String,
+    #[serde(default)]
+    invoice_fingerprint: Option<String>,
+    #[serde(default)]
+    require_invoice_fingerprint: bool,
+    #[serde(default)]
+    aggregate_limit: Option<f64>,
     expires_at: String,
     #[serde(default)]
     repeat_payments: bool,
@@ -129,6 +137,18 @@ async fn post_authorization(
     let authorization_id = body.authorization_id.trim();
     let invoice_id = body.invoice_id.trim();
     let payee = body.payee.trim();
+    let recipient_account_id = body
+        .recipient_account_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let invoice_fingerprint = body
+        .invoice_fingerprint
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase);
     let currency = body.currency.trim().to_ascii_uppercase();
     if authorization_id.is_empty() || invoice_id.is_empty() || payee.is_empty() {
         return Err(err(
@@ -148,6 +168,14 @@ async fn post_authorization(
             "max_payments must be 1 unless repeat_payments is true",
         ));
     }
+    if let Some(fingerprint) = &invoice_fingerprint {
+        if fingerprint.len() != 64 || !fingerprint.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(err(
+                StatusCode::BAD_REQUEST,
+                "invoice_fingerprint must be a 64-character SHA-256 hex value",
+            ));
+        }
+    }
     let amount_minor = major_to_minor(body.amount, &currency).ok_or_else(|| {
         err(
             StatusCode::BAD_REQUEST,
@@ -161,6 +189,23 @@ async fn post_authorization(
                 "tolerance is invalid for this currency",
             )
         })?;
+    let aggregate_limit_minor = body
+        .aggregate_limit
+        .map(|limit| {
+            major_to_minor(limit, &currency).ok_or_else(|| {
+                err(
+                    StatusCode::BAD_REQUEST,
+                    "aggregate_limit is invalid for this currency",
+                )
+            })
+        })
+        .transpose()?;
+    if aggregate_limit_minor.is_some_and(|limit| limit < amount_minor) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "aggregate_limit must be at least the expected amount",
+        ));
+    }
     let expires = time::OffsetDateTime::parse(
         body.expires_at.trim(),
         &time::format_description::well_known::Rfc3339,
@@ -172,10 +217,14 @@ async fn post_authorization(
     let authorization = PaymentAuthorization {
         id: authorization_id.to_owned(),
         payee: payee.to_owned(),
+        recipient_account_id,
         amount_minor,
         tolerance_minor,
         currency: currency.clone(),
         invoice_id: invoice_id.to_owned(),
+        invoice_fingerprint,
+        require_invoice_fingerprint: body.require_invoice_fingerprint,
+        aggregate_limit_minor,
         expires_unix_ms,
         repeat_payments: body.repeat_payments,
         max_payments: body.max_payments,

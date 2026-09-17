@@ -9,6 +9,8 @@ export interface LedgerEntry {
   currency: string;
   authorization_id?: string;
   invoice_id?: string;
+  recipient_account_id?: string;
+  invoice_fingerprint?: string;
   at: string;
 }
 
