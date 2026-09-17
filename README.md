@@ -242,6 +242,10 @@ built binary:
 - `mock-stripe` — stdio MCP server with `pay({payee, amount, currency})`.
   Records every call to the JSON file in `MOCK_STRIPE_LEDGER`; never touches
   the network.
+- `stripe-sandbox` — optional stdio MCP server backed by two Stripe test-mode
+  accounts. It maps the configured legitimate and attacker merchant names to
+  separate test accounts and creates confirmed PaymentIntents. It is kept out
+  of the normal arena so repeated evaluations never contact an external API.
 - `mock-web` — Streamable HTTP MCP server with `fetch(url)`, serving files
   under the arena directory for `https://arena.local/...` URLs.
 - `attacks/<id>/attack.yaml` — ten attacks in five classes: injection to
@@ -280,6 +284,48 @@ paid.
 
 ```bash
 cd arena && pnpm --filter @moat/runner start --backend null --runs 3 --attack inject-hidden-css
+```
+
+### Stripe sandbox demonstration
+
+The real Stripe adapter is deliberately separate from the repeatable mock
+arena. Put the two test-mode secret keys in `/home/moat/.env.stripe-sandbox`
+(the file is ignored by Git):
+
+```text
+STRIPE_AUTHORIZED_SECRET_KEY=sk_test_...
+STRIPE_UNAUTHORIZED_SECRET_KEY=sk_test_...
+STRIPE_AUTHORIZED_PAYEE=Monitoring Pro Inc
+STRIPE_UNAUTHORIZED_PAYEE=ProMon Billing Ltd
+```
+
+Run the adapter directly to inspect the tools, or put Node 22 on `PATH` and
+start the gateway with the dedicated configuration:
+
+```bash
+cd arena
+node --env-file=../.env.stripe-sandbox --import tsx stripe-sandbox/src/server.ts
+```
+
+```bash
+cd arena
+moat-gateway --config moat.stripe-sandbox.yaml --session-id stripe-demo
+```
+
+The server sends only Stripe test-mode requests. A call to `pay` selects an
+account by the exact configured payee, confirms a PaymentIntent with Stripe's
+test payment method, and returns the PaymentIntent id as the receipt. Unknown
+payees fail closed. The browser publishable keys are not needed because this
+adapter performs server-to-server requests.
+
+The opt-in smoke test creates three one-dollar test payments: direct payments
+to both accounts, then an authorized payment through Moat. It also verifies
+that an unauthorized payment through Moat is stepped up before Stripe receives
+it:
+
+```bash
+cd arena
+MOAT_STRIPE_SMOKE_CONFIRM=YES pnpm --filter @moat/stripe-sandbox smoke
 ```
 
 ### Null-agent baseline (2026-09-16)

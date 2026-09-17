@@ -1,0 +1,13 @@
+# Real Stripe test-mode upstream for a narrow Moat demonstration.
+# Run from arena/ with Node 22 on PATH. Secrets live in ../.env.stripe-sandbox,
+# which is ignored by Git.
+listen: { transport: stdio }
+upstreams:
+  - name: stripe
+    transport: stdio
+    command:
+      ["node", "--env-file=../.env.stripe-sandbox", "--import", "tsx", "stripe-sandbox/src/server.ts"]
+policy: ../policies/default.yaml
+evidence: ./results/stripe-sandbox-evidence.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7074" }

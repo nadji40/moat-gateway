@@ -2,5 +2,6 @@ packages:
   - mock-stripe
   - mock-web
   - runner
+  - stripe-sandbox
 allowBuilds:
   esbuild: true
