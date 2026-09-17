@@ -1,4 +1,4 @@
-import type { Attack, PayCall } from "../attacks.js";
+import type { ArenaScenario, PayCall } from "../attacks.js";
 import type { Connected, Endpoints } from "../mcp.js";
 
 /** What a `pay` call came back as. */
@@ -57,11 +57,11 @@ export interface RunContext {
   /** Tell Moat what the human asked for. No-op in direct mode. */
   registerIntent(text: string): Promise<void>;
   /** Register trusted payment authority and return the ids a payment call must carry. */
-  registerAuthorization(attack: Attack): Promise<PaymentMetadata | undefined>;
+  registerAuthorization(scenario: ArenaScenario): Promise<PaymentMetadata | undefined>;
 }
 
-/** An agent that can be driven through one attack task. */
+/** An agent that can be driven through one attack or legitimate control task. */
 export interface AgentBackend {
   readonly name: string;
-  run(attack: Attack, ctx: RunContext): Promise<AgentTrace>;
+  run(scenario: ArenaScenario, ctx: RunContext): Promise<AgentTrace>;
 }

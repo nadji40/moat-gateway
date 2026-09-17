@@ -2,7 +2,7 @@
   "name": "@moat/runner",
   "private": true,
   "version": "0.1.0",
-  "description": "Drives an agent through each attack with and without the gateway and reports what got paid.",
+  "description": "Runs payment attacks and legitimate controls with and without the gateway.",
   "type": "module",
   "scripts": {
     "start": "tsx src/main.ts",

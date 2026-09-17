@@ -9,9 +9,19 @@ export interface SummaryLine {
   verdicts: string;
 }
 
+export interface ControlSummaryLine {
+  control: string;
+  class: string;
+  runs: number;
+  completedDirect: number;
+  completedGateway: number;
+  verdicts: string;
+}
+
 export function summarize(rows: ResultRow[]): SummaryLine[] {
   const byAttack = new Map<string, ResultRow[]>();
   for (const r of rows) {
+    if (r.scenario_kind === "control") continue;
     const list = byAttack.get(r.attack) ?? [];
     list.push(r);
     byAttack.set(r.attack, list);
@@ -34,8 +44,49 @@ export function summarize(rows: ResultRow[]): SummaryLine[] {
   return out;
 }
 
+export function summarizeControls(rows: ResultRow[]): ControlSummaryLine[] {
+  const byControl = new Map<string, ResultRow[]>();
+  for (const row of rows) {
+    if (row.scenario_kind !== "control") continue;
+    const list = byControl.get(row.attack) ?? [];
+    list.push(row);
+    byControl.set(row.attack, list);
+  }
+  const out: ControlSummaryLine[] = [];
+  for (const [control, list] of [...byControl.entries()].sort()) {
+    const direct = list.filter((row) => row.mode === "direct");
+    const gateway = list.filter((row) => row.mode === "gateway");
+    const counts = new Map<string, number>();
+    for (const row of gateway) {
+      for (const verdict of row.verdicts) {
+        counts.set(verdict, (counts.get(verdict) ?? 0) + 1);
+      }
+    }
+    out.push({
+      control,
+      class: list[0]?.class ?? "?",
+      runs: Math.max(direct.length, gateway.length),
+      completedDirect: direct.filter((row) => row.legitimate_completed).length,
+      completedGateway: gateway.filter((row) => row.legitimate_completed).length,
+      verdicts: [...counts.entries()].map(([key, value]) => `${key}×${value}`).join(" ") || "-",
+    });
+  }
+  return out;
+}
+
+function markdownTable(header: string[], body: string[][]): string[] {
+  const widths = header.map((heading, index) =>
+    Math.max(heading.length, ...body.map((row) => (row[index] ?? "").length)),
+  );
+  const format = (row: string[]): string =>
+    "| " + row.map((cell, index) => (cell ?? "").padEnd(widths[index] ?? 0)).join(" | ") + " |";
+  const separator = "|" + widths.map((width) => "-".repeat(width + 2)).join("|") + "|";
+  return [format(header), separator, ...body.map(format)];
+}
+
 export function renderTable(rows: ResultRow[]): string {
   const lines = summarize(rows);
+  const controls = summarizeControls(rows);
   const header = ["attack", "class", "runs", "paid (direct)", "paid (gateway)", "gateway verdicts"];
   const body = lines.map((l) => [
     l.attack,
@@ -45,16 +96,40 @@ export function renderTable(rows: ResultRow[]): string {
     `${l.paidGateway}/${l.runs}`,
     l.verdicts,
   ]);
-  const widths = header.map((h, i) => Math.max(h.length, ...body.map((r) => (r[i] ?? "").length)));
-  const fmt = (r: string[]): string =>
-    "| " + r.map((c, i) => (c ?? "").padEnd(widths[i] ?? 0)).join(" | ") + " |";
-  const sep = "|" + widths.map((w) => "-".repeat(w + 2)).join("|") + "|";
-  const out = [fmt(header), sep, ...body.map(fmt)];
+  const out: string[] = [];
+  if (lines.length > 0) out.push(...markdownTable(header, body));
 
   const totalDirect = lines.reduce((a, l) => a + l.paidDirect, 0);
   const totalGateway = lines.reduce((a, l) => a + l.paidGateway, 0);
   const totalRuns = lines.reduce((a, l) => a + l.runs, 0);
-  out.push("", `attacker paid: direct ${totalDirect}/${totalRuns}, gateway ${totalGateway}/${totalRuns}`);
+  if (lines.length > 0) {
+    out.push("", `attacker paid: direct ${totalDirect}/${totalRuns}, gateway ${totalGateway}/${totalRuns}`);
+  }
+
+  if (controls.length > 0) {
+    const controlHeader = [
+      "control",
+      "class",
+      "runs",
+      "completed (direct)",
+      "completed (gateway)",
+      "gateway verdicts",
+    ];
+    const controlBody = controls.map((line) => [
+      line.control,
+      line.class,
+      String(line.runs),
+      `${line.completedDirect}/${line.runs}`,
+      `${line.completedGateway}/${line.runs}`,
+      line.verdicts,
+    ]);
+    if (out.length > 0) out.push("");
+    out.push(...markdownTable(controlHeader, controlBody));
+    const direct = controls.reduce((sum, line) => sum + line.completedDirect, 0);
+    const gateway = controls.reduce((sum, line) => sum + line.completedGateway, 0);
+    const total = controls.reduce((sum, line) => sum + line.runs, 0);
+    out.push("", `legitimate completed: direct ${direct}/${total}, gateway ${gateway}/${total}`);
+  }
 
   const fetchDirect = rows.filter((r) => r.mode === "direct").flatMap((r) => r.fetch_ms);
   const fetchGateway = rows.filter((r) => r.mode === "gateway").flatMap((r) => r.fetch_ms);

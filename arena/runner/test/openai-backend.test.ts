@@ -14,7 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Ledger } from "../../mock-stripe/src/ledger.js";
-import { loadAttacks } from "../src/attacks.js";
+import { loadAttacks, loadControls } from "../src/attacks.js";
 import { OpenAIBackend } from "../src/backends/openai.js";
 import { ScriptedModel } from "../src/backends/stubModel.js";
 import { contextFor } from "../src/context.js";
@@ -157,6 +157,50 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
     expect(new Ledger(ledger).paidTo("Monitoring Pro Inc")).toHaveLength(0);
   }, 60_000);
 
+  it("denies a currency substituted under an otherwise valid authorization", async () => {
+    const ledger = join(work, "currency-substitution.json");
+    const attack = loadAttacks(ARENA_ROOT).find((candidate) => candidate.id === "substitute-currency")!;
+    const model = new ScriptedModel([
+      {
+        tool: "pay",
+        args: {
+          payee: "Monitoring Pro Inc",
+          amount: 99,
+          currency: "EUR",
+          authorization_id: "auth-test-currency-substitution",
+          invoice_id: "inv-test-currency-substitution",
+        },
+      },
+    ]);
+    const ctx = contextFor("gateway", "test-currency-substitution", ledger);
+    const trace = await new OpenAIBackend(model).run(attack, ctx);
+
+    expect(trace.pays[0]!.outcome.kind).toBe("deny");
+    expect(new Ledger(ledger).read()).toHaveLength(0);
+  }, 60_000);
+
+  it("denies an invoice identity substituted under a valid authorization", async () => {
+    const ledger = join(work, "invoice-substitution.json");
+    const attack = loadAttacks(ARENA_ROOT).find((candidate) => candidate.id === "substitute-invoice-id")!;
+    const model = new ScriptedModel([
+      {
+        tool: "pay",
+        args: {
+          payee: "Monitoring Pro Inc",
+          amount: 99,
+          currency: "USD",
+          authorization_id: "auth-test-invoice-substitution",
+          invoice_id: "tampered-substitute-invoice-id",
+        },
+      },
+    ]);
+    const ctx = contextFor("gateway", "test-invoice-substitution", ledger);
+    const trace = await new OpenAIBackend(model).run(attack, ctx);
+
+    expect(trace.pays[0]!.outcome.kind).toBe("deny");
+    expect(new Ledger(ledger).read()).toHaveLength(0);
+  }, 60_000);
+
   it("without the gateway, the same injected call goes through", async () => {
     const ledger = join(work, "direct.json");
     const model = new ScriptedModel([
@@ -167,5 +211,27 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
 
     expect(trace.pays[0]!.outcome.kind).toBe("paid");
     expect(new Ledger(ledger).paidTo("ProMon Billing Ltd")).toHaveLength(1);
+  }, 60_000);
+
+  it("allows an exact legitimate control and records the intended payment", async () => {
+    const ledger = join(work, "legitimate-control.json");
+    const control = loadControls(ARENA_ROOT).find((candidate) => candidate.id === "authorized-exact")!;
+    const model = new ScriptedModel([
+      {
+        tool: "pay",
+        args: {
+          payee: "Monitoring Pro Inc",
+          amount: 99,
+          currency: "USD",
+          authorization_id: "auth-test-legitimate-control",
+          invoice_id: "inv-test-legitimate-control",
+        },
+      },
+    ]);
+    const ctx = contextFor("gateway", "test-legitimate-control", ledger);
+    const trace = await new OpenAIBackend(model).run(control, ctx);
+
+    expect(trace.pays[0]!.outcome.kind).toBe("paid");
+    expect(new Ledger(ledger).paidTo("Monitoring Pro Inc")).toHaveLength(1);
   }, 60_000);
 });

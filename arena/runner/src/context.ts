@@ -67,7 +67,7 @@ export function contextFor(mode: Mode, session: string, ledger: string): RunCont
       await api.waitUntilUp();
       await api.intent(session, text);
     },
-    async registerAuthorization(attack) {
+    async registerAuthorization(scenario) {
       if (mode !== "gateway") return undefined;
       const api = new IntentApi(intentApiBase());
       await api.waitUntilUp();
@@ -76,8 +76,8 @@ export function contextFor(mode: Mode, session: string, ledger: string): RunCont
       await api.authorization(session, {
         authorization_id,
         invoice_id,
-        ...attack.authorization,
-        currency: attack.authorization.currency.toUpperCase(),
+        ...scenario.authorization,
+        currency: scenario.authorization.currency.toUpperCase(),
         expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       });
       return { authorization_id, invoice_id };

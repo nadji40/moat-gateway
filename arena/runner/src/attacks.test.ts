@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ARENA_ROOT } from "./context.js";
-import { loadAttacks } from "./attacks.js";
+import { loadAttacks, loadControls, metadataForScenario } from "./attacks.js";
 
 describe("attack corpus authorizations", () => {
   it("carries trusted payment authority for every attack", () => {
     const attacks = loadAttacks(ARENA_ROOT);
-    expect(attacks).toHaveLength(10);
+    expect(attacks).toHaveLength(13);
     expect(attacks.every((attack) => attack.authorization.amount > 0)).toBe(true);
   });
 
@@ -20,5 +20,23 @@ describe("attack corpus authorizations", () => {
       max_payments: 1,
     });
     expect(attack?.injection.calls[0]?.amount).toBe(499);
+  });
+
+  it("loads legitimate controls separately from hostile scenarios", () => {
+    const controls = loadControls(ARENA_ROOT);
+    expect(controls).toHaveLength(4);
+    expect(controls.every((control) => control.kind === "control")).toBe(true);
+  });
+
+  it("models missing and substituted payment metadata explicitly", () => {
+    const attacks = loadAttacks(ARENA_ROOT);
+    const registered = { authorization_id: "auth-real", invoice_id: "inv-real" };
+    const omitted = attacks.find((candidate) => candidate.id === "omit-authorization-id")!;
+    const substituted = attacks.find((candidate) => candidate.id === "substitute-invoice-id")!;
+    expect(metadataForScenario(omitted, registered)).toBeUndefined();
+    expect(metadataForScenario(substituted, registered)).toEqual({
+      authorization_id: "auth-real",
+      invoice_id: "tampered-substitute-invoice-id",
+    });
   });
 });

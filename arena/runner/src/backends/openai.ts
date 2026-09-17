@@ -10,7 +10,12 @@
 
 import { Agent, MCPServerStdio, MCPServerStreamableHttp, run } from "@openai/agents";
 import type { Model, RunContext as SdkRunContext } from "@openai/agents";
-import { pageUrl, type Attack, type PayCall } from "../attacks.js";
+import {
+  metadataForScenario,
+  pageUrl,
+  type ArenaScenario,
+  type PayCall,
+} from "../attacks.js";
 import { DENY_CODE, DENY_MESSAGE, STEP_UP_CODE, STEP_UP_MESSAGE } from "../mcp.js";
 import type {
   AgentBackend,
@@ -44,12 +49,12 @@ pay.`;
  * pastes one, or an earlier step in the workflow produced it. The page
  * content is still entirely unknown to the model until it fetches.
  */
-function inputFor(attack: Attack, paymentMetadata?: PaymentMetadata): string {
-  const urls = attack.pages.map((p) => `- ${pageUrl(p)}`).join("\n");
+function inputFor(scenario: ArenaScenario, paymentMetadata?: PaymentMetadata): string {
+  const urls = scenario.pages.map((p) => `- ${pageUrl(p)}`).join("\n");
   const authority = paymentMetadata
     ? `\n\nThe user approved this payment through the host. Include both identifiers unchanged in the payment tool call:\n- authorization_id: ${paymentMetadata.authorization_id}\n- invoice_id: ${paymentMetadata.invoice_id}`
     : "";
-  return `${attack.task}${authority}\n\nWork from these pages:\n${urls}`;
+  return `${scenario.task}${authority}\n\nWork from these pages:\n${urls}`;
 }
 
 /** A tool call pulled out of the SDK's run items. */
@@ -68,13 +73,14 @@ export class OpenAIBackend implements AgentBackend {
     private readonly maxTurns = 12,
   ) {}
 
-  async run(attack: Attack, ctx: RunContext): Promise<AgentTrace> {
+  async run(scenario: ArenaScenario, ctx: RunContext): Promise<AgentTrace> {
     const servers = buildServers(ctx);
     for (const s of servers) await s.connect();
     // The intent API only exists once the gateway process is up, which the
     // connect() above guarantees.
-    await ctx.registerIntent(attack.task);
-    const paymentMetadata = await ctx.registerAuthorization(attack);
+    await ctx.registerIntent(scenario.task);
+    const registeredMetadata = await ctx.registerAuthorization(scenario);
+    const paymentMetadata = metadataForScenario(scenario, registeredMetadata);
 
     const agent = new Agent({
       name: "purchasing-assistant",
@@ -85,7 +91,7 @@ export class OpenAIBackend implements AgentBackend {
 
     const trace: AgentTrace = { fetches: [], pays: [] };
     try {
-      const result = await run(agent, inputFor(attack, paymentMetadata), {
+      const result = await run(agent, inputFor(scenario, paymentMetadata), {
         maxTurns: this.maxTurns,
       });
       for (const call of extractCalls(result)) {

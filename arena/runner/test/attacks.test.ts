@@ -1,7 +1,12 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { ATTACK_CLASSES, loadAttacks, pageUrl } from "../src/attacks.js";
+import {
+  ATTACK_CLASSES,
+  loadAttacks,
+  loadControls,
+  pageUrl,
+} from "../src/attacks.js";
 import { percentile } from "../src/results.js";
 import { renderTable, summarize } from "../src/table.js";
 
@@ -10,9 +15,9 @@ const ARENA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 describe("attack corpus", () => {
   const attacks = loadAttacks(ARENA_ROOT);
 
-  it("has ten attacks with unique ids and every class represented", () => {
-    expect(attacks).toHaveLength(10);
-    expect(new Set(attacks.map((a) => a.id)).size).toBe(10);
+  it("has thirteen attacks with unique ids and every class represented", () => {
+    expect(attacks).toHaveLength(13);
+    expect(new Set(attacks.map((a) => a.id)).size).toBe(13);
     for (const c of ATTACK_CLASSES) {
       expect(attacks.some((a) => a.class === c), c).toBe(true);
     }
@@ -27,6 +32,23 @@ describe("attack corpus", () => {
 
   it("builds arena URLs", () => {
     expect(pageUrl("attacks/x/page.html")).toBe("https://arena.local/attacks/x/page.html");
+  });
+});
+
+describe("legitimate control corpus", () => {
+  const controls = loadControls(ARENA_ROOT);
+
+  it("has four controls with exact expected payment outcomes", () => {
+    expect(controls).toHaveLength(4);
+    expect(new Set(controls.map((control) => control.id)).size).toBe(4);
+    for (const control of controls) {
+      expect(control.execution.calls).toHaveLength(control.expected_payments);
+      expect(control.execution.calls[0]).toMatchObject({
+        payee: control.expected_payee,
+        amount: control.expected_amount,
+        currency: control.expected_currency,
+      });
+    }
   });
 });
 
@@ -62,5 +84,32 @@ describe("summary", () => {
     expect(percentile([], 50)).toBeUndefined();
     expect(percentile([5, 1, 3], 50)).toBe(3);
     expect(percentile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 95)).toBe(10);
+  });
+
+  it("reports legitimate completion separately from attack success", () => {
+    const base = {
+      run_id: "r",
+      backend: "null",
+      attack: "authorized-exact",
+      class: "legitimate-invoice",
+      scenario_kind: "control" as const,
+      iteration: 1,
+      attacker_paid: false,
+      attacker_payments: 0,
+      verdicts: ["paid"],
+      fetch_ms: [1],
+      pay_ms: [1],
+      wall_ms: 2,
+      trace: { fetches: [], pays: [] },
+      at: "",
+    };
+    const rows = [
+      { ...base, mode: "direct" as const, legitimate_completed: true },
+      { ...base, mode: "gateway" as const, legitimate_completed: true },
+    ];
+    const table = renderTable(rows);
+    expect(table).toContain("completed (gateway)");
+    expect(table).toContain("legitimate completed: direct 1/1, gateway 1/1");
+    expect(table).not.toContain("attacker paid:");
   });
 });

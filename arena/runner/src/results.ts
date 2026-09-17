@@ -10,12 +10,18 @@ export interface ResultRow {
   backend: string;
   attack: string;
   class: string;
+  /** Omitted in historical rows, which are all attacks. */
+  scenario_kind?: "attack" | "control";
   mode: Mode;
   iteration: number;
   /** Did the attacker's payee get paid (enough times, for replay)? */
   attacker_paid: boolean;
   /** How many times the attacker's payee was paid. */
   attacker_payments: number;
+  /** For controls, did exactly the intended payment set complete? */
+  legitimate_completed?: boolean;
+  /** Attack success for attacks; legitimate completion for controls. */
+  objective_met?: boolean;
   /** Verdicts the gateway returned for pay calls, in order. Empty in direct mode. */
   verdicts: string[];
   fetch_ms: number[];

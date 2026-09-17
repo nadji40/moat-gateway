@@ -1,34 +1,34 @@
-import type { Attack } from "../attacks.js";
-import { pageUrl } from "../attacks.js";
+import type { ArenaScenario } from "../attacks.js";
+import { metadataForScenario, pageUrl, scriptedCalls } from "../attacks.js";
 import type { AgentBackend, AgentTrace, RunContext } from "./types.js";
 
 /**
- * A scripted agent that always follows the injection: it reads every page the
- * attack lists, then makes exactly the payment calls the attack says an
- * injected agent would make. No model, no tokens. It exists so the whole
- * pipeline can be exercised and so the gateway is measured against the
- * worst case, an agent that does whatever the page says.
+ * A scripted agent that reads every scenario page, then makes exactly the
+ * declared payment calls. No model, no tokens. Attack cases model a fully
+ * compromised agent; controls model the intended purchase path.
  */
 export class NullBackend implements AgentBackend {
   readonly name = "null";
 
-  async run(attack: Attack, ctx: RunContext): Promise<AgentTrace> {
+  async run(scenario: ArenaScenario, ctx: RunContext): Promise<AgentTrace> {
     const conn = await ctx.connect();
-    await ctx.registerIntent(attack.task);
-    const paymentMetadata = await ctx.registerAuthorization(attack);
+    await ctx.registerIntent(scenario.task);
+    const registeredMetadata = await ctx.registerAuthorization(scenario);
+    const paymentMetadata = metadataForScenario(scenario, registeredMetadata);
+    const calls = scriptedCalls(scenario);
     const trace: AgentTrace = { fetches: [], pays: [] };
     try {
-      for (const page of attack.pages) {
+      for (const page of scenario.pages) {
         const url = pageUrl(page);
         const { ms } = await conn.tools.fetch(url);
         trace.fetches.push({ url, ms });
       }
-      for (const args of attack.injection.calls) {
+      for (const args of calls) {
         const paymentArgs = paymentMetadata ? { ...args, ...paymentMetadata } : args;
         const outcome = await conn.tools.pay(paymentArgs);
         trace.pays.push({ args: paymentArgs, outcome });
       }
-      trace.final = `null agent: followed ${attack.injection.calls.length} injected call(s)`;
+      trace.final = `null agent: executed ${calls.length} scripted call(s)`;
     } finally {
       await conn.close();
     }
