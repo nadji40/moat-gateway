@@ -21,6 +21,11 @@ export interface ToolDescriptor {
   inputSchema: Record<string, unknown>;
 }
 
+export interface PaymentMetadata {
+  authorization_id: string;
+  invoice_id: string;
+}
+
 export interface AgentTrace {
   /** Every fetch the agent made, in order. */
   fetches: { url: string; ms: number }[];
@@ -51,6 +56,8 @@ export interface RunContext {
   connect(): Promise<Connected>;
   /** Tell Moat what the human asked for. No-op in direct mode. */
   registerIntent(text: string): Promise<void>;
+  /** Register trusted payment authority and return the ids a payment call must carry. */
+  registerAuthorization(attack: Attack): Promise<PaymentMetadata | undefined>;
 }
 
 /** An agent that can be driven through one attack task. */

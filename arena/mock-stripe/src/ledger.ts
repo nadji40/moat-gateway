@@ -7,6 +7,8 @@ export interface LedgerEntry {
   payee: string;
   amount: number;
   currency: string;
+  authorization_id?: string;
+  invoice_id?: string;
   at: string;
 }
 

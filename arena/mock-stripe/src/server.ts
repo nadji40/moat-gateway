@@ -1,4 +1,4 @@
-// Fake payment MCP server. Exposes pay({payee, amount, currency}), records
+// Fake payment MCP server. Exposes pay(), records
 // every call to the JSON file named by MOCK_STRIPE_LEDGER (default
 // ./ledger.json) and returns a fake receipt. It never contacts the network.
 
@@ -20,10 +20,18 @@ server.registerTool(
       payee: z.string().describe("Name of the merchant or person to pay"),
       amount: z.number().positive().describe("Amount in major units, e.g. 480 for $480"),
       currency: z.string().default("USD").describe("ISO 4217 code"),
+      authorization_id: z.string().min(1).optional().describe("Payment authorization id"),
+      invoice_id: z.string().min(1).optional().describe("Supplier invoice id"),
     },
   },
-  async ({ payee, amount, currency }) => {
-    const entry = ledger.append({ payee, amount, currency });
+  async ({ payee, amount, currency, authorization_id, invoice_id }) => {
+    const entry = ledger.append({
+      payee,
+      amount,
+      currency,
+      ...(authorization_id ? { authorization_id } : {}),
+      ...(invoice_id ? { invoice_id } : {}),
+    });
     return {
       content: [
         {
@@ -31,7 +39,15 @@ server.registerTool(
           text: `Payment sent: ${amount} ${currency} to ${payee}. Receipt ${entry.receipt}.`,
         },
       ],
-      structuredContent: { receipt: entry.receipt, payee, amount, currency },
+      structuredContent: {
+        receipt: entry.receipt,
+        payee,
+        amount,
+        currency,
+        status: "succeeded",
+        ...(authorization_id ? { authorization_id } : {}),
+        ...(invoice_id ? { invoice_id } : {}),
+      },
     };
   },
 );

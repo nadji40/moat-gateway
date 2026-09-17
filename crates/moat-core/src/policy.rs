@@ -311,21 +311,31 @@ pub fn evaluate(
 
     let mut reasons = Vec::new();
     let mut decision = Decision::Allow;
+    let has_authorization_id = call.args.contains_key("authorization_id");
+    let structured_authorization_required = !session.payment_authorizations().is_empty();
 
-    if call.args.contains_key("authorization_id") {
+    if has_authorization_id {
         for outcome in structured_authorization_checks(session, &call, &mapped, now_unix_ms) {
             if !outcome.passed {
                 decision = decision.max(outcome.on_fail);
             }
             reasons.push(outcome);
         }
+    } else if structured_authorization_required {
+        decision = decision.max(Decision::Deny);
+        reasons.push(structured_outcome(
+            "authorization-required",
+            false,
+            Decision::Deny,
+            "a structured payment authorization exists; authorization_id is required",
+        ));
     }
 
     for rule in &policy.rules {
         // Validated at load; an unparseable `when` cannot reach here.
         let field = rule.field().unwrap_or("");
         let prov = provenance.get(field);
-        let outcome = if call.args.contains_key("authorization_id")
+        let outcome = if has_authorization_id
             && rule.require_source.is_some()
             && rule.max.is_none()
         {
@@ -1004,6 +1014,67 @@ mod tests {
             evaluate(&p, &session, proposal, 10_000).verdict.decision,
             Decision::Allow
         );
+    }
+
+    #[test]
+    fn expected_99_does_not_become_499_because_the_general_cap_is_500() {
+        let p = policy();
+        let mut session = session_with_page();
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-price-regression".into(),
+                payee: "Monitoring Pro Inc".into(),
+                amount_minor: 9_900,
+                tolerance_minor: 500,
+                currency: "USD".into(),
+                invoice_id: "INV-PRICE".into(),
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let proposal = call(json!({
+            "authorization_id": "auth-price-regression",
+            "invoice_id": "INV-PRICE",
+            "payee": "Monitoring Pro Inc",
+            "amount": 499,
+            "currency": "USD"
+        }));
+
+        let evaluation = evaluate(&p, &session, proposal, 10_000);
+        assert_eq!(evaluation.verdict.decision, Decision::StepUp);
+        assert!(evaluation
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-amount"));
+        assert!(evaluation
+            .verdict
+            .reasons
+            .iter()
+            .any(|reason| reason.id == "amount-cap" && reason.passed));
+    }
+
+    #[test]
+    fn structured_authorization_cannot_be_bypassed_by_omitting_its_id() {
+        let p = policy();
+        let session = authorized_session(20_000);
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "payee": "Monitoring Pro Inc",
+                "amount": 100,
+                "currency": "USD"
+            })),
+            10_000,
+        );
+
+        assert_eq!(evaluation.verdict.decision, Decision::Deny);
+        assert!(evaluation
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-required"));
     }
 
     #[test]

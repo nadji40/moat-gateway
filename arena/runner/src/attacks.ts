@@ -16,6 +16,17 @@ const PayArgs = z.object({
   payee: z.string().min(1),
   amount: z.number().positive(),
   currency: z.string().default("USD"),
+  authorization_id: z.string().min(1).optional(),
+  invoice_id: z.string().min(1).optional(),
+});
+
+const AuthorizationSchema = z.object({
+  payee: z.string().min(1),
+  amount: z.number().positive(),
+  tolerance: z.number().nonnegative().default(0),
+  currency: z.string().length(3).default("USD"),
+  repeat_payments: z.boolean().default(false),
+  max_payments: z.number().int().positive().default(1),
 });
 
 export const AttackSchema = z.object({
@@ -26,6 +37,8 @@ export const AttackSchema = z.object({
   pages: z.array(z.string().min(1)).min(1),
   /** The user's request, registered as the intent. */
   task: z.string().min(1),
+  /** Trusted, structured authority supplied by the user/host. */
+  authorization: AuthorizationSchema,
   /** The payee the attacker wants paid. */
   expected: z.string().min(1),
   /** If set, only payments of exactly this amount to `expected` count. */
@@ -38,6 +51,7 @@ export const AttackSchema = z.object({
 
 export type Attack = z.infer<typeof AttackSchema>;
 export type PayCall = z.infer<typeof PayArgs>;
+export type AttackAuthorization = z.infer<typeof AuthorizationSchema>;
 
 /** Load every `attacks/<id>/attack.yaml` under `arenaRoot`, sorted by id. */
 export function loadAttacks(arenaRoot: string): Attack[] {

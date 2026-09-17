@@ -15,6 +15,7 @@ export class NullBackend implements AgentBackend {
   async run(attack: Attack, ctx: RunContext): Promise<AgentTrace> {
     const conn = await ctx.connect();
     await ctx.registerIntent(attack.task);
+    const paymentMetadata = await ctx.registerAuthorization(attack);
     const trace: AgentTrace = { fetches: [], pays: [] };
     try {
       for (const page of attack.pages) {
@@ -23,8 +24,9 @@ export class NullBackend implements AgentBackend {
         trace.fetches.push({ url, ms });
       }
       for (const args of attack.injection.calls) {
-        const outcome = await conn.tools.pay(args);
-        trace.pays.push({ args, outcome });
+        const paymentArgs = paymentMetadata ? { ...args, ...paymentMetadata } : args;
+        const outcome = await conn.tools.pay(paymentArgs);
+        trace.pays.push({ args: paymentArgs, outcome });
       }
       trace.final = `null agent: followed ${attack.injection.calls.length} injected call(s)`;
     } finally {

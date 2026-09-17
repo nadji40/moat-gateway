@@ -47,6 +47,31 @@ export class IntentApi {
     return body.turn;
   }
 
+  async authorization(
+    session: string,
+    body: {
+      authorization_id: string;
+      invoice_id: string;
+      payee: string;
+      amount: number;
+      tolerance: number;
+      currency: string;
+      expires_at: string;
+      repeat_payments: boolean;
+      max_payments: number;
+    },
+  ): Promise<void> {
+    const res = await fetch(
+      `${this.base}/v1/session/${encodeURIComponent(session)}/authorizations`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) throw new Error(`authorization: ${res.status} ${await res.text()}`);
+  }
+
   async evidence(session: string): Promise<unknown[]> {
     const res = await fetch(`${this.base}/v1/session/${encodeURIComponent(session)}/evidence`);
     if (!res.ok) throw new Error(`evidence: ${res.status}`);
