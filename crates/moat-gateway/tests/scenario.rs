@@ -42,6 +42,23 @@ fn pay(id: i64, payee: &str, amount: Value) -> Request {
     )
 }
 
+fn authorized_pay(id: i64, authorization_id: &str, invoice_id: &str, amount: f64) -> Request {
+    Request::new(
+        id,
+        method::TOOLS_CALL,
+        Some(json!({
+            "name": "stripe__pay",
+            "arguments": {
+                "authorization_id": authorization_id,
+                "invoice_id": invoice_id,
+                "payee": "Monitoring Pro Inc",
+                "amount": amount,
+                "currency": "USD"
+            }
+        })),
+    )
+}
+
 #[tokio::test]
 async fn allow_step_up_resume_deny() {
     let fake = fake_server_path();
@@ -251,6 +268,146 @@ intent_api: {{ addr: "{api}" }}
     assert!(!out.status.success());
     assert!(stdout.contains("line 1 (ev_"), "{stdout}");
     assert!(stdout.contains("signature"), "{stdout}");
+}
+
+#[tokio::test]
+async fn supplier_authorization_approval_outcome_and_duplicate() {
+    const SUPPLIER_SESSION: &str = "supplier-workflow-1";
+    let fake = fake_server_path();
+    let port = free_port();
+    let api = format!("127.0.0.1:{port}");
+    let policy = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../policies/supplier-invoice.yaml")
+        .canonicalize()
+        .unwrap();
+    let cfg = write_config(
+        "supplier-workflow",
+        &format!(
+            r#"
+session_id: "{SUPPLIER_SESSION}"
+upstreams:
+  - name: stripe
+    transport: stdio
+    command: ["{}"]
+policy: "{}"
+evidence: ./evidence.jsonl
+intent_api: {{ addr: "{api}" }}
+"#,
+            fake.display(),
+            policy.display()
+        ),
+    );
+    let mut gw = Peer::spawn(
+        &gateway_path(),
+        &["--config", cfg.to_str().unwrap()],
+        &[("RUST_LOG", "moat_gateway=info")],
+    );
+    wait_for_api(&api).await;
+    let (_, reply) = gw
+        .call(Request::new(
+            1,
+            method::INITIALIZE,
+            Some(
+                json!({"protocolVersion": PROTOCOL_VERSION_2025_11_25, "capabilities": {},
+                        "clientInfo": {"name": "supplier-test", "version": "0"}}),
+            ),
+        ))
+        .await;
+    assert!(matches!(reply, Message::Response(_)));
+    gw.notify(Notification::new(method::INITIALIZED, None))
+        .await;
+
+    let register = |authorization_id: &str, invoice_id: &str, tolerance: f64| {
+        json!({
+            "authorization_id": authorization_id,
+            "invoice_id": invoice_id,
+            "payee": "Monitoring Pro Inc",
+            "amount": 100,
+            "tolerance": tolerance,
+            "currency": "USD",
+            "expires_at": "2099-01-01T00:00:00Z"
+        })
+    };
+    let (status, body) = http::post(
+        &api,
+        &format!("/v1/session/{SUPPLIER_SESSION}/authorizations"),
+        &register("auth-tolerance", "INV-1", 5.0),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+
+    // A permitted price increase settles and produces a linked provider outcome.
+    let (_, reply) = gw
+        .call(authorized_pay(2, "auth-tolerance", "INV-1", 105.0))
+        .await;
+    assert!(matches!(reply, Message::Response(_)), "{reply:?}");
+
+    // The same successful invoice is stopped before the upstream sees it.
+    let (_, reply) = gw
+        .call(authorized_pay(3, "auth-tolerance", "INV-1", 105.0))
+        .await;
+    let Message::Error(error) = reply else {
+        panic!("duplicate was not denied: {reply:?}");
+    };
+    assert_eq!(error.error.code, moat_code::DENY);
+    assert!(error.error.data.unwrap()["moat"]["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|reason| reason["id"] == "authorization-duplicate"));
+
+    let (status, body) = http::post(
+        &api,
+        &format!("/v1/session/{SUPPLIER_SESSION}/authorizations"),
+        &register("auth-approval", "INV-2", 5.0),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+
+    // Above tolerance pauses, then the exact proposal resumes after approval.
+    let (_, reply) = gw
+        .call(authorized_pay(4, "auth-approval", "INV-2", 110.0))
+        .await;
+    let Message::Error(error) = reply else {
+        panic!("above-tolerance payment did not step up: {reply:?}");
+    };
+    assert_eq!(error.error.code, moat_code::STEP_UP);
+    let token = error.error.data.unwrap()["moat"]["resume_token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let (status, body) = http::post(
+        &api,
+        &format!("/v1/session/{SUPPLIER_SESSION}/resume"),
+        &json!({"resume_token": token, "approved": true}),
+    )
+    .await;
+    assert_eq!(status, 200, "{body}");
+    let (_, reply) = gw
+        .call(authorized_pay(5, "auth-approval", "INV-2", 110.0))
+        .await;
+    assert!(matches!(reply, Message::Response(_)), "{reply:?}");
+
+    let (status, workflow) =
+        http::get(&api, &format!("/v1/session/{SUPPLIER_SESSION}/workflow")).await;
+    assert_eq!(status, 200, "{workflow}");
+    assert_eq!(workflow["authorizations"].as_array().unwrap().len(), 2);
+    let outcomes = workflow["payment_outcomes"].as_array().unwrap();
+    assert_eq!(outcomes.len(), 2);
+    assert!(outcomes.iter().all(|outcome| outcome["succeeded"] == true));
+    assert!(outcomes
+        .iter()
+        .all(|outcome| outcome["receipt"].is_string()));
+    let verdicts: Vec<&str> = workflow["evidence"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|record| record["verdict"].as_str().unwrap())
+        .collect();
+    assert_eq!(verdicts, ["allow", "deny", "step_up", "allow"]);
+
+    let status = gw.close_and_wait().await;
+    assert!(status.success());
 }
 
 #[tokio::test]

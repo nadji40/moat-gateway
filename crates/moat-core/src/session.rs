@@ -38,6 +38,54 @@ pub struct Observed {
     pub path: String,
 }
 
+/// A user-approved envelope for one supplier payment (or an explicitly
+/// bounded series of payments).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PaymentAuthorization {
+    /// Stable host-generated identifier carried by every payment proposal.
+    pub id: String,
+    /// Supplier name exactly as approved by the user.
+    pub payee: String,
+    /// Expected amount in the currency's minor unit.
+    pub amount_minor: u64,
+    /// Permitted increase above `amount_minor`.
+    pub tolerance_minor: u64,
+    /// Uppercase ISO 4217 currency code.
+    pub currency: String,
+    /// Invoice that this authorization covers when repeats are disabled.
+    pub invoice_id: String,
+    /// Milliseconds since Unix epoch after which the authorization is invalid.
+    pub expires_unix_ms: u64,
+    /// Whether multiple, uniquely identified invoices may use this mandate.
+    pub repeat_payments: bool,
+    /// Maximum number of successfully settled payments.
+    pub max_payments: u32,
+    /// Set when the user or host cancels the authorization.
+    pub cancelled: bool,
+}
+
+/// The provider-side result observed after Moat allowed a payment.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PaymentOutcome {
+    /// Authorization that permitted the attempt.
+    pub authorization_id: String,
+    /// Supplier invoice carried to the provider.
+    pub invoice_id: String,
+    /// Signed verdict that allowed the attempt.
+    pub evidence_id: String,
+    /// Upstream provider name.
+    pub provider: String,
+    /// Provider transaction identifier, when one was returned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<String>,
+    /// Provider status or local failure classification.
+    pub status: String,
+    /// True only for a provider-confirmed successful settlement.
+    pub succeeded: bool,
+    /// Milliseconds since Unix epoch when Moat observed the outcome.
+    pub unix_ms: u64,
+}
+
 /// Something that happened in a session. The evidence `context_hash` is
 /// computed over the serialized log of these.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -82,6 +130,38 @@ pub enum Event {
         /// True when no human is available.
         headless: bool,
     },
+    /// A structured payment authorization was registered.
+    PaymentAuthorizationRegistered {
+        /// Stable authorization identifier.
+        authorization_id: String,
+        /// Invoice initially covered by the authorization.
+        invoice_id: String,
+    },
+    /// A structured payment authorization was cancelled.
+    PaymentAuthorizationCancelled {
+        /// Stable authorization identifier.
+        authorization_id: String,
+    },
+    /// Human approval was granted for one exact payment proposal.
+    PaymentProposalApproved {
+        /// SHA-256 over server, tool and canonical arguments.
+        fingerprint: String,
+    },
+    /// The payment provider returned (or failed to return) an outcome.
+    PaymentOutcomeObserved {
+        /// Authorization that permitted the attempt.
+        authorization_id: String,
+        /// Supplier invoice carried to the provider.
+        invoice_id: String,
+        /// Signed verdict that allowed the attempt.
+        evidence_id: String,
+        /// Upstream provider name.
+        provider: String,
+        /// Provider status or local failure classification.
+        status: String,
+        /// True only for a provider-confirmed successful settlement.
+        succeeded: bool,
+    },
 }
 
 /// An [`Event`] with its position and time.
@@ -103,6 +183,9 @@ pub struct Session {
     pub id: String,
     intents: Vec<Intent>,
     observed: Vec<Observed>,
+    authorizations: Vec<PaymentAuthorization>,
+    payment_outcomes: Vec<PaymentOutcome>,
+    approved_payment_fingerprints: Vec<String>,
     events: Vec<EventRecord>,
     headless: bool,
     next_seq: u64,
@@ -115,6 +198,9 @@ impl Session {
             id: id.into(),
             intents: Vec::new(),
             observed: Vec::new(),
+            authorizations: Vec::new(),
+            payment_outcomes: Vec::new(),
+            approved_payment_fingerprints: Vec::new(),
             events: Vec::new(),
             headless: false,
             next_seq: 0,
@@ -206,6 +292,89 @@ impl Session {
     /// Whether the host said no human is present.
     pub fn is_headless(&self) -> bool {
         self.headless
+    }
+
+    /// Register a structured payment authorization. Ids are unique within a
+    /// session so a stale client cannot silently replace prior user intent.
+    pub fn register_payment_authorization(
+        &mut self,
+        authorization: PaymentAuthorization,
+    ) -> Result<(), &'static str> {
+        if self
+            .authorizations
+            .iter()
+            .any(|existing| existing.id == authorization.id)
+        {
+            return Err("authorization id already exists");
+        }
+        self.log(Event::PaymentAuthorizationRegistered {
+            authorization_id: authorization.id.clone(),
+            invoice_id: authorization.invoice_id.clone(),
+        });
+        self.authorizations.push(authorization);
+        Ok(())
+    }
+
+    /// Cancel an authorization. A settled payment remains in the outcome log.
+    pub fn cancel_payment_authorization(&mut self, id: &str) -> bool {
+        let Some(authorization) = self.authorizations.iter_mut().find(|a| a.id == id) else {
+            return false;
+        };
+        if !authorization.cancelled {
+            authorization.cancelled = true;
+            self.log(Event::PaymentAuthorizationCancelled {
+                authorization_id: id.to_owned(),
+            });
+        }
+        true
+    }
+
+    /// Structured payment authorizations in registration order.
+    pub fn payment_authorizations(&self) -> &[PaymentAuthorization] {
+        &self.authorizations
+    }
+
+    /// Find a structured authorization by id.
+    pub fn payment_authorization(&self, id: &str) -> Option<&PaymentAuthorization> {
+        self.authorizations.iter().find(|a| a.id == id)
+    }
+
+    /// Provider outcomes in observation order.
+    pub fn payment_outcomes(&self) -> &[PaymentOutcome] {
+        &self.payment_outcomes
+    }
+
+    /// Record a provider outcome and append its audit event.
+    pub fn record_payment_outcome(&mut self, outcome: PaymentOutcome) {
+        self.log_at(
+            Event::PaymentOutcomeObserved {
+                authorization_id: outcome.authorization_id.clone(),
+                invoice_id: outcome.invoice_id.clone(),
+                evidence_id: outcome.evidence_id.clone(),
+                provider: outcome.provider.clone(),
+                status: outcome.status.clone(),
+                succeeded: outcome.succeeded,
+            },
+            outcome.unix_ms,
+        );
+        self.payment_outcomes.push(outcome);
+    }
+
+    /// Remember a human approval for the exact server/tool/argument payload.
+    pub fn approve_payment_proposal(&mut self, fingerprint: String) {
+        if !self.approved_payment_fingerprints.contains(&fingerprint) {
+            self.log(Event::PaymentProposalApproved {
+                fingerprint: fingerprint.clone(),
+            });
+            self.approved_payment_fingerprints.push(fingerprint);
+        }
+    }
+
+    /// Whether a human approved this exact payment proposal.
+    pub fn is_payment_proposal_approved(&self, fingerprint: &str) -> bool {
+        self.approved_payment_fingerprints
+            .iter()
+            .any(|approved| approved == fingerprint)
     }
 
     /// Append an event to the log, stamped with the current time.

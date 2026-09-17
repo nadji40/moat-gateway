@@ -312,11 +312,34 @@ pub fn evaluate(
     let mut reasons = Vec::new();
     let mut decision = Decision::Allow;
 
+    if call.args.contains_key("authorization_id") {
+        for outcome in structured_authorization_checks(session, &call, &mapped, now_unix_ms) {
+            if !outcome.passed {
+                decision = decision.max(outcome.on_fail);
+            }
+            reasons.push(outcome);
+        }
+    }
+
     for rule in &policy.rules {
         // Validated at load; an unparseable `when` cannot reach here.
         let field = rule.field().unwrap_or("");
         let prov = provenance.get(field);
-        let outcome = check_rule(rule, field, prov);
+        let outcome = if call.args.contains_key("authorization_id")
+            && rule.require_source.is_some()
+            && rule.max.is_none()
+        {
+            RuleOutcome {
+                id: rule.id.clone(),
+                field: Some(field.to_owned()),
+                passed: true,
+                source: prov.map(|p| p.resolution.source.kind()),
+                on_fail: rule.on_fail,
+                message: "ok: structured payment authorization is authoritative".to_owned(),
+            }
+        } else {
+            check_rule(rule, field, prov)
+        };
         if !outcome.passed {
             decision = decision.max(rule.on_fail);
         }
@@ -361,6 +384,239 @@ pub fn evaluate(
         },
         unix_ms: now_unix_ms,
     }
+}
+
+/// Stable identity of a payment proposal. JSON-RPC ids are deliberately not
+/// included: an approved proposal is normally retried as a new request.
+pub fn payment_fingerprint(call: &PaymentCall) -> String {
+    let args = crate::hash::canonical_json(&Value::Object(call.args.clone()));
+    crate::hash::sha256_hex(format!("{}|{}|{args}", call.server, call.tool).as_bytes())
+}
+
+fn structured_authorization_checks(
+    session: &Session,
+    call: &PaymentCall,
+    mapped: &BTreeMap<String, (String, &Value)>,
+    now_unix_ms: u64,
+) -> Vec<RuleOutcome> {
+    let mut outcomes = Vec::new();
+    let authorization_id = call
+        .args
+        .get("authorization_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let invoice_id = call
+        .args
+        .get("invoice_id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let Some(authorization) = session.payment_authorization(authorization_id) else {
+        outcomes.push(structured_outcome(
+            "authorization-exists",
+            false,
+            Decision::Deny,
+            "authorization_id is missing or unknown",
+        ));
+        return outcomes;
+    };
+
+    outcomes.push(structured_outcome(
+        "authorization-exists",
+        true,
+        Decision::Deny,
+        format!("ok: authorization {} exists", authorization.id),
+    ));
+    outcomes.push(structured_outcome(
+        "authorization-active",
+        !authorization.cancelled,
+        Decision::Deny,
+        if authorization.cancelled {
+            "authorization was cancelled".to_owned()
+        } else {
+            "ok: authorization is active".to_owned()
+        },
+    ));
+    outcomes.push(structured_outcome(
+        "authorization-expiry",
+        now_unix_ms <= authorization.expires_unix_ms,
+        Decision::Deny,
+        if now_unix_ms <= authorization.expires_unix_ms {
+            format!("ok: valid until {}", authorization.expires_unix_ms)
+        } else {
+            format!("authorization expired at {}", authorization.expires_unix_ms)
+        },
+    ));
+
+    let payee = mapped
+        .get("payee")
+        .and_then(|(_, value)| value.as_str())
+        .unwrap_or("");
+    outcomes.push(structured_outcome(
+        "authorization-payee",
+        crate::normalize::normalize_text(payee)
+            == crate::normalize::normalize_text(&authorization.payee),
+        Decision::Deny,
+        if crate::normalize::normalize_text(payee)
+            == crate::normalize::normalize_text(&authorization.payee)
+        {
+            "ok: recipient matches authorization".to_owned()
+        } else {
+            "recipient does not match authorization".to_owned()
+        },
+    ));
+
+    let currency = mapped
+        .get("currency")
+        .and_then(|(_, value)| value.as_str())
+        .unwrap_or("")
+        .to_ascii_uppercase();
+    outcomes.push(structured_outcome(
+        "authorization-currency",
+        currency == authorization.currency,
+        Decision::Deny,
+        if currency == authorization.currency {
+            "ok: currency matches authorization".to_owned()
+        } else {
+            "currency does not match authorization".to_owned()
+        },
+    ));
+
+    let invoice_matches = authorization.repeat_payments || invoice_id == authorization.invoice_id;
+    outcomes.push(structured_outcome(
+        "authorization-invoice",
+        !invoice_id.is_empty() && invoice_matches,
+        Decision::Deny,
+        if invoice_id.is_empty() {
+            "invoice_id is required".to_owned()
+        } else if invoice_matches {
+            "ok: invoice is covered by authorization".to_owned()
+        } else {
+            "invoice does not match authorization".to_owned()
+        },
+    ));
+
+    let fingerprint = payment_fingerprint(call);
+    let human_approved = session.is_payment_proposal_approved(&fingerprint);
+    let proposed_minor = mapped
+        .get("amount")
+        .and_then(|(_, value)| amount_to_minor(value, &currency));
+    let maximum = authorization
+        .amount_minor
+        .saturating_add(authorization.tolerance_minor);
+    let amount_ok = proposed_minor.is_some_and(|amount| amount <= maximum) || human_approved;
+    let amount_message = match proposed_minor {
+        Some(amount) if amount <= maximum => {
+            format!("ok: amount {amount} minor units is within approved maximum {maximum}")
+        }
+        Some(amount) if human_approved => format!(
+            "ok: human approved exact proposal of {amount} minor units above maximum {maximum}"
+        ),
+        Some(amount) => format!(
+            "amount {amount} minor units exceeds approved maximum {maximum}; exact proposal needs approval"
+        ),
+        None => "amount is missing or invalid".to_owned(),
+    };
+    outcomes.push(structured_outcome(
+        "authorization-amount",
+        amount_ok,
+        if proposed_minor.is_some() {
+            Decision::StepUp
+        } else {
+            Decision::Deny
+        },
+        amount_message,
+    ));
+
+    let succeeded_for_authorization = session
+        .payment_outcomes()
+        .iter()
+        .filter(|outcome| outcome.authorization_id == authorization.id && outcome.succeeded)
+        .count();
+    let duplicate = session.payment_outcomes().iter().any(|outcome| {
+        outcome.authorization_id == authorization.id
+            && outcome.invoice_id == invoice_id
+            && outcome.succeeded
+    });
+    outcomes.push(structured_outcome(
+        "authorization-duplicate",
+        !duplicate,
+        Decision::Deny,
+        if duplicate {
+            "invoice already settled; duplicate payment denied".to_owned()
+        } else {
+            "ok: invoice has no successful settlement".to_owned()
+        },
+    ));
+    outcomes.push(structured_outcome(
+        "authorization-usage",
+        succeeded_for_authorization < authorization.max_payments as usize,
+        Decision::Deny,
+        if succeeded_for_authorization < authorization.max_payments as usize {
+            format!(
+                "ok: {succeeded_for_authorization} of {} successful payments used",
+                authorization.max_payments
+            )
+        } else {
+            format!(
+                "authorization payment limit reached ({}/{})",
+                succeeded_for_authorization, authorization.max_payments
+            )
+        },
+    ));
+    outcomes
+}
+
+fn structured_outcome(
+    id: &str,
+    passed: bool,
+    on_fail: Decision,
+    message: impl Into<String>,
+) -> RuleOutcome {
+    RuleOutcome {
+        id: id.to_owned(),
+        field: None,
+        passed,
+        source: None,
+        on_fail,
+        message: message.into(),
+    }
+}
+
+fn amount_to_minor(value: &Value, currency: &str) -> Option<u64> {
+    let amount = match value {
+        Value::Number(number) => number.as_f64()?,
+        Value::String(text) => text.trim().parse::<f64>().ok()?,
+        _ => return None,
+    };
+    if !amount.is_finite() || amount <= 0.0 {
+        return None;
+    }
+    let factor = if matches!(
+        currency,
+        "BIF"
+            | "CLP"
+            | "DJF"
+            | "GNF"
+            | "JPY"
+            | "KMF"
+            | "KRW"
+            | "MGA"
+            | "PYG"
+            | "RWF"
+            | "UGX"
+            | "VND"
+            | "VUV"
+            | "XAF"
+            | "XOF"
+            | "XPF"
+    ) {
+        1.0
+    } else {
+        100.0
+    };
+    let minor = amount * factor;
+    let rounded = minor.round();
+    ((minor - rounded).abs() <= 1e-7 && rounded <= u64::MAX as f64).then_some(rounded as u64)
 }
 
 fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleOutcome {
@@ -536,6 +792,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session::{PaymentAuthorization, PaymentOutcome};
     use serde_json::json;
 
     const DEFAULT: &str = include_str!("../../../policies/default.yaml");
@@ -563,6 +820,36 @@ mod tests {
             &json!("Renewal notice: pay ProMon Billing Ltd $480. Premium tier $900."),
         );
         s
+    }
+
+    fn authorized_session(expires_unix_ms: u64) -> Session {
+        let mut session = session_with_page();
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-1".into(),
+                payee: "Monitoring Pro Inc".into(),
+                amount_minor: 10_000,
+                tolerance_minor: 500,
+                currency: "USD".into(),
+                invoice_id: "INV-100".into(),
+                expires_unix_ms,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        session.register_intent("Authorize invoice INV-100 to Monitoring Pro Inc for 100 USD");
+        session
+    }
+
+    fn authorized_call(amount: f64) -> PaymentCall {
+        call(json!({
+            "authorization_id": "auth-1",
+            "invoice_id": "INV-100",
+            "payee": "Monitoring Pro Inc",
+            "amount": amount,
+            "currency": "USD"
+        }))
     }
 
     #[test]
@@ -691,6 +978,75 @@ mod tests {
             .iter()
             .any(|r| r.id == "no_human_available"));
         assert!(e.verdict.step_up_prompt.is_none());
+    }
+
+    #[test]
+    fn structured_authorization_allows_tolerance_and_steps_up_above_it() {
+        let p = policy();
+        let mut session = authorized_session(20_000);
+        assert_eq!(
+            evaluate(&p, &session, authorized_call(105.0), 10_000)
+                .verdict
+                .decision,
+            Decision::Allow
+        );
+
+        let proposal = authorized_call(106.0);
+        let evaluation = evaluate(&p, &session, proposal.clone(), 10_000);
+        assert_eq!(evaluation.verdict.decision, Decision::StepUp);
+        assert!(evaluation
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-amount"));
+
+        session.approve_payment_proposal(payment_fingerprint(&proposal));
+        assert_eq!(
+            evaluate(&p, &session, proposal, 10_000).verdict.decision,
+            Decision::Allow
+        );
+    }
+
+    #[test]
+    fn structured_authorization_denies_duplicates_expiry_and_cancellation() {
+        let p = policy();
+        let mut session = authorized_session(20_000);
+        session.record_payment_outcome(PaymentOutcome {
+            authorization_id: "auth-1".into(),
+            invoice_id: "INV-100".into(),
+            evidence_id: "ev_paid".into(),
+            provider: "stripe".into(),
+            receipt: Some("pi_paid".into()),
+            status: "succeeded".into(),
+            succeeded: true,
+            unix_ms: 10_000,
+        });
+        let duplicate = evaluate(&p, &session, authorized_call(100.0), 11_000);
+        assert_eq!(duplicate.verdict.decision, Decision::Deny);
+        assert!(duplicate
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-duplicate"));
+
+        let expired = evaluate(
+            &p,
+            &authorized_session(9_000),
+            authorized_call(100.0),
+            10_000,
+        );
+        assert_eq!(expired.verdict.decision, Decision::Deny);
+        assert!(expired
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-expiry"));
+
+        let mut cancelled = authorized_session(20_000);
+        assert!(cancelled.cancel_payment_authorization("auth-1"));
+        let cancelled = evaluate(&p, &cancelled, authorized_call(100.0), 10_000);
+        assert_eq!(cancelled.verdict.decision, Decision::Deny);
+        assert!(cancelled
+            .verdict
+            .failures()
+            .any(|reason| reason.id == "authorization-active"));
     }
 
     #[test]

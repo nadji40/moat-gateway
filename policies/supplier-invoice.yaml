@@ -1,0 +1,39 @@
+version: 1
+
+payment_tools:
+  - server: "stripe"
+    tool: "pay"
+
+fields:
+  payee:    { args: ["payee"] }
+  amount:   { args: ["amount"] }
+  currency: { args: ["currency"] }
+
+allowlist:
+  payees:
+    - "Monitoring Pro Inc"
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User, Allowlist]
+    on_fail: step_up
+    message: "recipient was not approved by the user"
+
+  - id: absolute-spending-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds the workflow's absolute spending cap"
+
+  - id: amount-provenance
+    when: field == amount
+    require_source: [User, Allowlist, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 50
+  max_calls_per_minute: 30
+  on_exceed: deny
+
+no_human_available: deny

@@ -27,6 +27,13 @@ use crate::upstream::{Upstream, UpstreamEvent};
 
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 
+#[derive(Debug, Clone)]
+struct AuthorizedPayment {
+    evidence_id: String,
+    authorization_id: Option<String>,
+    invoice_id: Option<String>,
+}
+
 /// How long an HTTP caller waits for the reply to one request before the
 /// gateway gives up on it. Upstream tool calls can be slow; this is a
 /// backstop, not a budget.
@@ -597,12 +604,16 @@ impl Gateway {
         forwarded.name = tool.clone();
 
         // Payment tools go through policy before anything is forwarded.
-        if self.shared.policy.is_payment_tool(&upstream.name, &tool) {
+        let is_payment = self.shared.policy.is_payment_tool(&upstream.name, &tool);
+        let authorization = if is_payment {
             let args = forwarded.arguments.clone().unwrap_or_default();
-            if !self.authorize(&req.id, &upstream.name, &tool, args).await {
-                return;
+            match self.authorize(&req.id, &upstream.name, &tool, args).await {
+                Some(authorized) => Some(authorized),
+                None => return,
             }
-        }
+        } else {
+            None
+        };
 
         let line = match serde_json::to_value(&forwarded)
             .map_err(anyhow::Error::from)
@@ -625,10 +636,18 @@ impl Gateway {
             Ok(frame) => {
                 if let Message::Response(resp) = &frame.message {
                     self.observe(&upstream.name, &tool, &req.id, &resp.result);
+                    if let Some(authorization) = &authorization {
+                        self.record_provider_response(authorization, &upstream.name, &resp.result);
+                    }
+                } else if let Some(authorization) = &authorization {
+                    self.record_provider_failure(authorization, &upstream.name, "provider_error");
                 }
                 self.emit_raw(frame.raw).await
             }
             Err(e) => {
+                if let Some(authorization) = &authorization {
+                    self.record_provider_failure(authorization, &upstream.name, "transport_error");
+                }
                 self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
                     .await;
             }
@@ -651,7 +670,98 @@ impl Gateway {
         );
     }
 
-    /// Evaluate a payment call. Returns `true` if it may be forwarded; on
+    /// Record the provider-side result for a structured authorization.
+    fn record_provider_response(
+        &self,
+        authorized: &AuthorizedPayment,
+        provider: &str,
+        result: &Value,
+    ) {
+        let Some(authorization_id) = &authorized.authorization_id else {
+            return;
+        };
+        let Some(invoice_id) = &authorized.invoice_id else {
+            return;
+        };
+        let is_error = result
+            .get("isError")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let status = result
+            .pointer("/structuredContent/status")
+            .and_then(Value::as_str)
+            .unwrap_or(if is_error {
+                "provider_error"
+            } else {
+                "unknown"
+            });
+        let receipt = result
+            .pointer("/structuredContent/receipt")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let succeeded = !is_error && status == "succeeded";
+        let session = self.shared.store.get_or_create(&self.session_id);
+        moat_core::session::lock(&session).record_payment_outcome(
+            moat_core::session::PaymentOutcome {
+                authorization_id: authorization_id.clone(),
+                invoice_id: invoice_id.clone(),
+                evidence_id: authorized.evidence_id.clone(),
+                provider: provider.to_owned(),
+                receipt,
+                status: status.to_owned(),
+                succeeded,
+                unix_ms: now_unix_ms(),
+            },
+        );
+        tracing::info!(
+            session = %self.session_id,
+            %authorization_id,
+            %invoice_id,
+            evidence_id = %authorized.evidence_id,
+            provider,
+            status,
+            succeeded,
+            "payment provider outcome recorded"
+        );
+    }
+
+    fn record_provider_failure(
+        &self,
+        authorized: &AuthorizedPayment,
+        provider: &str,
+        status: &str,
+    ) {
+        let Some(authorization_id) = &authorized.authorization_id else {
+            return;
+        };
+        let Some(invoice_id) = &authorized.invoice_id else {
+            return;
+        };
+        let session = self.shared.store.get_or_create(&self.session_id);
+        moat_core::session::lock(&session).record_payment_outcome(
+            moat_core::session::PaymentOutcome {
+                authorization_id: authorization_id.clone(),
+                invoice_id: invoice_id.clone(),
+                evidence_id: authorized.evidence_id.clone(),
+                provider: provider.to_owned(),
+                receipt: None,
+                status: status.to_owned(),
+                succeeded: false,
+                unix_ms: now_unix_ms(),
+            },
+        );
+        tracing::warn!(
+            session = %self.session_id,
+            %authorization_id,
+            %invoice_id,
+            evidence_id = %authorized.evidence_id,
+            provider,
+            status,
+            "payment provider failure recorded; authorization remains retryable"
+        );
+    }
+
+    /// Evaluate a payment call. Returns its evidence context if it may be forwarded; on
     /// `step_up` or `deny` the error has already been sent to the client.
     async fn authorize(
         &self,
@@ -659,7 +769,7 @@ impl Gateway {
         server: &str,
         tool: &str,
         args: Map<String, Value>,
-    ) -> bool {
+    ) -> Option<AuthorizedPayment> {
         use moat_core::policy::{evaluate, PaymentCall};
         use moat_core::verdict::{code as moat_code, Decision};
 
@@ -700,7 +810,7 @@ impl Gateway {
                     Some(json!({"moat": {"verdict": "deny", "reasons": [format!("evidence: {e}")], "evidence_id": null}})),
                 )
                 .await;
-                return false;
+                return None;
             }
         };
 
@@ -713,7 +823,21 @@ impl Gateway {
         );
 
         match verdict.decision {
-            Decision::Allow => true,
+            Decision::Allow => Some(AuthorizedPayment {
+                evidence_id: record.id.clone(),
+                authorization_id: eval
+                    .call
+                    .args
+                    .get("authorization_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                invoice_id: eval
+                    .call
+                    .args
+                    .get("invoice_id")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+            }),
             Decision::StepUp => {
                 let values: Vec<(String, Value)> = eval
                     .provenance
@@ -723,6 +847,7 @@ impl Gateway {
                 let token = self.shared.new_resume(PendingResume {
                     session: self.session_id.clone(),
                     evidence_id: record.id.clone(),
+                    payment_fingerprint: moat_core::policy::payment_fingerprint(&eval.call),
                     values,
                 });
                 self.emit_error(
@@ -738,7 +863,7 @@ impl Gateway {
                     }})),
                 )
                 .await;
-                false
+                None
             }
             Decision::Deny => {
                 self.emit_error(
@@ -753,7 +878,7 @@ impl Gateway {
                     }})),
                 )
                 .await;
-                false
+                None
             }
         }
     }

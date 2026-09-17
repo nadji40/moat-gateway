@@ -6,7 +6,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { listPayments, recipientsFromEnv } from "./stripe.js";
 
-const STEP_UP_CODE = -31050;
+const DENY_CODE = -31051;
 const here = dirname(fileURLToPath(import.meta.url));
 const arena = resolve(here, "../..");
 const repo = resolve(arena, "..");
@@ -58,6 +58,26 @@ async function registerIntent(session: string): Promise<void> {
   throw new Error("intent registration endpoint did not become ready");
 }
 
+async function registerAuthorization(session: string, authorizationId: string, invoiceId: string, payee: string): Promise<void> {
+  const response = await fetch(
+    `http://127.0.0.1:7074/v1/session/${encodeURIComponent(session)}/authorizations`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        authorization_id: authorizationId,
+        invoice_id: invoiceId,
+        payee,
+        amount: 1,
+        tolerance: 0,
+        currency: "USD",
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+    },
+  );
+  if (!response.ok) throw new Error(`authorization registration failed: ${await response.text()}`);
+}
+
 async function main(): Promise<void> {
   if (process.env["MOAT_STRIPE_SMOKE_CONFIRM"] !== "YES") {
     throw new Error("set MOAT_STRIPE_SMOKE_CONFIRM=YES to create three Stripe test payments");
@@ -85,11 +105,11 @@ async function main(): Promise<void> {
     }
     await direct.callTool({
       name: "pay",
-      arguments: { payee: authorized.payee, amount: 1, currency: "USD" },
+      arguments: { payee: authorized.payee, amount: 1, currency: "USD", authorization_id: `direct-auth-${Date.now()}`, invoice_id: `direct-inv-a-${Date.now()}` },
     });
     await direct.callTool({
       name: "pay",
-      arguments: { payee: unauthorized.payee, amount: 1, currency: "USD" },
+      arguments: { payee: unauthorized.payee, amount: 1, currency: "USD", authorization_id: `direct-unauth-${Date.now()}`, invoice_id: `direct-inv-b-${Date.now()}` },
     });
   } finally {
     await direct.close();
@@ -106,20 +126,23 @@ async function main(): Promise<void> {
   );
   try {
     await registerIntent(session);
+    const authorizationId = `auth-${Date.now()}`;
+    const invoiceId = `inv-${Date.now()}`;
+    await registerAuthorization(session, authorizationId, invoiceId, authorized.payee);
     await protectedClient.callTool({
       name: "stripe__pay",
-      arguments: { payee: authorized.payee, amount: 1, currency: "USD" },
+      arguments: { payee: authorized.payee, amount: 1, currency: "USD", authorization_id: authorizationId, invoice_id: invoiceId },
     });
-    let steppedUp = false;
+    let denied = false;
     try {
       await protectedClient.callTool({
         name: "stripe__pay",
-        arguments: { payee: unauthorized.payee, amount: 1, currency: "USD" },
+        arguments: { payee: unauthorized.payee, amount: 1, currency: "USD", authorization_id: authorizationId, invoice_id: `${invoiceId}-wrong` },
       });
     } catch (error) {
-      steppedUp = error instanceof McpError && error.code === STEP_UP_CODE;
+      denied = error instanceof McpError && error.code === DENY_CODE;
     }
-    if (!steppedUp) throw new Error("Moat did not step up the unauthorized recipient");
+    if (!denied) throw new Error("Moat did not deny the unauthorized recipient");
   } finally {
     await protectedClient.close();
   }

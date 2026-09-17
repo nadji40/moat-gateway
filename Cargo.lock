@@ -1064,6 +1064,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_norway",
+ "time",
  "tokio",
  "tokio-stream",
  "tracing",

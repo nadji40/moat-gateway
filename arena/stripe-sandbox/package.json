@@ -7,6 +7,7 @@
   "scripts": {
     "start": "tsx src/server.ts",
     "smoke": "node --env-file=../../.env.stripe-sandbox --import tsx src/smoke.ts",
+    "workflow": "node --env-file=../../.env.stripe-sandbox --import tsx src/supplier-workflow.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

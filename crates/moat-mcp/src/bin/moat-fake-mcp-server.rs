@@ -81,7 +81,9 @@ fn main() {
                                 "properties": {
                                     "payee": {"type": "string"},
                                     "amount": {"type": "number"},
-                                    "currency": {"type": "string"}
+                                    "currency": {"type": "string"},
+                                    "authorization_id": {"type": "string"},
+                                    "invoice_id": {"type": "string"}
                                 },
                                 "required": ["payee", "amount"]
                             }
@@ -118,7 +120,13 @@ fn main() {
                                 args.get("currency").and_then(Value::as_str).unwrap_or("USD"),
                                 args.get("payee").and_then(Value::as_str).unwrap_or("?")
                             )}],
-                            "structuredContent": {"receipt_id": format!("fake_{calls}"), "call": calls},
+                            "structuredContent": {
+                                "receipt": format!("fake_{calls}"),
+                                "status": "succeeded",
+                                "authorization_id": args.get("authorization_id"),
+                                "invoice_id": args.get("invoice_id"),
+                                "call": calls
+                            },
                             "isError": false
                         }
                     }),

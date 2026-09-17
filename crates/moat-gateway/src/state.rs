@@ -74,6 +74,8 @@ pub struct PendingResume {
     pub session: String,
     /// Evidence record of the step-up verdict.
     pub evidence_id: String,
+    /// Exact payment proposal the human was shown. Excludes JSON-RPC id.
+    pub payment_fingerprint: String,
     /// The field values the human is being asked to approve.
     pub values: Vec<(String, Value)>,
 }
@@ -210,6 +212,7 @@ impl Shared {
         let mut s = lock(&session);
         let mut confirmed = Vec::new();
         if approved {
+            s.approve_payment_proposal(pending.payment_fingerprint);
             for (field, value) in &pending.values {
                 let text = match value {
                     Value::String(t) => t.clone(),

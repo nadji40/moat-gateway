@@ -11,7 +11,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use moat_core::session::lock;
+use moat_core::session::{lock, PaymentAuthorization};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -31,6 +31,26 @@ struct ResumeBody {
 #[derive(Deserialize)]
 struct HeadlessBody {
     headless: bool,
+}
+
+#[derive(Deserialize)]
+struct AuthorizationBody {
+    authorization_id: String,
+    invoice_id: String,
+    payee: String,
+    amount: f64,
+    #[serde(default)]
+    tolerance: f64,
+    currency: String,
+    expires_at: String,
+    #[serde(default)]
+    repeat_payments: bool,
+    #[serde(default = "one_payment")]
+    max_payments: u32,
+}
+
+fn one_payment() -> u32 {
+    1
 }
 
 #[derive(Serialize)]
@@ -101,6 +121,154 @@ async fn post_headless(
     Ok(Json(json!({ "session": id, "headless": body.headless })))
 }
 
+async fn post_authorization(
+    State(shared): State<Arc<Shared>>,
+    Path(id): Path<String>,
+    Json(body): Json<AuthorizationBody>,
+) -> ApiResult {
+    let authorization_id = body.authorization_id.trim();
+    let invoice_id = body.invoice_id.trim();
+    let payee = body.payee.trim();
+    let currency = body.currency.trim().to_ascii_uppercase();
+    if authorization_id.is_empty() || invoice_id.is_empty() || payee.is_empty() {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "authorization_id, invoice_id and payee are required",
+        ));
+    }
+    if currency.len() != 3 || !currency.bytes().all(|c| c.is_ascii_alphabetic()) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "currency must be a three-letter ISO code",
+        ));
+    }
+    if body.max_payments == 0 || (!body.repeat_payments && body.max_payments != 1) {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "max_payments must be 1 unless repeat_payments is true",
+        ));
+    }
+    let amount_minor = major_to_minor(body.amount, &currency).ok_or_else(|| {
+        err(
+            StatusCode::BAD_REQUEST,
+            "amount is invalid for this currency",
+        )
+    })?;
+    let tolerance_minor =
+        major_to_minor_allow_zero(body.tolerance, &currency).ok_or_else(|| {
+            err(
+                StatusCode::BAD_REQUEST,
+                "tolerance is invalid for this currency",
+            )
+        })?;
+    let expires = time::OffsetDateTime::parse(
+        body.expires_at.trim(),
+        &time::format_description::well_known::Rfc3339,
+    )
+    .map_err(|_| err(StatusCode::BAD_REQUEST, "expires_at must be RFC 3339"))?;
+    let expires_unix_ms = u64::try_from(expires.unix_timestamp_nanos() / 1_000_000)
+        .map_err(|_| err(StatusCode::BAD_REQUEST, "expires_at must be after 1970"))?;
+
+    let authorization = PaymentAuthorization {
+        id: authorization_id.to_owned(),
+        payee: payee.to_owned(),
+        amount_minor,
+        tolerance_minor,
+        currency: currency.clone(),
+        invoice_id: invoice_id.to_owned(),
+        expires_unix_ms,
+        repeat_payments: body.repeat_payments,
+        max_payments: body.max_payments,
+        cancelled: false,
+    };
+    let session = shared.store.get_or_create(&id);
+    let mut session = lock(&session);
+    session
+        .register_payment_authorization(authorization.clone())
+        .map_err(|message| err(StatusCode::CONFLICT, message))?;
+    // Feed the same user-approved values into the existing provenance engine.
+    session.register_intent(&format!(
+        "Authorize invoice {} to {} for {} {} until {}",
+        invoice_id, payee, body.amount, currency, body.expires_at
+    ));
+    tracing::info!(session = %id, authorization_id, invoice_id, "payment authorization registered");
+    Ok(Json(
+        json!({ "session": id, "authorization": authorization }),
+    ))
+}
+
+async fn cancel_authorization(
+    State(shared): State<Arc<Shared>>,
+    Path((id, authorization_id)): Path<(String, String)>,
+) -> ApiResult {
+    let session = shared.store.get_or_create(&id);
+    if !lock(&session).cancel_payment_authorization(&authorization_id) {
+        return Err(err(StatusCode::NOT_FOUND, "unknown authorization_id"));
+    }
+    tracing::info!(session = %id, %authorization_id, "payment authorization cancelled");
+    Ok(Json(json!({
+        "session": id,
+        "authorization_id": authorization_id,
+        "cancelled": true
+    })))
+}
+
+async fn get_workflow(State(shared): State<Arc<Shared>>, Path(id): Path<String>) -> ApiResult {
+    let Some(session) = shared.store.get(&id) else {
+        return Err(err(StatusCode::NOT_FOUND, "unknown session"));
+    };
+    let session = lock(&session);
+    Ok(Json(json!({
+        "session": id,
+        "authorizations": session.payment_authorizations(),
+        "payment_outcomes": session.payment_outcomes(),
+        "events": session.events(),
+        "evidence": shared.evidence_for(&id),
+    })))
+}
+
+fn currency_factor(currency: &str) -> f64 {
+    if matches!(
+        currency,
+        "BIF"
+            | "CLP"
+            | "DJF"
+            | "GNF"
+            | "JPY"
+            | "KMF"
+            | "KRW"
+            | "MGA"
+            | "PYG"
+            | "RWF"
+            | "UGX"
+            | "VND"
+            | "VUV"
+            | "XAF"
+            | "XOF"
+            | "XPF"
+    ) {
+        1.0
+    } else {
+        100.0
+    }
+}
+
+fn major_to_minor(amount: f64, currency: &str) -> Option<u64> {
+    if !amount.is_finite() || amount <= 0.0 {
+        return None;
+    }
+    major_to_minor_allow_zero(amount, currency)
+}
+
+fn major_to_minor_allow_zero(amount: f64, currency: &str) -> Option<u64> {
+    if !amount.is_finite() || amount < 0.0 {
+        return None;
+    }
+    let minor = amount * currency_factor(currency);
+    let rounded = minor.round();
+    ((minor - rounded).abs() <= 1e-7 && rounded <= u64::MAX as f64).then_some(rounded as u64)
+}
+
 async fn get_evidence(State(shared): State<Arc<Shared>>, Path(id): Path<String>) -> ApiResult {
     let records = shared.evidence_for(&id);
     Ok(Json(json!(records)))
@@ -112,6 +280,12 @@ pub fn router(shared: Arc<Shared>) -> Router {
         .route("/v1/session/{id}/intent", post(post_intent))
         .route("/v1/session/{id}/resume", post(post_resume))
         .route("/v1/session/{id}/headless", post(post_headless))
+        .route("/v1/session/{id}/authorizations", post(post_authorization))
+        .route(
+            "/v1/session/{id}/authorizations/{authorization_id}/cancel",
+            post(cancel_authorization),
+        )
+        .route("/v1/session/{id}/workflow", get(get_workflow))
         .route("/v1/session/{id}/evidence", get(get_evidence))
         .with_state(shared)
 }

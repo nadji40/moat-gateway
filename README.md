@@ -320,13 +320,48 @@ adapter performs server-to-server requests.
 
 The opt-in smoke test creates three one-dollar test payments: direct payments
 to both accounts, then an authorized payment through Moat. It also verifies
-that an unauthorized payment through Moat is stepped up before Stripe receives
-it:
+that a recipient and invoice outside that authorization are denied before
+Stripe receives them:
 
 ```bash
 cd arena
 MOAT_STRIPE_SMOKE_CONFIRM=YES pnpm --filter @moat/stripe-sandbox smoke
 ```
+
+### Supplier-invoice workflow
+
+`POST /v1/session/{session}/authorizations` registers a structured user
+authorization with an id, supplier, invoice, expected amount, tolerance,
+currency, RFC 3339 expiry, repeat-payment flag and maximum payment count. A
+payment proposal carries `authorization_id` and `invoice_id`. Moat then:
+
+- denies an unknown, expired or cancelled authorization and any recipient,
+  currency or invoice mismatch;
+- allows the expected amount and increases inside the approved tolerance;
+- steps up an increase above tolerance and resumes only the exact proposal the
+  human approved;
+- denies a second successful settlement for the same invoice;
+- leaves a failed or unknown provider attempt retryable.
+
+The Stripe adapter derives its idempotency key from Stripe account,
+authorization id and invoice id. The same retry therefore resolves to the same
+PaymentIntent instead of creating a second charge. Stripe metadata carries both
+ids, and `GET /v1/session/{session}/workflow` returns the authorizations,
+provider outcomes, event timeline and signed verdict records for reconciliation.
+
+Run the complete real-sandbox sequence with the dedicated policy:
+
+```bash
+cd arena
+MOAT_STRIPE_WORKFLOW_CONFIRM=YES pnpm --filter @moat/stripe-sandbox workflow
+```
+
+The opt-in run covers an ordinary invoice, a permitted price increase, an
+above-tolerance approval and resume, two repeat purchases with fresh
+authorizations, cancellation, a simulated lost provider response followed by
+a safe retry, duplicate denial, and reconciliation against Stripe's
+PaymentIntent records. The failure injection happens only after Stripe accepts
+the test-mode PaymentIntent; it never changes a live payment path.
 
 ### Null-agent baseline (2026-09-16)
 

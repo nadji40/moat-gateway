@@ -20,11 +20,17 @@ server.registerTool(
       payee: z.string().describe("Exact configured merchant name"),
       amount: z.number().positive().describe("Amount in major units, for example 4.80 USD"),
       currency: z.string().length(3).default("USD").describe("ISO 4217 currency code"),
+      authorization_id: z.string().min(1).describe("Moat payment authorization id"),
+      invoice_id: z.string().min(1).describe("Supplier invoice id"),
+      simulate_response_loss: z.boolean().default(false).describe("Test-only failure after Stripe accepts the payment"),
     },
   },
-  async ({ payee, amount, currency }) => {
+  async ({ payee, amount, currency, authorization_id, invoice_id, simulate_response_loss }) => {
     const recipient = recipientFor(payee, recipients);
-    const payment = await createPayment(recipient, amount, currency);
+    const payment = await createPayment(recipient, amount, currency, authorization_id, invoice_id);
+    if (simulate_response_loss) {
+      throw new Error("simulated response loss after Stripe accepted the idempotent payment");
+    }
     return {
       content: [
         {
@@ -40,6 +46,8 @@ server.registerTool(
         status: payment.status,
         account: payment.account,
         recipient_role: payment.role,
+        authorization_id: payment.authorization_id,
+        invoice_id: payment.invoice_id,
       },
     };
   },

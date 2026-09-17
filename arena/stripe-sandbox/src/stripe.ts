@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 
 export type RecipientRole = "authorized" | "unauthorized";
 
@@ -25,6 +25,8 @@ export interface PaymentSummary {
   currency: string;
   status: string;
   created: string;
+  authorization_id: string;
+  invoice_id: string;
 }
 
 interface StripeAccount {
@@ -162,6 +164,8 @@ function paymentSummary(intent: StripePaymentIntent, recipient: Recipient): Paym
     currency: intent.currency.toUpperCase(),
     status: intent.status,
     created: new Date(intent.created * 1000).toISOString(),
+    authorization_id: intent.metadata?.["moat_authorization_id"] ?? "",
+    invoice_id: intent.metadata?.["moat_invoice_id"] ?? "",
   };
 }
 
@@ -169,7 +173,11 @@ export async function createPayment(
   recipient: Recipient,
   amount: number,
   currency: string,
+  authorizationId: string,
+  invoiceId: string,
 ): Promise<PaymentSummary> {
+  if (!authorizationId.trim()) throw new Error("authorization_id is required");
+  if (!invoiceId.trim()) throw new Error("invoice_id is required");
   const account = await inspectAccount(recipient);
   const params = new URLSearchParams();
   params.set("amount", String(majorToMinor(amount, currency)));
@@ -182,11 +190,16 @@ export async function createPayment(
   params.set("metadata[moat_payee]", recipient.payee);
   params.set("metadata[moat_recipient_role]", recipient.role);
   params.set("metadata[moat_account]", account.id);
+  params.set("metadata[moat_authorization_id]", authorizationId);
+  params.set("metadata[moat_invoice_id]", invoiceId);
+  const idempotencyKey = `moat-${createHash("sha256")
+    .update(`${account.id}\u0000${authorizationId}\u0000${invoiceId}`)
+    .digest("hex")}`;
   const intent = await stripeRequest<StripePaymentIntent>(recipient, "/v1/payment_intents", {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
-      "idempotency-key": `moat-${randomUUID()}`,
+      "idempotency-key": idempotencyKey,
     },
     body: params,
   });
