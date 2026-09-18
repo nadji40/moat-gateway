@@ -1,0 +1,19 @@
+listen: { transport: http, addr: "127.0.0.1:7081" }
+upstreams:
+  - name: stripe
+    transport: stdio
+    command:
+      - "/usr/bin/node"
+      - "--env-file=/home/moat/.env.stripe-sandbox"
+      - "--import"
+      - "tsx"
+      - "/home/moat/arena/stripe-sandbox/src/server.ts"
+policy: /home/moat/policies/supplier-invoice.yaml
+evidence: /var/lib/moat/evidence/evidence.jsonl
+keys: /var/lib/moat/keys
+intent_api: { addr: "127.0.0.1:7082" }
+storage:
+  database_url_env: MOAT_DATABASE_URL
+  max_connections: 12
+auth:
+  required: true

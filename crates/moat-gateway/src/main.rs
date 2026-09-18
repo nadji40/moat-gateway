@@ -7,6 +7,7 @@ mod http_listen;
 mod intent_api;
 mod proxy;
 mod state;
+mod storage;
 mod upstream;
 
 use std::path::PathBuf;
@@ -135,7 +136,7 @@ fn main() -> Result<()> {
                 .build()
                 .context("starting tokio runtime")?;
             rt.block_on(async move {
-                let shared = build_shared(&cfg)?;
+                let shared = build_shared(&cfg).await?;
                 start_intent_api(&cfg, &shared);
                 match cfg.listen.clone() {
                     config::Listen::Stdio => {
@@ -157,7 +158,7 @@ fn main() -> Result<()> {
     }
 }
 
-fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
+async fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
     let policy = state::PolicyState::load(cfg.policy.as_deref());
     let (keys, created) = moat_core::keys::Keys::load_or_create(&cfg.keys)
         .with_context(|| format!("signing keys in {}", cfg.keys.display()))?;
@@ -165,10 +166,31 @@ fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
         keys = %cfg.keys.display(), public = %keys.public_hex(), created,
         "evidence signing key ready"
     );
+    let storage = match &cfg.storage {
+        Some(storage) => {
+            let database_url = std::env::var(&storage.database_url_env).with_context(|| {
+                format!(
+                    "reading storage URL from environment variable {}",
+                    storage.database_url_env
+                )
+            })?;
+            let store = storage::DurableStore::connect(&database_url, storage.max_connections)
+                .await
+                .context("connecting durable storage")?;
+            tracing::info!(
+                max_connections = storage.max_connections,
+                "durable PostgreSQL storage ready"
+            );
+            Some(store)
+        }
+        None => None,
+    };
     Ok(Arc::new(state::Shared::new(
         policy,
         keys,
         cfg.evidence.clone(),
+        storage,
+        cfg.auth.required,
     )?))
 }
 
@@ -194,10 +216,6 @@ fn start_intent_api(cfg: &config::Config, shared: &Arc<state::Shared>) {
 }
 
 fn generate_session_id() -> String {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let h = moat_core::hash::sha256_hex(format!("{nanos}|{}", std::process::id()).as_bytes());
-    format!("s_{}", &h[..16])
+    let random: [u8; 24] = rand::random();
+    format!("s_{}", moat_core::hash::sha256_hex(&random))
 }

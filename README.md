@@ -30,8 +30,9 @@ Early. Follow the work order below for what is actually built.
 - [x] 9. `arena`: mock servers, first ten attacks, null-agent runner
 - [x] 10. `arena`: OpenAI Agents SDK backend, first results against gpt-5 and gpt-5-mini (ADR 0006)
 - [x] 11. Streamable HTTP transport on the listen side
+- [x] 12. Dedicated PostgreSQL state, tenant API keys, durable approvals and evidence
 
-All eleven steps of the first phase are built.
+The first prototype phase and the durable authenticated pilot foundation are built.
 
 ## Quickstart
 
@@ -92,6 +93,8 @@ policy: policies/default.yaml
 evidence: ./evidence.jsonl
 keys: ./keys
 intent_api: { addr: "127.0.0.1:7072" }
+storage: { database_url_env: "MOAT_DATABASE_URL", max_connections: 16 }
+auth: { required: true }
 ```
 
 | Key | Meaning | Default |
@@ -103,6 +106,8 @@ intent_api: { addr: "127.0.0.1:7072" }
 | `evidence` | Append-only JSONL file | `./evidence.jsonl` |
 | `keys` | Directory for the ed25519 signing key (step 8) | `./keys` |
 | `intent_api.addr` | Where the intent API listens; keep it loopback | none → no intents can be registered |
+| `storage` | Dedicated PostgreSQL state; URL is read from the named environment variable | none → memory only |
+| `auth.required` | Require a tenant bearer key on HTTP and intent routes | false |
 | `separator` | Between upstream name and tool name | `__` |
 | `session_id` | Fixed session id | generated, printed to stderr at start |
 
@@ -122,8 +127,11 @@ shape the MCP TypeScript SDK's `StreamableHTTPClientTransport` speaks:
 - `GET /mcp` with the session header opens the SSE stream for server-initiated
   notifications; one per session.
 - `DELETE /mcp` ends the session and stops its upstreams.
-- `Origin`, if present, must be loopback; anything else is `403`. Bind to
-  loopback: there is no authentication.
+- `Authorization: Bearer <key>` is mandatory when `auth.required` is true.
+  Agent-plane and approver-plane keys are separate, SHA-256 hashed in the
+  dedicated database, and every session is tenant-bound.
+- `Origin`, if present, must be loopback; anything else is `403`. Keep the
+  gateway on loopback behind a TLS reverse proxy even when authentication is enabled.
 
 A request with no session header that is not `initialize` is served by a
 lazily created default session, so a client without a handshake still works,
@@ -201,8 +209,29 @@ The session id is whatever `session_id` says in the config, or a generated
 `s_…` printed to stderr at startup. Why the intent is a side channel rather
 than something parsed from the MCP stream is [ADR 0004](docs/adr/0004-intent-api-side-channel.md).
 
-The intent API binds to localhost and has no authentication. Adding it is future
-work, tracked before any deployment where localhost is not a trust boundary.
+With `auth.required: true`, the intent API uses the same tenant bearer key as the
+MCP listener. Session snapshots, signed evidence and single-use approval tokens
+are durable in PostgreSQL and survive a gateway restart. Raw approval and API
+tokens are never stored in the database.
+
+## Authenticated pilot deployment
+
+Use a dedicated database and restricted roles. The migration runner refuses to
+operate unless it is connected as `moat_migrator` to a database named
+`moat_gateway`:
+
+```bash
+sudo scripts/migrate.sh
+sudo scripts/provision-tenant.sh pilot "Moat pilot" agent
+sudo scripts/provision-tenant.sh pilot "Moat pilot" approver
+```
+
+The provisioner writes each one-time raw API key to a root-only environment file
+under `/etc/moat/tenants/`; PostgreSQL receives only its SHA-256 hash. The pilot
+config and hardened systemd unit are in `deploy/`. Health endpoints are
+`/health/live` and `/health/ready` on both HTTP listeners. See
+[`docs/pilot-operations.md`](docs/pilot-operations.md) for deployment,
+verification, rotation and recovery procedures.
 
 ## Evidence
 

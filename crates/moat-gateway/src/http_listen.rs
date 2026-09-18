@@ -18,7 +18,7 @@
 //! `Origin` is validated as the spec requires: absent is fine (non-browser
 //! clients), loopback is fine, anything else is refused.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::sync::Arc;
 
@@ -47,6 +47,7 @@ pub const MCP_PATH: &str = "/mcp";
 
 struct Session {
     gw: Arc<Gateway>,
+    tenant_id: String,
     /// Server-initiated lines, taken by the GET stream when a client opens
     /// one. `None` once taken.
     notifications: Mutex<Option<mpsc::Receiver<String>>>,
@@ -56,23 +57,50 @@ struct Listener {
     cfg: Config,
     shared: Arc<Shared>,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
+    /// Sessions explicitly terminated during this process lifetime. Durable
+    /// state remains available for audit/recovery after a process restart, but
+    /// DELETE must not immediately resurrect the session in the same process.
+    ended_sessions: Mutex<HashSet<String>>,
     default_session: Mutex<Option<Arc<Session>>>,
 }
 
 impl Listener {
-    async fn new_session(&self, id: String) -> Result<Arc<Session>> {
-        let (gw, rx) = Gateway::start(&self.cfg, Arc::clone(&self.shared), id.clone()).await?;
+    async fn new_session(&self, tenant_id: String, id: String) -> Result<Arc<Session>> {
+        let (gw, rx) = Gateway::start_for_tenant(
+            &self.cfg,
+            Arc::clone(&self.shared),
+            id.clone(),
+            tenant_id.clone(),
+        )
+        .await?;
         tracing::info!(session = %id, "http session started");
         let s = Arc::new(Session {
             gw,
+            tenant_id,
             notifications: Mutex::new(Some(rx)),
         });
         self.sessions.lock().await.insert(id, Arc::clone(&s));
         Ok(s)
     }
 
-    async fn session(&self, id: &str) -> Option<Arc<Session>> {
-        self.sessions.lock().await.get(id).cloned()
+    async fn session(&self, tenant_id: &str, id: &str) -> Result<Option<Arc<Session>>> {
+        if self.ended_sessions.lock().await.contains(id) {
+            return Ok(None);
+        }
+        if let Some(session) = self.sessions.lock().await.get(id).cloned() {
+            return Ok((session.tenant_id == tenant_id).then_some(session));
+        }
+        if self
+            .shared
+            .session_for_tenant(tenant_id, id, false)
+            .await?
+            .is_none()
+        {
+            return Ok(None);
+        }
+        self.new_session(tenant_id.to_owned(), id.to_owned())
+            .await
+            .map(Some)
     }
 
     async fn default_session(&self) -> Result<Arc<Session>> {
@@ -86,7 +114,7 @@ impl Listener {
             .clone()
             .unwrap_or_else(|| generate_id("s"));
         tracing::warn!(session = %id, "request without Mcp-Session-Id; serving from the default session");
-        let s = self.new_session(id).await?;
+        let s = self.new_session("local".to_owned(), id).await?;
         *slot = Some(Arc::clone(&s));
         Ok(s)
     }
@@ -101,6 +129,7 @@ impl Listener {
         match removed {
             Some(s) => {
                 s.gw.shutdown().await;
+                self.ended_sessions.lock().await.insert(id.to_owned());
                 tracing::info!(session = %id, "http session ended");
                 true
             }
@@ -110,12 +139,50 @@ impl Listener {
 }
 
 fn generate_id(prefix: &str) -> String {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let h = moat_core::hash::sha256_hex(format!("{nanos}|{}", std::process::id()).as_bytes());
-    format!("{prefix}_{}", &h[..24])
+    let random: [u8; 24] = rand::random();
+    format!("{prefix}_{}", moat_core::hash::sha256_hex(&random))
+}
+
+fn bearer(headers: &HeaderMap) -> Option<&str> {
+    headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn unauthorized() -> Response {
+    (
+        StatusCode::UNAUTHORIZED,
+        [(header::WWW_AUTHENTICATE, "Bearer")],
+        "valid Moat bearer token required",
+    )
+        .into_response()
+}
+
+async fn authenticated_tenant(
+    listener: &Listener,
+    headers: &HeaderMap,
+) -> Result<String, Box<Response>> {
+    match listener
+        .shared
+        .authenticate_bearer(bearer(headers), "agent")
+        .await
+    {
+        Ok(Some(tenant)) => Ok(tenant),
+        Ok(None) => Err(Box::new(unauthorized())),
+        Err(error) => {
+            tracing::error!(%error, "authentication storage unavailable");
+            Err(Box::new(
+                (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "authentication unavailable",
+                )
+                    .into_response(),
+            ))
+        }
+    }
 }
 
 fn jsonrpc_error(status: StatusCode, code: i64, message: &str) -> Response {
@@ -156,6 +223,10 @@ async fn post_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap, body: Byte
             "Origin not allowed",
         );
     }
+    let tenant_id = match authenticated_tenant(&l, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return *response,
+    };
     let text = match std::str::from_utf8(&body) {
         Ok(t) => t.trim(),
         Err(_) => {
@@ -195,7 +266,7 @@ async fn post_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap, body: Byte
     // one; otherwise the default.
     let is_initialize = frame.message.method() == Some(method::INITIALIZE);
     let session = if is_initialize {
-        match l.new_session(generate_id("s")).await {
+        match l.new_session(tenant_id.clone(), generate_id("s")).await {
             Ok(s) => s,
             Err(e) => {
                 tracing::error!(error = %e, "could not start session");
@@ -207,9 +278,17 @@ async fn post_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap, body: Byte
             }
         }
     } else if let Some(id) = session_header(&headers) {
-        match l.session(&id).await {
-            Some(s) => s,
-            None => {
+        match l.session(&tenant_id, &id).await {
+            Ok(Some(s)) => s,
+            Err(error) => {
+                tracing::error!(%error, session = %id, "could not restore session");
+                return jsonrpc_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    code::INTERNAL_ERROR,
+                    "session storage unavailable",
+                );
+            }
+            Ok(None) => {
                 return jsonrpc_error(
                     StatusCode::NOT_FOUND,
                     code::INVALID_REQUEST,
@@ -217,6 +296,12 @@ async fn post_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap, body: Byte
                 )
             }
         }
+    } else if l.shared.auth_required() {
+        return jsonrpc_error(
+            StatusCode::BAD_REQUEST,
+            code::INVALID_REQUEST,
+            "Mcp-Session-Id required after initialize",
+        );
     } else {
         match l.default_session().await {
             Ok(s) => s,
@@ -261,11 +346,20 @@ async fn get_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap) -> Response
     if !origin_allowed(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
+    let tenant_id = match authenticated_tenant(&l, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return *response,
+    };
     let Some(id) = session_header(&headers) else {
         return (StatusCode::BAD_REQUEST, "Mcp-Session-Id required").into_response();
     };
-    let Some(session) = l.session(&id).await else {
-        return (StatusCode::NOT_FOUND, "unknown session").into_response();
+    let session = match l.session(&tenant_id, &id).await {
+        Ok(Some(session)) => session,
+        Ok(None) => return (StatusCode::NOT_FOUND, "unknown session").into_response(),
+        Err(error) => {
+            tracing::error!(%error, session = %id, "could not restore session");
+            return StatusCode::SERVICE_UNAVAILABLE.into_response();
+        }
     };
     let Some(rx) = session.notifications.lock().await.take() else {
         return (StatusCode::CONFLICT, "stream already open").into_response();
@@ -283,13 +377,34 @@ async fn get_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap) -> Response
 }
 
 async fn delete_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap) -> Response {
+    let tenant_id = match authenticated_tenant(&l, &headers).await {
+        Ok(tenant) => tenant,
+        Err(response) => return *response,
+    };
     let Some(id) = session_header(&headers) else {
         return (StatusCode::BAD_REQUEST, "Mcp-Session-Id required").into_response();
     };
-    if l.end_session(&id).await {
-        StatusCode::OK.into_response()
-    } else {
-        (StatusCode::NOT_FOUND, "unknown session").into_response()
+    match l.session(&tenant_id, &id).await {
+        Ok(Some(_)) if l.end_session(&id).await => StatusCode::OK.into_response(),
+        Ok(_) => (StatusCode::NOT_FOUND, "unknown session").into_response(),
+        Err(error) => {
+            tracing::error!(%error, session = %id, "could not restore session");
+            StatusCode::SERVICE_UNAVAILABLE.into_response()
+        }
+    }
+}
+
+async fn live() -> StatusCode {
+    StatusCode::OK
+}
+
+async fn ready(State(listener): State<Arc<Listener>>) -> StatusCode {
+    match listener.shared.storage_ready().await {
+        Ok(()) => StatusCode::OK,
+        Err(error) => {
+            tracing::error!(%error, "readiness check failed");
+            StatusCode::SERVICE_UNAVAILABLE
+        }
     }
 }
 
@@ -299,10 +414,13 @@ pub fn router(cfg: Config, shared: Arc<Shared>) -> Router {
         cfg,
         shared,
         sessions: Mutex::new(HashMap::new()),
+        ended_sessions: Mutex::new(HashSet::new()),
         default_session: Mutex::new(None),
     });
     Router::new()
         .route(MCP_PATH, get(get_mcp).post(post_mcp).delete(delete_mcp))
+        .route("/health/live", get(live))
+        .route("/health/ready", get(ready))
         .with_state(l)
 }
 
@@ -314,8 +432,8 @@ pub async fn serve(addr: &str, cfg: Config, shared: Arc<Shared>) -> Result<()> {
     let local = listener
         .local_addr()
         .context("MCP listener local address")?;
-    if !local.ip().is_loopback() {
-        tracing::warn!(%local, "MCP listener is not bound to loopback; there is no authentication");
+    if !local.ip().is_loopback() && !shared.auth_required() {
+        tracing::warn!(%local, "MCP listener is not loopback and authentication is disabled");
     }
     tracing::info!(%local, path = MCP_PATH, "streamable http listener ready");
     axum::serve(listener, router(cfg, shared))

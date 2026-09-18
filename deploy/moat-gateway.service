@@ -1,0 +1,28 @@
+[Unit]
+Description=Moat authenticated payment authorization gateway
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=moat
+Group=moat
+WorkingDirectory=/home/moat/arena
+EnvironmentFile=/etc/moat/moat-db.env
+Environment=RUST_LOG=info
+ExecStart=/usr/local/bin/moat-gateway --config /etc/moat/moat.pilot.yaml
+Restart=on-failure
+RestartSec=2s
+TimeoutStopSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadOnlyPaths=/home/moat
+ReadWritePaths=/var/lib/moat
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

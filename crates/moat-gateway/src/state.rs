@@ -10,7 +10,11 @@ use moat_core::evidence::Record;
 use moat_core::keys::Keys;
 use moat_core::policy::{Evaluation, Policy, PolicyError};
 use moat_core::session::{lock, Event, Session, SessionStore};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::sync::Mutex as AsyncMutex;
+
+use crate::storage::DurableStore;
 
 /// Tool names treated as payments when no policy could be loaded. The
 /// gateway fails closed for these and open for everything else.
@@ -68,7 +72,7 @@ impl PolicyState {
 }
 
 /// A step-up waiting for the host's answer.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingResume {
     /// Session the step-up belongs to.
     pub session: String,
@@ -94,14 +98,25 @@ pub struct Shared {
     pub policy: PolicyState,
     keys: Keys,
     resumes: Mutex<HashMap<String, PendingResume>>,
+    session_tenants: Mutex<HashMap<String, String>>,
+    session_versions: Mutex<HashMap<String, i64>>,
+    session_gates: AsyncMutex<HashMap<String, std::sync::Arc<AsyncMutex<()>>>>,
     evidence: Mutex<EvidenceLog>,
+    storage: Option<DurableStore>,
+    auth_required: bool,
 }
 
 impl Shared {
     /// Build shared state. The evidence file is opened lazily on first write.
     /// If the file already has records, the chain continues from its last
     /// line.
-    pub fn new(policy: PolicyState, keys: Keys, evidence_path: PathBuf) -> Result<Shared> {
+    pub fn new(
+        policy: PolicyState,
+        keys: Keys,
+        evidence_path: PathBuf,
+        storage: Option<DurableStore>,
+        auth_required: bool,
+    ) -> Result<Shared> {
         let last_hash = match std::fs::read_to_string(&evidence_path) {
             Ok(text) => text
                 .lines()
@@ -121,12 +136,232 @@ impl Shared {
             policy,
             keys,
             resumes: Mutex::new(HashMap::new()),
+            session_tenants: Mutex::new(HashMap::new()),
+            session_versions: Mutex::new(HashMap::new()),
+            session_gates: AsyncMutex::new(HashMap::new()),
             evidence: Mutex::new(EvidenceLog {
                 path: evidence_path,
                 records: Vec::new(),
                 last_hash,
             }),
+            storage,
+            auth_required,
         })
+    }
+
+    /// Whether HTTP callers must present a database-backed bearer key.
+    pub fn auth_required(&self) -> bool {
+        self.auth_required
+    }
+
+    /// Resolve a bearer token to a tenant, or the trusted local tenant when
+    /// authentication is disabled.
+    pub async fn authenticate_bearer(
+        &self,
+        token: Option<&str>,
+        access_role: &str,
+    ) -> Result<Option<String>> {
+        if !self.auth_required {
+            return Ok(Some("local".to_owned()));
+        }
+        let Some(token) = token.map(str::trim).filter(|token| !token.is_empty()) else {
+            return Ok(None);
+        };
+        let Some(storage) = &self.storage else {
+            anyhow::bail!("authentication requires durable storage");
+        };
+        let hash = moat_core::hash::sha256_hex(token.as_bytes());
+        storage.authenticate(&hash, access_role).await
+    }
+
+    async fn session_gate(&self, tenant_id: &str, id: &str) -> std::sync::Arc<AsyncMutex<()>> {
+        let key = format!("{tenant_id}\0{id}");
+        let mut gates = self.session_gates.lock().await;
+        std::sync::Arc::clone(
+            gates
+                .entry(key)
+                .or_insert_with(|| std::sync::Arc::new(AsyncMutex::new(()))),
+        )
+    }
+
+    /// Return a tenant-bound session, restoring it from PostgreSQL when
+    /// necessary. `create` is used only for a new trusted session.
+    pub async fn session_for_tenant(
+        &self,
+        tenant_id: &str,
+        id: &str,
+        create: bool,
+    ) -> Result<Option<std::sync::Arc<Mutex<Session>>>> {
+        let gate = self.session_gate(tenant_id, id).await;
+        let _guard = gate.lock().await;
+        if let Some(bound) = self
+            .session_tenants
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(id)
+            .cloned()
+        {
+            if bound != tenant_id {
+                return Ok(None);
+            }
+            return Ok(self.store.get(id));
+        }
+
+        if let Some(storage) = &self.storage {
+            if let Some((session, version)) = storage.load_session(tenant_id, id).await? {
+                let session = self.store.insert(session);
+                self.session_tenants
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .insert(id.to_owned(), tenant_id.to_owned());
+                self.session_versions
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .insert(id.to_owned(), version);
+                return Ok(Some(session));
+            }
+        }
+
+        if !create {
+            return Ok(None);
+        }
+        let session = self.store.get_or_create(id);
+        self.session_tenants
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(id.to_owned(), tenant_id.to_owned());
+        if let Some(storage) = &self.storage {
+            let snapshot = lock(&session).clone();
+            let version = storage.save_session(tenant_id, &snapshot, None).await?;
+            self.session_versions
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .insert(id.to_owned(), version);
+        }
+        Ok(Some(session))
+    }
+
+    /// Persist the current complete session snapshot.
+    pub async fn persist_session(&self, tenant_id: &str, id: &str) -> Result<()> {
+        let Some(storage) = &self.storage else {
+            return Ok(());
+        };
+        let gate = self.session_gate(tenant_id, id).await;
+        let _guard = gate.lock().await;
+        let bound = self
+            .session_tenants
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(id)
+            .cloned();
+        anyhow::ensure!(
+            bound.as_deref() == Some(tenant_id),
+            "session is not bound to authenticated tenant"
+        );
+        let session = self
+            .store
+            .get(id)
+            .ok_or_else(|| anyhow::anyhow!("session is not loaded"))?;
+        let snapshot = lock(&session).clone();
+        let expected_version = self
+            .session_versions
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(id)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("session version is not loaded"))?;
+        let version = storage
+            .save_session(tenant_id, &snapshot, Some(expected_version))
+            .await?;
+        self.session_versions
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(id.to_owned(), version);
+        Ok(())
+    }
+
+    /// Apply a control-plane mutation and its durable snapshot as one logical
+    /// operation. A failed write restores the in-memory state before returning.
+    pub async fn mutate_session<T, F>(
+        &self,
+        tenant_id: &str,
+        id: &str,
+        mutate: F,
+    ) -> Result<std::result::Result<T, String>>
+    where
+        T: Send,
+        F: FnOnce(&mut Session) -> std::result::Result<T, String> + Send,
+    {
+        let gate = self.session_gate(tenant_id, id).await;
+        let _guard = gate.lock().await;
+        let bound = self
+            .session_tenants
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(id)
+            .cloned();
+        anyhow::ensure!(
+            bound.as_deref() == Some(tenant_id),
+            "session is not bound to authenticated tenant"
+        );
+        let session = self
+            .store
+            .get(id)
+            .ok_or_else(|| anyhow::anyhow!("session is not loaded"))?;
+        let (before, after, value) = {
+            let mut session = lock(&session);
+            let before = session.clone();
+            match mutate(&mut session) {
+                Ok(value) => (before, session.clone(), value),
+                Err(message) => {
+                    *session = before;
+                    return Ok(Err(message));
+                }
+            }
+        };
+        if let Some(storage) = &self.storage {
+            let expected_version = self
+                .session_versions
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(id)
+                .copied()
+                .ok_or_else(|| anyhow::anyhow!("session version is not loaded"))?;
+            match storage
+                .save_session(tenant_id, &after, Some(expected_version))
+                .await
+            {
+                Ok(version) => {
+                    self.session_versions
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .insert(id.to_owned(), version);
+                }
+                Err(error) => {
+                    *lock(&session) = before;
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Ok(value))
+    }
+
+    /// Persist signed evidence in PostgreSQL as well as the append-only file.
+    pub async fn persist_evidence(&self, tenant_id: &str, record: &Record) -> Result<()> {
+        let Some(storage) = &self.storage else {
+            return Ok(());
+        };
+        storage
+            .save_evidence(tenant_id, &record.session, record)
+            .await
+    }
+
+    /// Check durable storage readiness when configured.
+    pub async fn storage_ready(&self) -> Result<()> {
+        match &self.storage {
+            Some(storage) => storage.ready().await,
+            None => Ok(()),
+        }
     }
 
     /// Append the evidence record for an evaluation and log the evaluation
@@ -172,58 +407,97 @@ impl Shared {
             .collect()
     }
 
-    /// Mint a resume token for a step-up.
-    pub fn new_resume(&self, pending: PendingResume) -> String {
-        let seed = format!(
-            "{}|{}|{}",
-            pending.session,
-            pending.evidence_id,
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        );
-        let token = format!("rt_{}", &moat_core::hash::sha256_hex(seed.as_bytes())[..32]);
-        self.resumes
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(token.clone(), pending);
-        token
+    /// Evidence for one authenticated tenant session, restored from durable
+    /// storage when configured.
+    pub async fn evidence_for_tenant(
+        &self,
+        tenant_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<Record>> {
+        match &self.storage {
+            Some(storage) => storage.evidence_for(tenant_id, session_id).await,
+            None => Ok(self.evidence_for(session_id)),
+        }
     }
 
-    /// Consume a resume token. `Ok(None)` when unknown.
-    pub fn take_resume(&self, token: &str) -> Option<PendingResume> {
-        self.resumes
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .remove(token)
+    /// Mint a resume token for a step-up.
+    pub async fn new_resume(&self, tenant_id: &str, pending: PendingResume) -> Result<String> {
+        let random: [u8; 32] = rand::random();
+        let token = format!("rt_{}", moat_core::hash::sha256_hex(&random));
+        if let Some(storage) = &self.storage {
+            let value = serde_json::to_value(&pending).context("encoding pending approval")?;
+            storage
+                .save_resume(
+                    &moat_core::hash::sha256_hex(token.as_bytes()),
+                    tenant_id,
+                    &pending.session,
+                    &value,
+                    900,
+                )
+                .await?;
+        } else {
+            self.resumes
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .insert(token.clone(), pending);
+        }
+        Ok(token)
+    }
+
+    /// Atomically consume a tenant- and session-bound resume token.
+    pub async fn take_resume(
+        &self,
+        tenant_id: &str,
+        session_id: &str,
+        token: &str,
+    ) -> Result<Option<PendingResume>> {
+        if let Some(storage) = &self.storage {
+            let value = storage
+                .take_resume(
+                    &moat_core::hash::sha256_hex(token.as_bytes()),
+                    tenant_id,
+                    session_id,
+                )
+                .await?;
+            return value
+                .map(|value| serde_json::from_value(value).context("decoding pending approval"))
+                .transpose();
+        }
+        let mut resumes = self.resumes.lock().unwrap_or_else(PoisonError::into_inner);
+        if resumes
+            .get(token)
+            .is_some_and(|pending| pending.session == session_id)
+        {
+            Ok(resumes.remove(token))
+        } else {
+            Ok(None)
+        }
     }
 
     /// Apply the host's answer to a step-up: on approval every value the
     /// human saw is registered as an intent, so the same call resolves to
     /// `User` next time. Returns what was confirmed.
     pub fn resolve_step_up(
-        &self,
+        session: &mut Session,
         pending: PendingResume,
         token: &str,
         approved: bool,
     ) -> Vec<String> {
-        let session = self.store.get_or_create(&pending.session);
-        let mut s = lock(&session);
         let mut confirmed = Vec::new();
         if approved {
-            s.approve_payment_proposal(pending.payment_fingerprint);
+            session.approve_payment_proposal(pending.payment_fingerprint);
             for (field, value) in &pending.values {
                 let text = match value {
                     Value::String(t) => t.clone(),
                     other => other.to_string(),
                 };
-                s.register_intent(&format!("confirmed {field}: {text}"));
+                session.register_intent(&format!("confirmed {field}: {text}"));
                 confirmed.push(text);
             }
         }
-        s.log(Event::StepUpResolved {
-            resume_token: token.to_owned(),
+        session.log(Event::StepUpResolved {
+            // Correlate the audit event without persisting the bearer token.
+            resume_token: format!("sha256:{}", moat_core::hash::sha256_hex(token.as_bytes())),
             approved,
         });
         confirmed

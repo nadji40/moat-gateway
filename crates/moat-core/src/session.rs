@@ -515,6 +515,17 @@ impl SessionStore {
         )
     }
 
+    /// Insert or replace a session restored from durable storage.
+    pub fn insert(&self, session: Session) -> Arc<Mutex<Session>> {
+        let id = session.id.clone();
+        let session = Arc::new(Mutex::new(session));
+        self.inner
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(id, Arc::clone(&session));
+        session
+    }
+
     /// The session with this id, if it exists.
     pub fn get(&self, id: &str) -> Option<Arc<Mutex<Session>>> {
         let map = self.inner.lock().unwrap_or_else(PoisonError::into_inner);

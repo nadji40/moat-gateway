@@ -36,6 +36,12 @@ pub struct Config {
     #[serde(default)]
     #[allow(dead_code)]
     pub session_id: Option<String>,
+    /// Optional durable PostgreSQL state. Required for authenticated HTTP.
+    #[serde(default)]
+    pub storage: Option<Storage>,
+    /// Bearer authentication for HTTP and the intent API.
+    #[serde(default)]
+    pub auth: Auth,
 }
 
 /// Listen-side transport.
@@ -93,6 +99,27 @@ pub struct IntentApi {
     pub addr: String,
 }
 
+/// Durable PostgreSQL storage configuration.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Storage {
+    /// Environment variable containing the PostgreSQL URL.
+    #[serde(default = "default_database_url_env")]
+    pub database_url_env: String,
+    /// Maximum PostgreSQL connections held by this gateway process.
+    #[serde(default = "default_max_connections")]
+    pub max_connections: usize,
+}
+
+/// HTTP authentication configuration.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Auth {
+    /// Require a database-backed bearer key on HTTP and intent requests.
+    #[serde(default)]
+    pub required: bool,
+}
+
 fn default_evidence() -> PathBuf {
     PathBuf::from("./evidence.jsonl")
 }
@@ -101,6 +128,12 @@ fn default_keys() -> PathBuf {
 }
 fn default_separator() -> String {
     "__".to_owned()
+}
+fn default_database_url_env() -> String {
+    "MOAT_DATABASE_URL".to_owned()
+}
+fn default_max_connections() -> usize {
+    16
 }
 
 impl Config {
@@ -134,6 +167,22 @@ impl Config {
     fn validate(&self) -> Result<()> {
         anyhow::ensure!(!self.upstreams.is_empty(), "config has no upstreams");
         anyhow::ensure!(!self.separator.is_empty(), "separator must not be empty");
+        if self.auth.required {
+            anyhow::ensure!(
+                self.storage.is_some(),
+                "auth.required needs durable storage for tenant API keys"
+            );
+        }
+        if let Some(storage) = &self.storage {
+            anyhow::ensure!(
+                !storage.database_url_env.trim().is_empty(),
+                "storage.database_url_env must not be empty"
+            );
+            anyhow::ensure!(
+                storage.max_connections > 0,
+                "storage.max_connections must be positive"
+            );
+        }
         let mut seen = std::collections::HashSet::new();
         for u in &self.upstreams {
             anyhow::ensure!(!u.name.is_empty(), "an upstream has an empty name");
@@ -199,5 +248,27 @@ upstreams:
 "#;
         let cfg: Config = serde_norway::from_str(sep).unwrap();
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn authenticated_http_requires_durable_storage() {
+        let missing = r#"
+listen: { transport: http, addr: "127.0.0.1:7071" }
+upstreams:
+  - { name: stripe, transport: stdio, command: ["x"] }
+auth: { required: true }
+"#;
+        let cfg: Config = serde_norway::from_str(missing).unwrap();
+        assert!(cfg.validate().is_err());
+
+        let durable = r#"
+listen: { transport: http, addr: "127.0.0.1:7071" }
+upstreams:
+  - { name: stripe, transport: stdio, command: ["x"] }
+storage: { database_url_env: MOAT_DATABASE_URL, max_connections: 4 }
+auth: { required: true }
+"#;
+        let cfg: Config = serde_norway::from_str(durable).unwrap();
+        assert!(cfg.validate().is_ok());
     }
 }

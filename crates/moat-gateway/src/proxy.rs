@@ -48,6 +48,7 @@ pub struct Gateway {
     separator: String,
     shared: Arc<Shared>,
     session_id: String,
+    tenant_id: String,
     /// Raw lines destined for the client that no caller is waiting on: on
     /// stdio, everything; on HTTP, server notifications for the GET stream.
     /// One consumer drains this so concurrent handlers never interleave.
@@ -70,6 +71,16 @@ impl Gateway {
         shared: Arc<Shared>,
         session_id: String,
     ) -> Result<(Arc<Gateway>, mpsc::Receiver<String>)> {
+        Self::start_for_tenant(cfg, shared, session_id, "local".to_owned()).await
+    }
+
+    /// Start every upstream for one authenticated tenant session.
+    pub async fn start_for_tenant(
+        cfg: &Config,
+        shared: Arc<Shared>,
+        session_id: String,
+        tenant_id: String,
+    ) -> Result<(Arc<Gateway>, mpsc::Receiver<String>)> {
         let (events_tx, mut events_rx) = mpsc::channel(256);
         let mut upstreams = Vec::with_capacity(cfg.upstreams.len());
         for u in &cfg.upstreams {
@@ -81,12 +92,16 @@ impl Gateway {
 
         // Create the session up front so the intent API can find it even
         // before the first message arrives.
-        shared.store.get_or_create(&session_id);
+        shared
+            .session_for_tenant(&tenant_id, &session_id, true)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("session belongs to another tenant"))?;
         let gw = Arc::new(Gateway {
             upstreams,
             separator: cfg.separator.clone(),
             shared,
             session_id,
+            tenant_id,
             out: out_tx,
             pending: Mutex::new(HashMap::new()),
             upstream_requests: Mutex::new(HashMap::new()),
@@ -628,7 +643,7 @@ impl Gateway {
             Ok(l) => l,
             Err(e) => {
                 if let Some(authorization) = &authorization {
-                    self.release_provider_reservation(authorization);
+                    self.release_provider_reservation(authorization).await;
                 }
                 self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
                     .await;
@@ -641,18 +656,22 @@ impl Gateway {
         match upstream.request_raw(req.id.clone(), &line).await {
             Ok(frame) => {
                 if let Message::Response(resp) = &frame.message {
-                    self.observe(&upstream.name, &tool, &req.id, &resp.result);
+                    self.observe(&upstream.name, &tool, &req.id, &resp.result)
+                        .await;
                     if let Some(authorization) = &authorization {
-                        self.record_provider_response(authorization, &upstream.name, &resp.result);
+                        self.record_provider_response(authorization, &upstream.name, &resp.result)
+                            .await;
                     }
                 } else if let Some(authorization) = &authorization {
-                    self.record_provider_failure(authorization, &upstream.name, "provider_error");
+                    self.record_provider_failure(authorization, &upstream.name, "provider_error")
+                        .await;
                 }
                 self.emit_raw(frame.raw).await
             }
             Err(e) => {
                 if let Some(authorization) = &authorization {
-                    self.record_provider_failure(authorization, &upstream.name, "transport_error");
+                    self.record_provider_failure(authorization, &upstream.name, "transport_error")
+                        .await;
                 }
                 self.emit_error(req.id, code::INTERNAL_ERROR, e.to_string(), None)
                     .await;
@@ -661,23 +680,32 @@ impl Gateway {
     }
 
     /// Register every string and number in a tool result as observed.
-    fn observe(&self, server: &str, tool: &str, call_id: &RequestId, result: &Value) {
+    async fn observe(&self, server: &str, tool: &str, call_id: &RequestId, result: &Value) {
         let session = self.shared.store.get_or_create(&self.session_id);
-        let leaves = moat_core::session::lock(&session).observe_tool_result(
-            server,
-            tool,
-            &call_id.to_string(),
-            result,
-        );
+        let leaves = {
+            moat_core::session::lock(&session).observe_tool_result(
+                server,
+                tool,
+                &call_id.to_string(),
+                result,
+            )
+        };
         let sha = moat_core::hash::sha256_hex(moat_core::hash::canonical_json(result).as_bytes());
         tracing::info!(
             session = %self.session_id, server, tool, call_id = %call_id, leaves,
             result_sha256 = %sha, "tool result observed"
         );
+        if let Err(error) = self
+            .shared
+            .persist_session(&self.tenant_id, &self.session_id)
+            .await
+        {
+            tracing::error!(%error, session = %self.session_id, "tool observation was not persisted");
+        }
     }
 
     /// Record the provider-side result for a structured authorization.
-    fn record_provider_response(
+    async fn record_provider_response(
         &self,
         authorized: &AuthorizedPayment,
         provider: &str,
@@ -719,11 +747,13 @@ impl Gateway {
             succeeded,
             unix_ms: now_unix_ms(),
         };
-        let mut session = moat_core::session::lock(&session);
-        if let Some(fingerprint) = &authorized.reservation_fingerprint {
-            session.finish_reserved_payment(fingerprint, outcome);
-        } else {
-            session.record_payment_outcome(outcome);
+        {
+            let mut session = moat_core::session::lock(&session);
+            if let Some(fingerprint) = &authorized.reservation_fingerprint {
+                session.finish_reserved_payment(fingerprint, outcome);
+            } else {
+                session.record_payment_outcome(outcome);
+            }
         }
         tracing::info!(
             session = %self.session_id,
@@ -735,9 +765,16 @@ impl Gateway {
             succeeded,
             "payment provider outcome recorded"
         );
+        if let Err(error) = self
+            .shared
+            .persist_session(&self.tenant_id, &self.session_id)
+            .await
+        {
+            tracing::error!(%error, session = %self.session_id, "provider outcome was not persisted");
+        }
     }
 
-    fn record_provider_failure(
+    async fn record_provider_failure(
         &self,
         authorized: &AuthorizedPayment,
         provider: &str,
@@ -762,11 +799,13 @@ impl Gateway {
             succeeded: false,
             unix_ms: now_unix_ms(),
         };
-        let mut session = moat_core::session::lock(&session);
-        if let Some(fingerprint) = &authorized.reservation_fingerprint {
-            session.finish_reserved_payment(fingerprint, outcome);
-        } else {
-            session.record_payment_outcome(outcome);
+        {
+            let mut session = moat_core::session::lock(&session);
+            if let Some(fingerprint) = &authorized.reservation_fingerprint {
+                session.finish_reserved_payment(fingerprint, outcome);
+            } else {
+                session.record_payment_outcome(outcome);
+            }
         }
         tracing::warn!(
             session = %self.session_id,
@@ -777,14 +816,30 @@ impl Gateway {
             status,
             "payment provider failure recorded; authorization remains retryable"
         );
+        if let Err(error) = self
+            .shared
+            .persist_session(&self.tenant_id, &self.session_id)
+            .await
+        {
+            tracing::error!(%error, session = %self.session_id, "provider failure was not persisted");
+        }
     }
 
-    fn release_provider_reservation(&self, authorized: &AuthorizedPayment) {
+    async fn release_provider_reservation(&self, authorized: &AuthorizedPayment) {
         let Some(fingerprint) = &authorized.reservation_fingerprint else {
             return;
         };
         let session = self.shared.store.get_or_create(&self.session_id);
-        moat_core::session::lock(&session).release_payment_reservation(fingerprint);
+        {
+            moat_core::session::lock(&session).release_payment_reservation(fingerprint);
+        }
+        if let Err(error) = self
+            .shared
+            .persist_session(&self.tenant_id, &self.session_id)
+            .await
+        {
+            tracing::error!(%error, session = %self.session_id, "reservation release was not persisted");
+        }
     }
 
     /// Evaluate a payment call. Returns its evidence context if it may be forwarded; on
@@ -886,6 +941,40 @@ impl Gateway {
             }
         };
 
+        let durable_result = async {
+            self.shared
+                .persist_evidence(&self.tenant_id, &record)
+                .await?;
+            self.shared
+                .persist_session(&self.tenant_id, &self.session_id)
+                .await
+        }
+        .await;
+        if let Err(error) = durable_result {
+            if let Some(fingerprint) = &reservation_fingerprint {
+                {
+                    moat_core::session::lock(&session).release_payment_reservation(fingerprint);
+                }
+                let _ = self
+                    .shared
+                    .persist_session(&self.tenant_id, &self.session_id)
+                    .await;
+            }
+            tracing::error!(%error, "durable decision write failed; denying");
+            self.emit_error(
+                id.clone(),
+                moat_code::DENY,
+                "Moat could not persist the decision; payment refused",
+                Some(json!({"moat": {
+                    "verdict": "deny",
+                    "reasons": [format!("durable storage: {error}")],
+                    "evidence_id": record.id,
+                }})),
+            )
+            .await;
+            return None;
+        }
+
         let verdict = &eval.verdict;
         let failing: Vec<&str> = verdict.failures().map(|r| r.message.as_str()).collect();
         tracing::info!(
@@ -924,12 +1013,36 @@ impl Gateway {
                     .iter()
                     .map(|(field, p)| (field.clone(), p.resolution.value.clone()))
                     .collect();
-                let token = self.shared.new_resume(PendingResume {
-                    session: self.session_id.clone(),
-                    evidence_id: record.id.clone(),
-                    payment_fingerprint: moat_core::policy::payment_fingerprint(&eval.call),
-                    values,
-                });
+                let token = match self
+                    .shared
+                    .new_resume(
+                        &self.tenant_id,
+                        PendingResume {
+                            session: self.session_id.clone(),
+                            evidence_id: record.id.clone(),
+                            payment_fingerprint: moat_core::policy::payment_fingerprint(&eval.call),
+                            values,
+                        },
+                    )
+                    .await
+                {
+                    Ok(token) => token,
+                    Err(error) => {
+                        tracing::error!(%error, "approval token could not be persisted");
+                        self.emit_error(
+                            id.clone(),
+                            moat_code::DENY,
+                            "Moat could not persist approval state; payment refused",
+                            Some(json!({"moat": {
+                                "verdict": "deny",
+                                "reasons": [format!("approval storage: {error}")],
+                                "evidence_id": record.id,
+                            }})),
+                        )
+                        .await;
+                        return None;
+                    }
+                };
                 self.emit_error(
                     id.clone(),
                     moat_code::STEP_UP,
