@@ -3,7 +3,7 @@ upstreams:
   - name: stripe
     transport: stdio
     command:
-      - "/usr/bin/node"
+      - "/opt/node22/bin/node"
       - "--env-file=/home/moat/.env.stripe-sandbox"
       - "--import"
       - "tsx"
