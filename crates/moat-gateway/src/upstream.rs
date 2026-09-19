@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
+use moat_core::rail::Rail;
 use moat_mcp::http::HttpClient;
 use moat_mcp::process::ChildTransport;
 use moat_mcp::stdio::{Frame, FrameWriter};
@@ -44,6 +45,8 @@ enum Link {
 pub struct Upstream {
     /// The configured name; also the tool namespace.
     pub name: String,
+    /// The settlement rail this upstream moves money on, from the config.
+    pub rail: Rail,
     link: Link,
     next_id: AtomicU64,
 }
@@ -76,6 +79,7 @@ impl Upstream {
 
                 let up = Arc::new(Upstream {
                     name: cfg.name.clone(),
+                    rail: cfg.rail,
                     link: Link::Stdio(Box::new(StdioLink {
                         writer: Mutex::new(writer),
                         pending: Mutex::new(HashMap::new()),
@@ -123,6 +127,7 @@ impl Upstream {
                 tracing::info!(upstream = %cfg.name, %url, "http upstream configured");
                 Ok(Arc::new(Upstream {
                     name: cfg.name.clone(),
+                    rail: cfg.rail,
                     link: Link::Http(Box::new(client)),
                     next_id: AtomicU64::new(1),
                 }))

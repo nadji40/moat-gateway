@@ -159,7 +159,12 @@ fn main() -> Result<()> {
 }
 
 async fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
-    let policy = state::PolicyState::load(cfg.policy.as_deref());
+    let policies = state::Policies::load(
+        cfg.policy.as_deref(),
+        cfg.upstreams
+            .iter()
+            .map(|u| (u.name.as_str(), u.policy.as_deref())),
+    );
     let (keys, created) = moat_core::keys::Keys::load_or_create(&cfg.keys)
         .with_context(|| format!("signing keys in {}", cfg.keys.display()))?;
     tracing::info!(
@@ -186,7 +191,7 @@ async fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
         None => None,
     };
     Ok(Arc::new(state::Shared::new(
-        policy,
+        policies,
         keys,
         cfg.evidence.clone(),
         storage,

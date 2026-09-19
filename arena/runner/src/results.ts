@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { AgentTrace } from "./backends/types.js";
+import type { Rail } from "./rails.js";
 
 export type Mode = "gateway" | "direct";
 
@@ -26,6 +27,8 @@ export interface ResultRow {
   backend: string;
   /** Omitted in historical rows; derive with armForMode(mode). */
   arm?: Arm;
+  /** Which settlement rail. Omitted in rows written before rails; absent means card. */
+  rail?: Rail;
   /** Policy file the gateway ran with, relative to the arena root. Absent for the none arm. */
   policy?: string;
   /** Commit of the tree that produced the row, when the runner could ask git. */

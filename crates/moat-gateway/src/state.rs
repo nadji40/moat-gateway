@@ -71,6 +71,65 @@ impl PolicyState {
     }
 }
 
+/// The policies in force: a default, plus an override for any upstream that
+/// names its own.
+///
+/// Each loads independently. Rails differ enough that one document cannot
+/// sensibly govern a card merchant and a bank beneficiary, and an unusable
+/// bank policy must deny bank payments without disturbing the card upstream
+/// beside it.
+pub struct Policies {
+    default: PolicyState,
+    per_upstream: HashMap<String, PolicyState>,
+}
+
+impl Policies {
+    /// Load the default policy and every per-upstream override.
+    ///
+    /// Never fails: an unreadable policy becomes [`PolicyState::Missing`] for
+    /// whatever it governs, which denies payment-looking tools there.
+    pub fn load<'a, I>(default_path: Option<&Path>, upstreams: I) -> Policies
+    where
+        I: IntoIterator<Item = (&'a str, Option<&'a Path>)>,
+    {
+        let default = PolicyState::load(default_path);
+        let mut per_upstream = HashMap::new();
+        for (name, path) in upstreams {
+            let Some(path) = path else { continue };
+            tracing::info!(upstream = name, policy = %path.display(), "loading upstream policy");
+            per_upstream.insert(name.to_owned(), PolicyState::load(Some(path)));
+        }
+        Policies {
+            default,
+            per_upstream,
+        }
+    }
+
+    /// Build from one already-loaded policy with no per-upstream overrides.
+    ///
+    /// Test-only: a deployment reaches the same state through
+    /// [`Policies::load`], which is the path that logs what it loaded.
+    #[cfg(test)]
+    pub fn single(default: PolicyState) -> Policies {
+        Policies {
+            default,
+            per_upstream: HashMap::new(),
+        }
+    }
+
+    /// The policy governing `upstream`, which is the default unless that
+    /// upstream named its own.
+    pub fn for_upstream(&self, upstream: &str) -> &PolicyState {
+        self.per_upstream.get(upstream).unwrap_or(&self.default)
+    }
+
+    /// Whether `tool` on `server` must go through evaluation, under whichever
+    /// policy governs `server`.
+    pub fn is_payment_tool(&self, server: &str, tool: &str) -> bool {
+        self.for_upstream(server).is_payment_tool(server, tool)
+    }
+}
+
 /// A step-up waiting for the host's answer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingResume {
@@ -94,8 +153,8 @@ struct EvidenceLog {
 pub struct Shared {
     /// Sessions by id.
     pub store: SessionStore,
-    /// The policy, or why there is none.
-    pub policy: PolicyState,
+    /// The policies in force, one per upstream with a shared fallback.
+    pub policies: Policies,
     keys: Keys,
     resumes: Mutex<HashMap<String, PendingResume>>,
     session_tenants: Mutex<HashMap<String, String>>,
@@ -111,7 +170,7 @@ impl Shared {
     /// If the file already has records, the chain continues from its last
     /// line.
     pub fn new(
-        policy: PolicyState,
+        policies: Policies,
         keys: Keys,
         evidence_path: PathBuf,
         storage: Option<DurableStore>,
@@ -133,7 +192,7 @@ impl Shared {
         }
         Ok(Shared {
             store: SessionStore::new(),
-            policy,
+            policies,
             keys,
             resumes: Mutex::new(HashMap::new()),
             session_tenants: Mutex::new(HashMap::new()),
@@ -501,5 +560,81 @@ impl Shared {
             approved,
         });
         confirmed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn loaded(yaml: &str) -> PolicyState {
+        PolicyState::Loaded(Policy::from_yaml(yaml).expect("policy parses"))
+    }
+
+    /// A policy that calls `transfer` a payment, which the default policy
+    /// does not. Used to prove the two are consulted independently.
+    const BANK_POLICY: &str = "\
+version: 1
+payment_tools:
+  - server: bank
+    tool: transfer
+fields:
+  payee: { args: [\"payee\"] }
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User]
+    on_fail: deny
+";
+
+    #[test]
+    fn an_upstream_without_its_own_policy_uses_the_default() {
+        let policies = Policies::single(loaded(include_str!("../../../policies/default.yaml")));
+        assert!(policies.is_payment_tool("stripe", "pay"));
+        assert!(policies.is_payment_tool("anything", "pay"));
+        assert!(!policies.is_payment_tool("web", "fetch"));
+    }
+
+    #[test]
+    fn an_upstream_policy_governs_only_that_upstream() {
+        let policies = Policies {
+            default: loaded(include_str!("../../../policies/default.yaml")),
+            per_upstream: HashMap::from([("bank".to_owned(), loaded(BANK_POLICY))]),
+        };
+        // The bank policy knows `transfer` is a payment; the default does not.
+        assert!(policies.is_payment_tool("bank", "transfer"));
+        assert!(!policies.is_payment_tool("stripe", "transfer"));
+        // And the default still governs the card upstream.
+        assert!(policies.is_payment_tool("stripe", "pay"));
+        // `pay` on the bank upstream is not a payment under the bank policy,
+        // which lists only `transfer`. Each upstream is judged by its own.
+        assert!(!policies.is_payment_tool("bank", "pay"));
+    }
+
+    /// The reason policies are per upstream: one rail's unusable policy must
+    /// not decide anything for another rail.
+    #[test]
+    fn one_unusable_policy_does_not_disturb_the_other_upstream() {
+        let policies = Policies {
+            default: loaded(include_str!("../../../policies/default.yaml")),
+            per_upstream: HashMap::from([(
+                "bank".to_owned(),
+                PolicyState::Missing("unreadable".to_owned()),
+            )]),
+        };
+        // The broken bank policy falls back to the fail-closed tool list, so
+        // payment-shaped tools there are still caught.
+        assert!(policies.is_payment_tool("bank", "transfer"));
+        assert!(matches!(
+            policies.for_upstream("bank"),
+            PolicyState::Missing(_)
+        ));
+        // The card upstream is untouched and still evaluates normally.
+        assert!(matches!(
+            policies.for_upstream("stripe"),
+            PolicyState::Loaded(_)
+        ));
+        assert!(policies.is_payment_tool("stripe", "pay"));
+        assert!(!policies.is_payment_tool("stripe", "fetch"));
     }
 }

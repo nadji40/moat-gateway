@@ -82,6 +82,17 @@ no authorization by design. Pull requests that make a baseline arm smarter are
 declined: the comparison is only meaningful while those arms are what a
 payment rail already offers.
 
+## Settlement rails
+
+A rail is how the money leaves: `card`, `bank`, `crypto`. It is declared per
+upstream in the gateway config and never taken from a call argument — a
+payment must not be able to select the rail whose checks it prefers. Adding a
+rail means a new entry in `arena/runner/src/rails.ts` plus a mock package, not
+edits spread through the runner; if you find yourself special-casing a rail
+outside its `RailSpec`, the registry is missing a field. Card is the only
+implemented rail today, and every change must leave its published numbers
+untouched — `--rails card` is the regression.
+
 ## Policy changes
 
 A change to `policies/default.yaml` changes the published numbers. It ships

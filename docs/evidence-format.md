@@ -22,6 +22,8 @@ payment is refused. This document specifies the record; the implementation is
 ```jsonc
 {
   "id": "ev_3f9c…",                 // "ev_" + 24 hex chars, unique per record
+  "format_version": 2,              // omitted in version 1 records; absent means 1
+  "rail": "card",                   // "card" | "bank" | "crypto"; absent in version 1
   "session": "s_…",                 // session id
   "ts": "2026-09-15T20:31:07.412Z", // RFC 3339, UTC, millisecond precision
   "call": {
@@ -106,10 +108,29 @@ the secret key was not stolen, or that the gateway's inputs (intents, tool
 results) were truthful. Intent text is not in the record; its SHA-256 is in
 the event log that `context_hash` covers.
 
+## Versions
+
+**Version 2** (current) adds `format_version` and `rail`. A verdict now says
+which settlement rail the money would have left on, so one file can hold
+card, bank-transfer and on-chain decisions and a reader can tell them apart
+without inferring it from the upstream name.
+
+**Version 1** records carry neither field. They are still valid and still
+verify: both fields are omitted whenever they hold their version 1 meaning,
+so a version 1 line read and rewritten by a current build is byte-identical
+and its signature still checks out. A reader treats an absent
+`format_version` as `1` and an absent `rail` as `card`, which is what every
+upstream was before rails existed.
+
+The rule that keeps this workable: a new field may only be added if it is
+omitted when it carries no information, and the golden fixture must not
+exercise it. Otherwise the golden bytes move on every release and the one
+signal that the format changed is lost in the noise.
+
 ## Stability
 
-This is format version 1 by convention; there is no version field yet. A
-change to any key, to canonicalization, to what is hashed or to what is
+A change to any key, to canonicalization, to what is hashed or to what is
 signed changes the bytes and fails the golden test. When that is intended,
 update this document, then regenerate the golden file with
-`MOAT_UPDATE_GOLDEN=1 cargo test -p moat-core --test golden`.
+`MOAT_UPDATE_GOLDEN=1 cargo test -p moat-core --test golden`, and commit the
+regenerated fixture on its own so the diff is reviewable.

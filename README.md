@@ -120,6 +120,9 @@ Early. Follow the work order below for what is actually built.
 - [x] 12. Dedicated PostgreSQL state, tenant API keys, durable approvals and evidence
 - [x] 13. `arena`: evaluation arms, run manifests and the analysis that produces
       the two tables with confidence intervals
+- [x] 14. Settlement rails declared per upstream, per-upstream policies, and
+      evidence format version 2 (ADR 0008). Card is the only rail implemented;
+      the behaviour that makes bank and crypto correct is the work after it.
 
 The first prototype phase and the durable authenticated pilot foundation are built.
 
@@ -436,6 +439,41 @@ recording the commit, policy hashes, model and scenarios. `arena/analysis/`
 turns any set of runs into the two tables the project rests on, with
 confidence intervals; see [`arena/analysis/README.md`](arena/analysis/README.md).
 `--modes direct,gateway` is still accepted and means `--arms none,moat`.
+
+### Settlement rails
+
+An *arm* is what stands between the agent and the money; a **rail** is how the
+money leaves. `--rails` selects which, and defaults to `card` — what every run
+before rails meant.
+
+```bash
+cd arena && pnpm --filter @moat/runner start --backend null --runs 5 --arms none,cap,allowlist,moat --rails card --suite all
+```
+
+A rail is declared per upstream in the gateway config, not by the call:
+
+```yaml
+upstreams:
+  - name: stripe
+    rail: card               # card | bank | crypto; absent means card
+    policy: policies/default.yaml   # optional; falls back to the top-level policy
+    transport: stdio
+    command: [...]
+```
+
+Arguments are reachable by whatever compromised the agent and configuration is
+not, so a payment cannot talk its way onto a rail with weaker checks. Each
+upstream's policy loads independently: an unusable bank policy denies bank
+payments and leaves the card upstream working. Every verdict records its rail
+(evidence format version 2). See
+[ADR 0008](docs/adr/0008-settlement-rails.md).
+
+Only `card` has an implementation today. `bank` and `crypto` exist in the
+model, in the config vocabulary and in the evidence format; the checks that
+make them correct — an asset model that can hold 6- and 18-decimal tokens, a
+canonical destination compared exactly, and an outcome state machine in which
+a broadcast transfer is committed rather than retryable — are the work that
+follows, and none of it changes the card path.
 
 ### Stripe sandbox demonstration
 

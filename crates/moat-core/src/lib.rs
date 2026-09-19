@@ -10,6 +10,7 @@
 //! - [`extract`]: pulling leaves out of a tool result.
 //! - [`session`]: per-session intents, observed values and the event log.
 //! - [`provenance`]: resolving where a payment argument came from.
+//! - [`rail`]: which settlement rail an upstream moves money on.
 //! - [`policy`]: the YAML policy and its evaluation.
 //! - [`verdict`]: what the evaluation produces.
 //! - [`evidence`]: the record written for every verdict.
@@ -24,12 +25,16 @@ pub mod keys;
 pub mod normalize;
 pub mod policy;
 pub mod provenance;
+pub mod rail;
 pub mod session;
 pub mod source;
 pub mod verdict;
 
-pub use policy::{evaluate, Evaluation, PaymentCall, Policy, PolicyError};
+pub use policy::{
+    evaluate, evaluate_with, EvalContext, Evaluation, PaymentCall, Policy, PolicyError,
+};
 pub use provenance::{resolve, MatchKind, Resolution};
+pub use rail::Rail;
 pub use session::{Session, SessionStore};
 pub use source::{Source, SourceKind};
 pub use verdict::{Decision, RuleOutcome, Verdict};

@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use moat_core::rail::Rail;
 use moat_mcp::jsonrpc::code;
 use moat_mcp::stdio::{Frame, FrameReader, FrameWriter};
 use moat_mcp::types::{
@@ -621,11 +622,16 @@ impl Gateway {
         let mut forwarded = params;
         forwarded.name = tool.clone();
 
-        // Payment tools go through policy before anything is forwarded.
-        let is_payment = self.shared.policy.is_payment_tool(&upstream.name, &tool);
+        // Payment tools go through policy before anything is forwarded. Both
+        // which policy applies and which rail the money leaves on come from
+        // the upstream, never from the call.
+        let is_payment = self.shared.policies.is_payment_tool(&upstream.name, &tool);
         let authorization = if is_payment {
             let args = forwarded.arguments.clone().unwrap_or_default();
-            match self.authorize(&req.id, &upstream.name, &tool, args).await {
+            match self
+                .authorize(&req.id, &upstream.name, &tool, upstream.rail, args)
+                .await
+            {
                 Some(authorized) => Some(authorized),
                 None => return,
             }
@@ -849,9 +855,12 @@ impl Gateway {
         id: &RequestId,
         server: &str,
         tool: &str,
+        rail: Rail,
         args: Map<String, Value>,
     ) -> Option<AuthorizedPayment> {
-        use moat_core::policy::{evaluate, payment_amount_minor, payment_fingerprint, PaymentCall};
+        use moat_core::policy::{
+            evaluate_with, payment_amount_minor, payment_fingerprint, EvalContext, PaymentCall,
+        };
         use moat_core::session::PaymentReservation;
         use moat_core::verdict::{code as moat_code, Decision};
 
@@ -864,10 +873,10 @@ impl Gateway {
         let session = self.shared.store.get_or_create(&self.session_id);
         let now = now_unix_ms();
 
-        let (eval, reservation_fingerprint) = match &self.shared.policy {
+        let (eval, reservation_fingerprint) = match self.shared.policies.for_upstream(server) {
             PolicyState::Loaded(policy) => {
                 let mut s = moat_core::session::lock(&session);
-                let mut eval = evaluate(policy, &s, call, now);
+                let mut eval = evaluate_with(policy, &s, call, now, &EvalContext::for_rail(rail));
                 let mut reservation_fingerprint = None;
                 if eval.verdict.decision == Decision::Allow {
                     let authorization_id = eval
@@ -915,9 +924,10 @@ impl Gateway {
                 tracing::error!(
                     server,
                     tool,
+                    %rail,
                     "payment tool called with no usable policy: DENIED ({why})"
                 );
-                (policy_missing_evaluation(call, why, now), None)
+                (policy_missing_evaluation(call, why, now, rail), None)
             }
         };
 
@@ -1116,6 +1126,7 @@ fn policy_missing_evaluation(
     call: moat_core::policy::PaymentCall,
     why: &str,
     now: u64,
+    rail: Rail,
 ) -> moat_core::policy::Evaluation {
     use moat_core::verdict::{Decision, RuleOutcome, Verdict};
     let seed = format!("{}|{}|{}|{now}", call.server, call.tool, call.call_id);
@@ -1137,6 +1148,7 @@ fn policy_missing_evaluation(
             evidence_id,
         },
         unix_ms: now,
+        rail,
     }
 }
 

@@ -53,6 +53,10 @@ def _arm(row: dict) -> str:
     return row.get("arm") or ("none" if row.get("mode") == "direct" else "moat")
 
 
+def _policies(manifest: dict) -> dict:
+    return manifest.get("policies") or {}
+
+
 def _manifest_for(file: Path) -> dict:
     candidate = file.with_name(file.name[: -len(".jsonl")] + ".manifest.json")
     if candidate.exists():
@@ -79,6 +83,7 @@ def load_results(paths: list[str | Path] | None = None) -> pd.DataFrame:
                     continue
                 r = json.loads(line)
                 arm = _arm(r)
+                rail = r.get("rail") or "card"
                 verdicts = r.get("verdicts") or []
                 backend = r.get("backend")
                 pay_ms = r.get("pay_ms") or []
@@ -102,6 +107,7 @@ def load_results(paths: list[str | Path] | None = None) -> pd.DataFrame:
                         "scenario": r.get("attack"),
                         "class": r.get("class"),
                         "kind": r.get("scenario_kind") or "attack",
+                        "rail": rail,
                         "arm": arm,
                         "mode": r.get("mode"),
                         "iteration": r.get("iteration"),
@@ -117,8 +123,11 @@ def load_results(paths: list[str | Path] | None = None) -> pd.DataFrame:
                         "fetch_ms": r.get("fetch_ms") or [],
                         "wall_ms": r.get("wall_ms"),
                         "commit": r.get("commit") or manifest.get("commit"),
+                        # Manifests are keyed "<rail>/<arm>"; ones written
+                        # before rails are keyed by arm alone and mean card.
                         "policy": r.get("policy")
-                        or ((manifest.get("policies") or {}).get(arm) or {}).get("file"),
+                        or (_policies(manifest).get(f"{rail}/{arm}") or {}).get("file")
+                        or (_policies(manifest).get(arm) or {}).get("file"),
                         "at": r.get("at"),
                     }
                 )
@@ -139,6 +148,7 @@ def runs_summary(df: pd.DataFrame) -> pd.DataFrame:
         rows=("scenario", "size"),
         scenarios=("scenario", "nunique"),
         arms=("arm", lambda s: ",".join(str(a) for a in ARMS if a in set(s))),
+        rails=("rail", lambda s: ",".join(sorted(set(s)))),
         attacks=("kind", lambda s: int((s == "attack").sum())),
         controls=("kind", lambda s: int((s == "control").sum())),
         errors=("errors", "sum"),
@@ -161,7 +171,7 @@ def bypass_table(df: pd.DataFrame, by_class: bool = False) -> pd.DataFrame:
     a = df[df["kind"] == "attack"]
     if a.empty:
         return pd.DataFrame()
-    keys = ["backend", "model", "arm"] + (["class"] if by_class else [])
+    keys = ["backend", "model", "rail", "arm"] + (["class"] if by_class else [])
     return _rates(a.groupby(keys, observed=True), "attacker_paid", "attacks_paid", "bypass_rate")
 
 
@@ -171,7 +181,7 @@ def usefulness_table(df: pd.DataFrame) -> pd.DataFrame:
     if c.empty:
         return pd.DataFrame()
     c["legitimate_completed"] = c["legitimate_completed"].fillna(False).astype(bool)
-    keys = ["backend", "model", "arm"]
+    keys = ["backend", "model", "rail", "arm"]
     grouped = c.groupby(keys, observed=True)
     t = _rates(grouped, "legitimate_completed", "completed", "completion_rate")
     t["unnecessary_block_rate"] = 1 - t["completion_rate"]
@@ -199,7 +209,7 @@ def latency_table(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
     rows = []
-    for (backend, model), g in df.groupby(["backend", "model"], observed=True):
+    for (backend, model, rail), g in df.groupby(["backend", "model", "rail"], observed=True):
         base = _flat(g.loc[g["arm"] == "none", "forwarded_pay_ms"])
         for arm in ARMS:
             sub = g[g["arm"] == arm]
@@ -211,6 +221,7 @@ def latency_table(df: pd.DataFrame) -> pd.DataFrame:
                 {
                     "backend": backend,
                     "model": model,
+                    "rail": rail,
                     "arm": arm,
                     "forwarded_calls": int(len(v)),
                     "all_pay_calls": int(len(_flat(sub["pay_ms"]))),
@@ -231,9 +242,9 @@ def scenario_matrix(df: pd.DataFrame, kind: str = "attack") -> pd.DataFrame:
         return pd.DataFrame()
     col = "attacker_paid" if kind == "attack" else "legitimate_completed"
     s[col] = s[col].fillna(False).astype(bool)
-    g = s.groupby(["class", "scenario", "arm"], observed=True)[col].agg(["sum", "size"]).reset_index()
+    g = s.groupby(["rail", "class", "scenario", "arm"], observed=True)[col].agg(["sum", "size"]).reset_index()
     g["cell"] = g["sum"].astype(int).astype(str) + "/" + g["size"].astype(str)
-    return g.pivot(index=["class", "scenario"], columns="arm", values="cell").fillna("").reset_index()
+    return g.pivot(index=["rail", "class", "scenario"], columns="arm", values="cell").fillna("").reset_index()
 
 
 def to_markdown(df: pd.DataFrame, floats: int = 3) -> str:

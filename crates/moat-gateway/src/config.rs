@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use moat_core::rail::Rail;
 use serde::Deserialize;
 
 /// Top-level `moat.yaml`.
@@ -14,8 +15,8 @@ pub struct Config {
     pub listen: Listen,
     /// The MCP servers being proxied.
     pub upstreams: Vec<Upstream>,
-    /// Path to the policy YAML. Missing or unreadable means fail closed for
-    /// payment tools.
+    /// Path to the policy YAML used by any upstream that does not name its
+    /// own. Missing or unreadable means fail closed for payment tools.
     #[serde(default)]
     pub policy: Option<PathBuf>,
     /// Path to the append-only evidence JSONL file.
@@ -66,6 +67,17 @@ pub enum Listen {
 pub struct Upstream {
     /// Name used as the tool namespace prefix. Must be unique.
     pub name: String,
+    /// Which settlement rail this upstream moves money on. Declared here and
+    /// not inferred from the tool, so an agent cannot claim a different one.
+    /// Absent means `card`, which is what every upstream was before rails.
+    #[serde(default)]
+    pub rail: Rail,
+    /// Policy governing payments on this upstream. Falls back to the
+    /// top-level `policy` when absent. Each upstream's policy loads and fails
+    /// independently: an unusable bank policy denies bank payments and leaves
+    /// the card upstream alone.
+    #[serde(default)]
+    pub policy: Option<PathBuf>,
     /// How to reach it.
     #[serde(flatten)]
     pub transport: UpstreamTransport,
@@ -160,6 +172,11 @@ impl Config {
         if let Some(p) = self.policy.as_mut() {
             fix(p);
         }
+        for upstream in &mut self.upstreams {
+            if let Some(p) = upstream.policy.as_mut() {
+                fix(p);
+            }
+        }
         fix(&mut self.evidence);
         fix(&mut self.keys);
     }
@@ -248,6 +265,62 @@ upstreams:
 "#;
         let cfg: Config = serde_norway::from_str(sep).unwrap();
         assert!(cfg.validate().is_err());
+    }
+
+    #[test]
+    fn an_upstream_without_a_rail_is_a_card_upstream() {
+        let text = r#"
+upstreams:
+  - { name: stripe, transport: stdio, command: ["x"] }
+"#;
+        let cfg: Config = serde_norway::from_str(text).unwrap();
+        assert_eq!(cfg.upstreams[0].rail, Rail::Card);
+        assert!(cfg.upstreams[0].policy.is_none());
+    }
+
+    #[test]
+    fn an_upstream_can_declare_its_rail_and_its_own_policy() {
+        let text = r#"
+policy: policies/default.yaml
+upstreams:
+  - { name: stripe, rail: card, transport: stdio, command: ["x"] }
+  - { name: bank, rail: bank, policy: policies/rails/bank.yaml, transport: stdio, command: ["y"] }
+  - { name: evm, rail: crypto, transport: stdio, command: ["z"] }
+"#;
+        let mut cfg: Config = serde_norway::from_str(text).unwrap();
+        cfg.resolve_paths(Path::new("/cfg"));
+        assert_eq!(cfg.upstreams[0].rail, Rail::Card);
+        assert_eq!(cfg.upstreams[1].rail, Rail::Bank);
+        assert_eq!(cfg.upstreams[2].rail, Rail::Crypto);
+        // A per-upstream policy path resolves against the config's directory,
+        // exactly like the top-level one.
+        assert_eq!(
+            cfg.upstreams[1].policy.as_deref(),
+            Some(Path::new("/cfg").join("policies/rails/bank.yaml").as_path())
+        );
+        assert!(cfg.upstreams[0].policy.is_none(), "falls back to top level");
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn an_unrecognised_rail_is_rejected_rather_than_treated_as_card() {
+        let text = r#"
+upstreams:
+  - { name: sepa, rail: wire, transport: stdio, command: ["x"] }
+"#;
+        assert!(serde_norway::from_str::<Config>(text).is_err());
+    }
+
+    /// The pilot runs from a clone of this repo. Its config must keep parsing
+    /// unchanged, with every upstream reading as the card rail it has always
+    /// been.
+    #[test]
+    fn the_pilot_config_still_parses_as_card() {
+        let text = include_str!("../../../deploy/moat.pilot.yaml");
+        let cfg: Config = serde_norway::from_str(text).unwrap();
+        assert!(cfg.upstreams.iter().all(|u| u.rail == Rail::Card));
+        assert!(cfg.upstreams.iter().all(|u| u.policy.is_none()));
+        assert!(cfg.validate().is_ok());
     }
 
     #[test]

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::provenance::{resolve, Resolution};
+use crate::rail::Rail;
 use crate::session::{Event, Session};
 use crate::source::SourceKind;
 use crate::verdict::{Decision, RuleOutcome, Verdict};
@@ -284,18 +285,57 @@ pub struct Evaluation {
     pub verdict: Verdict,
     /// The clock value the evaluation used, in milliseconds since the epoch.
     pub unix_ms: u64,
+    /// The settlement rail the upstream moves money on. Defaults to card, so
+    /// an evaluation deserialized from before this field reads as what it was.
+    #[serde(default)]
+    pub rail: Rail,
 }
 
-/// Evaluate a payment call against the policy and the session's state.
+/// What the deployment knows about a payment that the call itself cannot say.
 ///
-/// `now_unix_ms` drives the per-minute velocity window. The caller records
-/// the outcome with [`Session::record_evaluation`] once evidence has been
-/// written; this function only reads the session.
+/// The rail is declared per upstream in the gateway config. Keeping it here
+/// rather than on [`PaymentCall`] is deliberate: arguments are reachable by
+/// whatever compromised the agent, configuration is not. A call cannot talk
+/// its way onto a rail with weaker checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub struct EvalContext {
+    /// The settlement rail the upstream moves money on.
+    pub rail: Rail,
+}
+
+impl EvalContext {
+    /// Context for an upstream on `rail`.
+    pub fn for_rail(rail: Rail) -> EvalContext {
+        EvalContext { rail }
+    }
+}
+
+/// Evaluate a payment call on the default rail.
+///
+/// Short for [`evaluate_with`] and [`EvalContext::default`], which is the card
+/// rail: what every deployment was before rails existed.
 pub fn evaluate(
     policy: &Policy,
     session: &Session,
     call: PaymentCall,
     now_unix_ms: u64,
+) -> Evaluation {
+    evaluate_with(policy, session, call, now_unix_ms, &EvalContext::default())
+}
+
+/// Evaluate a payment call against the policy, the session's state, and what
+/// the deployment declares about the upstream.
+///
+/// `now_unix_ms` drives the per-minute velocity window. The caller records
+/// the outcome with [`Session::record_evaluation`] once evidence has been
+/// written; this function only reads the session.
+pub fn evaluate_with(
+    policy: &Policy,
+    session: &Session,
+    call: PaymentCall,
+    now_unix_ms: u64,
+    ctx: &EvalContext,
 ) -> Evaluation {
     let mapped = policy.map_fields(&call.args);
     let mut provenance = BTreeMap::new();
@@ -391,6 +431,7 @@ pub fn evaluate(
             evidence_id,
         },
         unix_ms: now_unix_ms,
+        rail: ctx.rail,
     }
 }
 

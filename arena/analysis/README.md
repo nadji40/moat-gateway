@@ -12,6 +12,15 @@ Both come with Wilson 95% intervals and the run count behind every number. Nothi
 the README of the repository should be typed by hand once this is running: the
 numbers come from `tables.py`.
 
+## Arms and rails
+
+Two dimensions cross. A **rail** is how the money leaves — `card` through a provider,
+and in later work a bank transfer to an account or an on-chain transfer to an address.
+An **arm** is what stands between the agent and the money on that rail. `--rails`
+selects the first and defaults to `card`; every table groups by both, so a number is
+always read as "this arm, on this rail". Runs recorded before rails existed read as
+card, which is what they were.
+
 ## What an arm is
 
 The runner drives every scenario through each selected *arm*, one control layer at a
@@ -82,6 +91,7 @@ A row without a manifest is not reproducible and should not go into the report.
 | field                  | meaning                                                                                 |
 | ---------------------- | --------------------------------------------------------------------------------------- |
 | `arm`, `mode`          | which control layer; `mode` is the old name (`direct`/`gateway`)                        |
+| `rail`                 | how the money would leave: `card` today. Absent in rows written before rails, meaning card |
 | `scenario_kind`        | `attack` or `control`                                                                   |
 | `attack`, `class`      | scenario id and class (the field is called `attack` for controls too, historically)     |
 | `attacker_paid`        | attacks: the attacker's payee was paid enough times to count as success                 |

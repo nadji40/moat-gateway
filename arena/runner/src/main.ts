@@ -33,6 +33,7 @@ import { NullBackend } from "./backends/null.js";
 import { DEFAULT_MODEL, OpenAIBackend } from "./backends/openai.js";
 import type { AgentBackend, AgentTrace } from "./backends/types.js";
 import { gatewayBinary } from "./gateway.js";
+import { parseRails, type Rail } from "./rails.js";
 import { ARMS, modeForArm, writeRow, type Arm, type ResultRow } from "./results.js";
 import { renderTable } from "./table.js";
 
@@ -46,10 +47,16 @@ interface RunManifest {
   runs: number;
   suite: string;
   arms: Arm[];
+  rails: Rail[];
   scenarios: string[];
   commit: string;
   dirty: boolean;
-  policies: Partial<Record<Arm, { file: string; sha256: string }>>;
+  /**
+   * Keyed `<rail>/<arm>`, because the same arm is a different policy on a
+   * different rail. Manifests written before rails are keyed by arm alone
+   * and mean the card rail.
+   */
+  policies: Record<string, { file: string; sha256: string }>;
   gateway: string | null;
   node: string;
   platform: string;
@@ -130,19 +137,22 @@ async function waitForHttp(url: string, timeoutMs = 10_000): Promise<void> {
 async function runOne(
   backend: AgentBackend,
   scenario: ArenaScenario,
+  rail: Rail,
   arm: Arm,
   iteration: number,
   manifest: RunManifest,
   workDir: string,
 ): Promise<ResultRow> {
   const mode = modeForArm(arm);
-  const session = `${manifest.run_id}-${scenario.id}-${arm}-${iteration}`;
+  // The rail is part of the session id so two rails in one run cannot share
+  // a session, a ledger file, or an intent-API registration.
+  const session = `${manifest.run_id}-${rail}-${scenario.id}-${arm}-${iteration}`;
   const ledger = join(workDir, `${session}.ledger.json`);
   let trace: AgentTrace = { fetches: [], pays: [] };
   let error: string | undefined;
   const t0 = performance.now();
   try {
-    trace = await backend.run(scenario, contextFor(arm, session, ledger));
+    trace = await backend.run(scenario, contextFor(arm, session, ledger, rail));
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
@@ -183,6 +193,7 @@ async function runOne(
     run_id: manifest.run_id,
     backend: backend.name,
     arm,
+    rail,
     attack: scenario.id,
     class: scenario.class,
     scenario_kind: scenario.kind,
@@ -199,7 +210,7 @@ async function runOne(
     trace,
     at: new Date().toISOString(),
   };
-  const policy = manifest.policies[arm]?.file;
+  const policy = manifest.policies[`${rail}/${arm}`]?.file;
   if (policy !== undefined) row.policy = policy;
   if (manifest.commit !== "unknown") row.commit = manifest.commit;
   const model = trace.model ?? manifest.model ?? undefined;
@@ -219,6 +230,7 @@ async function main(): Promise<void> {
       case: { type: "string" },
       suite: { type: "string", default: "attacks" },
       arms: { type: "string" },
+      rails: { type: "string" },
       modes: { type: "string" },
       model: { type: "string", default: DEFAULT_MODEL },
       out: { type: "string" },
@@ -228,6 +240,7 @@ async function main(): Promise<void> {
   const runs = Number(values.runs);
   if (!Number.isInteger(runs) || runs < 1) throw new Error(`--runs must be a positive integer`);
   const arms = parseArms(values.arms, values.modes);
+  const rails = parseRails(values.rails);
   const suite = values.suite ?? "attacks";
   if (!new Set(["attacks", "controls", "all"]).has(suite)) {
     throw new Error(`unknown suite ${suite}; use attacks, controls or all`);
@@ -245,10 +258,15 @@ async function main(): Promise<void> {
   const workDir = mkdtempSync(join(tmpdir(), "moat-arena-"));
 
   const policies: RunManifest["policies"] = {};
-  for (const arm of arms) {
-    if (arm === "none") continue;
-    const file = policyFor(arm);
-    policies[arm] = { file: relative(ARENA_ROOT, file).split("\\").join("/"), sha256: sha256File(file) };
+  for (const rail of rails) {
+    for (const arm of arms) {
+      if (arm === "none") continue;
+      const file = policyFor(arm, rail);
+      policies[`${rail}/${arm}`] = {
+        file: relative(ARENA_ROOT, file).split("\\").join("/"),
+        sha256: sha256File(file),
+      };
+    }
   }
   const needsGateway = arms.some((arm) => arm !== "none");
   const manifest: RunManifest = {
@@ -260,6 +278,7 @@ async function main(): Promise<void> {
     runs,
     suite,
     arms,
+    rails,
     scenarios: scenarios.map((scenario) => scenario.id),
     commit: git("rev-parse HEAD") ?? "unknown",
     dirty: (git("status --porcelain") ?? "").length > 0,
@@ -281,21 +300,26 @@ async function main(): Promise<void> {
   try {
     await waitForHttp(`http://127.0.0.1:${mockWebPort()}/mcp`);
     for (const scenario of scenarios) {
-      for (const arm of arms) {
-        for (let i = 1; i <= runs; i++) {
-          const row = await runOne(backend, scenario, arm, i, manifest, workDir);
-          writeRow(out, row);
-          rows.push(row);
-          const v = row.verdicts.length ? ` [${row.verdicts.join(",")}]` : "";
-          const e = row.error ? ` ERROR ${row.error}` : "";
-          const outcome =
-            scenario.kind === "attack"
-              ? `attacker_paid=${row.attacker_paid ? "YES" : "no "}`
-              : `completed=${row.legitimate_completed ? "YES" : "no "}`;
-          process.stderr.write(
-            `${scenario.id.padEnd(28)} ${arm.padEnd(9)} #${i} ${String(row.wall_ms).padStart(6)}ms ` +
-              `${outcome}${v}${e}\n`,
-          );
+      for (const rail of rails) {
+        for (const arm of arms) {
+          for (let i = 1; i <= runs; i++) {
+            const row = await runOne(backend, scenario, rail, arm, i, manifest, workDir);
+            writeRow(out, row);
+            rows.push(row);
+            const v = row.verdicts.length ? ` [${row.verdicts.join(",")}]` : "";
+            const e = row.error ? ` ERROR ${row.error}` : "";
+            const outcome =
+              scenario.kind === "attack"
+                ? `attacker_paid=${row.attacker_paid ? "YES" : "no "}`
+                : `completed=${row.legitimate_completed ? "YES" : "no "}`;
+            // Only name the rail when more than one is in play, so a
+            // single-rail run reads exactly as it always has.
+            const railLabel = rails.length > 1 ? `${rail.padEnd(7)} ` : "";
+            process.stderr.write(
+              `${scenario.id.padEnd(28)} ${railLabel}${arm.padEnd(9)} #${i} ` +
+                `${String(row.wall_ms).padStart(6)}ms ${outcome}${v}${e}\n`,
+            );
+          }
         }
       }
     }
@@ -309,7 +333,8 @@ async function main(): Promise<void> {
   const modelNote = backend.name === "openai" ? `, model ${values.model}` : "";
   process.stdout.write(
     `\nrun ${runId} — backend ${backend.name}${modelNote}, ${runs} run(s) per scenario per arm ` +
-      `[${arms.join(", ")}], commit ${manifest.commit.slice(0, 7)}${manifest.dirty ? "+dirty" : ""}\n\n`,
+      `[${arms.join(", ")}] on rail(s) [${rails.join(", ")}], ` +
+      `commit ${manifest.commit.slice(0, 7)}${manifest.dirty ? "+dirty" : ""}\n\n`,
   );
   process.stdout.write(renderTable(rows) + "\n");
   process.stdout.write(`\nresults:  ${out}\nmanifest: ${manifestPath}\n`);

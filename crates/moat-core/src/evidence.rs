@@ -14,8 +14,25 @@ use serde_json::{Map, Value};
 use crate::hash::{canonical_json, sha256_hex};
 use crate::keys::{KeyError, Keys, Public};
 use crate::policy::{Evaluation, FieldProvenance};
+use crate::rail::Rail;
 use crate::session::Session;
 use crate::verdict::{Decision, RuleOutcome};
+
+/// The format version this build writes.
+///
+/// Version 1 records carry no `format_version` and no `rail`; they were all
+/// card. Both fields are omitted when they hold those version 1 meanings, so
+/// a version 1 record read by this build re-serializes to the same bytes and
+/// its signature still verifies. See `docs/evidence-format.md`.
+pub const FORMAT_VERSION: u32 = 2;
+
+fn format_version_1() -> u32 {
+    1
+}
+
+fn is_format_version_1(v: &u32) -> bool {
+    *v == 1
+}
 
 /// The call as recorded in evidence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -35,6 +52,17 @@ pub struct CallRecord {
 pub struct Record {
     /// `ev_` plus 24 hex characters.
     pub id: String,
+    /// Which version of this format the record is in. Omitted when 1, which
+    /// is what a record written before the field means.
+    #[serde(
+        default = "format_version_1",
+        skip_serializing_if = "is_format_version_1"
+    )]
+    pub format_version: u32,
+    /// The settlement rail the payment was evaluated on. Absent on version 1
+    /// records, which predate rails and were all card.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rail: Option<Rail>,
     /// Session id.
     pub session: String,
     /// RFC 3339 timestamp of the evaluation.
@@ -62,6 +90,8 @@ impl Record {
     pub fn from_evaluation(session: &Session, eval: &Evaluation, prev: Option<String>) -> Record {
         Record {
             id: eval.verdict.evidence_id.clone(),
+            format_version: FORMAT_VERSION,
+            rail: Some(eval.rail),
             session: session.id.clone(),
             ts: rfc3339(eval.unix_ms),
             call: CallRecord {
@@ -294,5 +324,58 @@ mod tests {
         );
         assert_eq!(r.ts, "2023-11-14T22:13:20Z");
         assert_eq!(r.context_hash.len(), 64);
+    }
+
+    /// A record written before `format_version` and `rail` existed must come
+    /// back out byte for byte, or every signature already on disk stops
+    /// verifying. Both fields are omitted when they mean what version 1 meant.
+    #[test]
+    fn a_version_1_record_round_trips_byte_identically() {
+        let line = concat!(
+            r#"{"call":{"args":{"amount":480,"payee":"ProMon Billing Ltd"},"call_id":"10","#,
+            r#""server":"stripe","tool":"pay"},"context_hash":"#,
+            r#""ddbf141e8d944aad36d7ad9ddf8e3001c79fa79f57ffd49e602843a4d1c4fa91","#,
+            r#""id":"ev_f7bab86d7ab458556471f134","prev":null,"provenance":{},"rules":[],"#,
+            r#""session":"golden-session","sig":"99b1","ts":"2023-11-14T22:13:22Z","#,
+            r#""verdict":"step_up"}"#
+        );
+        let parsed: Record = serde_json::from_str(line).expect("a version 1 record still parses");
+        assert_eq!(parsed.format_version, 1, "absent format_version reads as 1");
+        assert_eq!(parsed.rail, None, "version 1 records carry no rail");
+        assert_eq!(
+            parsed.to_line(),
+            line,
+            "a version 1 record must serialize back to its own bytes"
+        );
+    }
+
+    /// New records declare the version and the rail, so a reader never has to
+    /// guess which of the two shapes it is holding.
+    #[test]
+    fn a_new_record_declares_version_2_and_its_rail() {
+        let s = Session::new("s");
+        let eval = crate::policy::Evaluation {
+            call: crate::policy::PaymentCall {
+                server: "bank".into(),
+                tool: "transfer".into(),
+                call_id: "1".into(),
+                args: serde_json::Map::new(),
+            },
+            provenance: BTreeMap::new(),
+            verdict: crate::verdict::Verdict {
+                decision: Decision::Deny,
+                reasons: Vec::new(),
+                step_up_prompt: None,
+                evidence_id: "ev_x".into(),
+            },
+            unix_ms: 1_700_000_000_000,
+            rail: Rail::Bank,
+        };
+        let r = Record::from_evaluation(&s, &eval, None);
+        assert_eq!(r.format_version, FORMAT_VERSION);
+        assert_eq!(r.rail, Some(Rail::Bank));
+        let line = r.to_line();
+        assert!(line.contains(r#""format_version":2"#), "{line}");
+        assert!(line.contains(r#""rail":"bank""#), "{line}");
     }
 }

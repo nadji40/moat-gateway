@@ -1,3 +1,4 @@
+import type { Rail } from "./rails.js";
 import { ARMS, armForMode, percentile, type Arm, type ResultRow } from "./results.js";
 
 export interface SummaryLine {
@@ -250,8 +251,38 @@ function renderArmTable(rows: ResultRow[], arms: Arm[]): string {
 }
 
 /** Two-arm runs render the way they always have; anything else gets one column per arm. */
-export function renderTable(rows: ResultRow[]): string {
+/** The rail a row ran on. Rows written before rails were all card. */
+function railOfRow(row: ResultRow): Rail {
+  return row.rail ?? "card";
+}
+
+/** Rails present in a set of rows, in first-seen order. */
+export function railsIn(rows: ResultRow[]): Rail[] {
+  const out: Rail[] = [];
+  for (const row of rows) {
+    const rail = railOfRow(row);
+    if (!out.includes(rail)) out.push(rail);
+  }
+  return out;
+}
+
+function renderOneRail(rows: ResultRow[]): string {
   const arms = armsIn(rows);
   const legacy = arms.every((arm) => arm === "none" || arm === "moat");
   return legacy ? renderLegacyTable(rows) : renderArmTable(rows, arms);
+}
+
+/**
+ * One table per rail. A single-rail run renders exactly as it did before
+ * rails existed, so the published card numbers stay comparable line for line.
+ */
+export function renderTable(rows: ResultRow[]): string {
+  const rails = railsIn(rows);
+  if (rails.length <= 1) return renderOneRail(rows);
+  return rails
+    .map((rail) => {
+      const subset = rows.filter((row) => railOfRow(row) === rail);
+      return `## rail: ${rail}\n\n${renderOneRail(subset)}`;
+    })
+    .join("\n\n");
 }

@@ -87,3 +87,24 @@ into a failing test that names the file to update.
 - Evidence is written before the verdict is sent and a write failure refuses
   the payment. This is the one place Moat prefers availability loss to a
   missing record.
+
+## Addendum (2026-09-19, rails)
+
+There is now a second format. Adding the settlement rail to the record — so
+one file can hold card, bank-transfer and on-chain verdicts and a reader can
+tell which is which — created it, and the version field this ADR said could
+be added "when there is a second format" has been added: `format_version`,
+with `rail` beside it.
+
+The constraint that made this cheap is worth stating as a rule, because it is
+what lets the format grow without the golden test losing its meaning. **A new
+field is omitted whenever it carries the meaning the previous version
+implied.** A version 1 record has neither `format_version` nor `rail`; read
+by a current build it deserializes to version 1 and rail card, serializes
+back to exactly its original bytes, and its signature still verifies. No
+migration of existing evidence, no runtime branch in the verifier, and the
+golden fixture moves once per format change rather than once per release.
+
+`crates/moat-core/src/evidence.rs` pins this with a test that a literal
+version 1 line round-trips byte for byte. If that test ever fails, evidence
+already on disk has stopped verifying.
