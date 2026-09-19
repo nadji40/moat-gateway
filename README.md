@@ -31,6 +31,8 @@ Early. Follow the work order below for what is actually built.
 - [x] 10. `arena`: OpenAI Agents SDK backend, first results against gpt-5 and gpt-5-mini (ADR 0006)
 - [x] 11. Streamable HTTP transport on the listen side
 - [x] 12. Dedicated PostgreSQL state, tenant API keys, durable approvals and evidence
+- [x] 13. `arena`: evaluation arms, run manifests and the analysis that produces
+      the two tables with confidence intervals
 
 The first prototype phase and the durable authenticated pilot foundation are built.
 
@@ -492,6 +494,41 @@ repeat invoices inside an aggregate mandate all completed **5/5 directly and
 5/5 through Moat**. This is the first legitimate-task control set; five
 deterministic cases are enough to catch obvious fail-closed
 regressions, not enough to estimate a production false-positive rate.
+
+### Four-arm baseline (2026-09-19)
+
+Comparing Moat against nothing only shows that Moat beats nothing. Every
+scenario now also runs through the two controls a payment rail already offers,
+under identical tasks and pages: `cap` is the gateway with a per-transaction
+spending limit and nothing else, `allowlist` is a payee allowlist and nothing
+else. Neither baseline arm registers intent or an authorization, so neither can
+borrow Moat's checks.
+
+Null backend, sixteen attacks and five controls, five iterations per scenario
+per arm — 420 runs, no errors, Wilson 95% intervals:
+
+| arm | attacker paid | 95% CI | legitimate completed | added pay latency (p50) |
+|---|---:|---|---:|---:|
+| `none` | 80/80 | [0.954, 1.000] | 25/25 | — |
+| `cap` | 80/80 | [0.954, 1.000] | 25/25 | +1.1 ms |
+| `allowlist` | 40/80 | [0.393, 0.607] | 20/25 | +1.0 ms |
+| `moat` | **0/80** | **[0.000, 0.046]** | 25/25 | +1.6 ms |
+
+A spending cap stops nothing that stays under it. An allowlist stops the wrong
+*name* and nothing else: the wrong bank account, a substituted currency, a
+duplicate invoice, the same invoice relabelled, a split below the threshold and
+an inflated price to the right payee all go through it. It also blocks five
+legitimate payments — `authorized-eur-invoice` pays a supplier who is not on the
+list — which is the false-positive cost a static list carries, not a defect.
+
+Latency is measured only on calls that reached the provider. A denied call
+returns without forwarding anything, so counting denials would make a gateway
+that blocks everything look faster than no gateway at all.
+
+The run and its manifest are committed under
+[`arena/analysis/data/`](arena/analysis/data/), and
+[`arena/analysis/`](arena/analysis/README.md) regenerates every number above
+from them rather than anyone typing one in.
 
 ### First results against a real model (2026-09-16)
 
