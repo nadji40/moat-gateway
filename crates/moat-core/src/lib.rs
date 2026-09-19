@@ -7,6 +7,7 @@
 //!
 //! - [`source`]: the [`Source`] label every value carries.
 //! - [`normalize`]: the canonical forms values are compared in.
+//! - [`destination`]: where the money goes, in a comparable form.
 //! - [`extract`]: pulling leaves out of a tool result.
 //! - [`money`]: assets, their exponents, and amounts in minor units.
 //! - [`session`]: per-session intents, observed values and the event log.
@@ -19,6 +20,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod destination;
 pub mod evidence;
 pub mod extract;
 pub mod hash;
@@ -32,6 +34,7 @@ pub mod session;
 pub mod source;
 pub mod verdict;
 
+pub use destination::{Destination, DestinationKind};
 pub use money::{Asset, AssetRegistry, Minor};
 pub use policy::{
     evaluate, evaluate_with, EvalContext, Evaluation, PaymentCall, Policy, PolicyError,

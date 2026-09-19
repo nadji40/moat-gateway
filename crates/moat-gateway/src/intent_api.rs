@@ -307,6 +307,15 @@ async fn post_authorization(
     let expires_unix_ms = u64::try_from(expires.unix_timestamp_nanos() / 1_000_000)
         .map_err(|_| err(StatusCode::BAD_REQUEST, "expires_at must be after 1970"))?;
 
+    // Computed before the value moves into the authorization. Feeding the
+    // bound account into the session as part of the user's own words is what
+    // gives a destination User provenance; without it the account the
+    // approver typed would resolve to Unknown and no destination rule could
+    // ever pass.
+    let account_note = recipient_account_id
+        .as_deref()
+        .map(|account| format!(" at {account}"))
+        .unwrap_or_default();
     let authorization = PaymentAuthorization {
         id: authorization_id.to_owned(),
         payee: payee.to_owned(),
@@ -331,8 +340,8 @@ async fn post_authorization(
             .map_err(|message| message.to_owned())?;
         // Feed the same user-approved values into the existing provenance engine.
         session.register_intent(&format!(
-            "Authorize invoice {} to {} for {} {} until {}",
-            invoice_id, payee, body.amount, currency, body.expires_at
+            "Authorize invoice {} to {}{} for {} {} until {}",
+            invoice_id, payee, account_note, body.amount, currency, body.expires_at
         ));
         Ok(())
     })

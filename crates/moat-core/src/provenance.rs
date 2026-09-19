@@ -13,6 +13,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::destination::{destinations_in_text, Destination};
 use crate::normalize::{Normalized, MIN_SUBSTRING_LEN};
 use crate::session::Session;
 use crate::source::Source;
@@ -86,8 +87,120 @@ pub fn normalize_arg(value: &Value) -> Normalized {
     }
 }
 
-/// Resolve one argument against a session and the policy allowlist.
+/// How an argument is compared against the values Moat has seen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MatchMode {
+    /// Names and numbers: substring for long enough strings, exact for
+    /// numbers. What ADR 0001 describes, and the default.
+    #[default]
+    Text,
+    /// Destinations: exact on a canonical form and nothing else.
+    ///
+    /// Neither of the text rules is safe for an identifier. A fragment of an
+    /// address matching another address is how address poisoning works, and
+    /// the numeric path drops leading zeros, so the account `0012345` would
+    /// be credited to a user who merely mentioned the number 12345. See
+    /// [`crate::destination`].
+    Destination,
+}
+
+/// Resolve one argument against a session and the policy allowlist, matching
+/// it as text.
 pub fn resolve(session: &Session, allowlist: &[String], value: &Value) -> Resolution {
+    resolve_with(session, allowlist, value, MatchMode::Text)
+}
+
+/// Resolve one argument the way `mode` says to compare it.
+///
+/// `allowlist` holds whichever trusted values suit the mode: payee names for
+/// [`MatchMode::Text`], destinations for [`MatchMode::Destination`].
+pub fn resolve_with(
+    session: &Session,
+    allowlist: &[String],
+    value: &Value,
+    mode: MatchMode,
+) -> Resolution {
+    match mode {
+        MatchMode::Text => resolve_text(session, allowlist, value),
+        MatchMode::Destination => resolve_destination(session, allowlist, value),
+    }
+}
+
+/// Exact matching on canonical destinations, in the same trust order as
+/// [`resolve_text`]: the user's own words, then the allowlist, then whatever
+/// a tool result happened to contain.
+fn resolve_destination(session: &Session, allowlist: &[String], value: &Value) -> Resolution {
+    let normalized = normalize_arg(value);
+    let raw = match value.as_str() {
+        Some(s) => s.to_owned(),
+        None => normalized.original.clone(),
+    };
+    let target = Destination::parse(&raw);
+    if target.canonical.is_empty() {
+        return Resolution::unknown(value.clone(), normalized);
+    }
+    let key = target.key();
+    let mut matches = Vec::new();
+
+    for intent in session.intents() {
+        if destinations_in_text(&intent.text)
+            .iter()
+            .any(|found| found.key() == key)
+        {
+            matches.push(Match {
+                source: Source::User { turn: intent.turn },
+                kind: MatchKind::Exact,
+                matched_in: format!("intent:{}", intent.turn),
+                path: None,
+            });
+        }
+    }
+
+    for entry in allowlist {
+        if Destination::parse(entry).key() == key {
+            matches.push(Match {
+                source: Source::Allowlist {
+                    name: entry.clone(),
+                },
+                kind: MatchKind::Exact,
+                matched_in: entry.clone(),
+                path: None,
+            });
+        }
+    }
+
+    for obs in session.observed() {
+        if destinations_in_text(&obs.value.original)
+            .iter()
+            .any(|found| found.key() == key)
+        {
+            let call_id = match &obs.source {
+                Source::ToolResult { call_id, .. } => call_id.clone(),
+                _ => String::new(),
+            };
+            matches.push(Match {
+                source: obs.source.clone(),
+                kind: MatchKind::Exact,
+                matched_in: call_id,
+                path: Some(obs.path.clone()),
+            });
+        }
+    }
+
+    match matches.first() {
+        None => Resolution::unknown(value.clone(), normalized),
+        Some(winner) => Resolution {
+            value: value.clone(),
+            normalized,
+            source: winner.source.clone(),
+            kind: Some(winner.kind),
+            matched_in: Some(winner.matched_in.clone()),
+            matches,
+        },
+    }
+}
+
+fn resolve_text(session: &Session, allowlist: &[String], value: &Value) -> Resolution {
     let normalized = normalize_arg(value);
     let mut matches = Vec::new();
 

@@ -12,8 +12,9 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::destination::Destination;
 use crate::money::{parse_major, Asset, AssetRegistry, Minor};
-use crate::provenance::{resolve, Resolution};
+use crate::provenance::{resolve_with, MatchMode, Resolution};
 use crate::rail::Rail;
 use crate::session::{Event, Session};
 use crate::source::SourceKind;
@@ -55,10 +56,31 @@ impl ToolMatcher {
     }
 }
 
+/// How a logical field's value is compared against what Moat has seen.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FieldKind {
+    /// A name or a number, matched the way ADR 0001 describes.
+    #[default]
+    Text,
+    /// A destination: matched exactly on its canonical form, never by
+    /// substring and never as a number. Declare this for any field naming an
+    /// account, an IBAN or an address.
+    Destination,
+}
+
+fn is_text_kind(kind: &FieldKind) -> bool {
+    matches!(kind, FieldKind::Text)
+}
+
 /// Which argument names feed a logical field.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FieldSpec {
+    /// How the field's value is compared. Text unless stated, which is what
+    /// every field was before destinations were typed.
+    #[serde(default, skip_serializing_if = "is_text_kind")]
+    pub kind: FieldKind,
     /// Argument names, first match wins.
     pub args: Vec<String>,
 }
@@ -70,6 +92,11 @@ pub struct Allowlist {
     /// Payees that are trusted without a user intent.
     #[serde(default)]
     pub payees: Vec<String>,
+    /// Destinations the user has approved out of band: IBANs, addresses,
+    /// provider account ids. Compared canonically, so an IBAN's spacing is
+    /// presentation and a near-miss address is still not a match.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub accounts: Vec<String>,
 }
 
 /// One rule.
@@ -351,11 +378,17 @@ pub fn evaluate_with(
     let mapped = policy.map_fields(&call.args);
     let mut provenance = BTreeMap::new();
     for (field, (arg, value)) in &mapped {
+        // A destination is compared on its canonical form and nothing else;
+        // everything else keeps the text rules of ADR 0001.
+        let (mode, trusted) = match policy.fields.get(field).map(|spec| spec.kind) {
+            Some(FieldKind::Destination) => (MatchMode::Destination, &policy.allowlist.accounts),
+            _ => (MatchMode::Text, &policy.allowlist.payees),
+        };
         provenance.insert(
             field.clone(),
             FieldProvenance {
                 arg: arg.clone(),
-                resolution: resolve(session, &policy.allowlist.payees, value),
+                resolution: resolve_with(session, trusted, value, mode),
             },
         );
     }
@@ -534,10 +567,14 @@ fn structured_authorization_checks(
         .and_then(Value::as_str)
         .map(str::trim)
         .unwrap_or("");
+    // Canonical comparison: an IBAN's spacing and case are presentation, and
+    // a provider's own identifier is still matched exactly as written.
     let account_matches = authorization
         .recipient_account_id
         .as_deref()
-        .is_none_or(|expected| recipient_account_id == expected);
+        .is_none_or(|expected| {
+            Destination::parse(recipient_account_id).same_as(&Destination::parse(expected))
+        });
     outcomes.push(structured_outcome(
         "authorization-recipient-account",
         account_matches,
@@ -914,11 +951,23 @@ fn step_up_prompt(
         .filter(|r| !r.passed)
         .map(|r| r.message.as_str())
         .collect();
+    // The destination is the field a business-email-compromise attack moves,
+    // so a human asked to approve a payment has to be shown it. Omitted when
+    // there is none, which keeps a card prompt reading as it always has.
+    let destination = provenance
+        .get("destination")
+        .map(|p| p.resolution.value.clone())
+        .or_else(|| call.args.get("recipient_account_id").cloned())
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .filter(|text| !text.trim().is_empty())
+        .map(|text| format!(" at {}", Destination::parse(&text)))
+        .unwrap_or_default();
     format!(
-        "Approve payment of {} {} to \"{}\" via {}/{}? Moat could not verify it: {}",
+        "Approve payment of {} {} to \"{}\"{} via {}/{}? Moat could not verify it: {}",
         show("amount"),
         show("currency"),
         show("payee"),
+        destination,
         call.server,
         call.tool,
         why.join("; ")
@@ -1223,6 +1272,235 @@ mod tests {
             .reasons
             .iter()
             .any(|reason| reason.id == "amount-cap" && reason.passed));
+    }
+
+    /// A policy that treats the destination arguments as destinations rather
+    /// than as text.
+    const DESTINATION_POLICY: &str = r#"
+version: 1
+payment_tools:
+  - server: "*"
+    tool: pay
+fields:
+  payee: { args: ["payee"] }
+  amount: { args: ["amount"] }
+  currency: { args: ["currency"] }
+  destination: { kind: destination, args: ["recipient_account_id", "to_address", "iban"] }
+allowlist:
+  payees: ["Monitoring Pro Inc"]
+  accounts: ["DE89 3704 0044 0532 0130 00"]
+rules:
+  - id: destination-provenance
+    when: field == destination
+    require_source: [User, Allowlist]
+    on_fail: deny
+    message: "destination was not approved by the user"
+"#;
+
+    fn destination_policy() -> Policy {
+        Policy::from_yaml(DESTINATION_POLICY).unwrap()
+    }
+
+    /// The bug this match mode exists to fix. `normalize_number` drops
+    /// leading zeros, so under text matching the account `0012345` and the
+    /// number `12345` are the same value, and a user who merely mentioned
+    /// invoice 12345 would have lent their own authority to an attacker's
+    /// account. Destinations never take the numeric path.
+    #[test]
+    fn a_number_in_the_request_cannot_launder_an_account_into_user_trust() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent("Pay invoice 12345 for the monitoring renewal");
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "USD",
+                "recipient_account_id": "0012345"
+            })),
+            0,
+        );
+        let destination = evaluation
+            .provenance
+            .get("destination")
+            .expect("the destination field resolved");
+        assert_eq!(
+            destination.resolution.source.kind(),
+            SourceKind::Unknown,
+            "an unrelated number must not make this the user's account"
+        );
+        assert_eq!(evaluation.verdict.decision, Decision::Deny);
+    }
+
+    /// A destination that only ever appeared on a page is attributable to
+    /// that page, exactly, rather than resolving to Unknown.
+    #[test]
+    fn a_destination_from_a_page_is_attributed_to_the_page() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent("Pay the renewal");
+        session.observe_tool_result(
+            "web",
+            "fetch",
+            "c1",
+            &json!("Remit to 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 before Friday."),
+        );
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "USD",
+                "to_address": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045"
+            })),
+            0,
+        );
+        let destination = &evaluation.provenance["destination"].resolution;
+        assert_eq!(destination.source.kind(), SourceKind::ToolResult);
+        assert_eq!(
+            destination.kind,
+            Some(crate::provenance::MatchKind::Exact),
+            "a destination is never a substring match"
+        );
+        assert_eq!(evaluation.verdict.decision, Decision::Deny);
+    }
+
+    /// The poisoning case: an address sharing a prefix and suffix with one
+    /// the user named is a different account, and gets no credit for the
+    /// resemblance.
+    #[test]
+    fn a_poisoned_lookalike_address_matches_nothing() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent("Pay the supplier at 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045");
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "USD",
+                "to_address": "0xd8da6bf26964af9d7eed9e03e53415d37aa96040"
+            })),
+            0,
+        );
+        assert_eq!(
+            evaluation.provenance["destination"]
+                .resolution
+                .source
+                .kind(),
+            SourceKind::Unknown,
+            "one digit apart is a different account"
+        );
+        assert_eq!(evaluation.verdict.decision, Decision::Deny);
+
+        // The address the user actually named resolves to them.
+        let good = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "USD",
+                "to_address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+            })),
+            0,
+        );
+        assert_eq!(
+            good.provenance["destination"].resolution.source.kind(),
+            SourceKind::User
+        );
+    }
+
+    /// An allowlisted IBAN is the same account however it is spaced, because
+    /// spacing is how humans write them and not part of the identifier.
+    #[test]
+    fn an_allowlisted_iban_matches_whatever_its_spacing() {
+        let p = destination_policy();
+        let session = Session::new("s");
+        for written in [
+            "DE89370400440532013000",
+            "DE89 3704 0044 0532 0130 00",
+            "de89-3704-0044-0532-0130-00",
+        ] {
+            let evaluation = evaluate(
+                &p,
+                &session,
+                call(json!({
+                    "payee": "Monitoring Pro Inc", "amount": 100, "currency": "USD",
+                    "iban": written
+                })),
+                0,
+            );
+            assert_eq!(
+                evaluation.provenance["destination"]
+                    .resolution
+                    .source
+                    .kind(),
+                SourceKind::Allowlist,
+                "{written} is the allowlisted account"
+            );
+        }
+        // One digit different is not on the list, whatever the spacing.
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "USD",
+                "iban": "DE89 3704 0044 0532 0130 01"
+            })),
+            0,
+        );
+        assert_eq!(
+            evaluation.provenance["destination"]
+                .resolution
+                .source
+                .kind(),
+            SourceKind::Unknown
+        );
+    }
+
+    /// A bound account is compared canonically, so agreement between the
+    /// authorization and the call survives a difference in presentation --
+    /// and a difference in digits still does not.
+    #[test]
+    fn a_bound_iban_survives_a_change_of_spacing_but_not_of_digits() {
+        let p = policy();
+        let mut session = session_with_page();
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-iban".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("DE89 3704 0044 0532 0130 00".into()),
+                amount_minor: Minor(10_000),
+                tolerance_minor: Minor(0),
+                currency: "EUR".into(),
+                invoice_id: "INV-IBAN".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let proposal = |account: &str| {
+            call(json!({
+                "authorization_id": "auth-iban", "invoice_id": "INV-IBAN",
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "EUR",
+                "recipient_account_id": account
+            }))
+        };
+        let same = evaluate(&p, &session, proposal("DE89370400440532013000"), 10_000);
+        assert!(
+            same.verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-recipient-account" && r.passed),
+            "compact and spaced are one account: {:?}",
+            same.verdict.failures().collect::<Vec<_>>()
+        );
+        let diverted = evaluate(&p, &session, proposal("DE89370400440532013001"), 10_000);
+        assert!(diverted
+            .verdict
+            .failures()
+            .any(|r| r.id == "authorization-recipient-account"));
     }
 
     /// A six-decimal token is priced by its own exponent, not by the
