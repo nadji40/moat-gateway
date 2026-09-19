@@ -15,6 +15,90 @@ real. The rails cannot distinguish the two, because by the time a payment reache
 them, the information about where each field came from is gone. Moat sits where
 that information still exists.
 
+Moat is **open source**, licensed under the [Apache License 2.0](LICENSE). The
+gateway, the policy engine, the evidence format and the whole arena — mock
+servers, the attack corpus, the legitimate controls and the analysis that turns
+runs into tables — are all in this repository. A payment control nobody can read
+is a payment control nobody should deploy, so the defence is published in full:
+knowing the rules does not help an attacker who still cannot be the user. New
+attacks, legitimate-workflow cases and bug reports are welcome — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md) and [`SECURITY.md`](SECURITY.md).
+
+## Architecture
+
+Moat is a proxy that both sides already know how to talk to. The agent host sees
+an ordinary MCP server; the upstream servers see an ordinary MCP client. Because
+every tool result and every tool call passes through one process, Moat is the
+only place that still knows whether a payee came from the user or from a web
+page the agent happened to read.
+
+```mermaid
+flowchart LR
+    user(["User"])
+    agent["LLM agent<br/>any MCP host"]
+
+    subgraph gw["moat-gateway"]
+        direction TB
+        proxy["MCP proxy<br/>namespaces tools, intercepts payments"]
+        core["moat-core<br/>provenance, policy, verdict"]
+        evidence[("evidence log<br/>signed, hash-chained")]
+        proxy --> core
+        core --> evidence
+    end
+
+    web["web MCP server<br/>untrusted content"]
+    pay["payment MCP server<br/>Stripe and others"]
+
+    user -->|"intent and authorization<br/>loopback API"| core
+    agent <-->|"MCP over stdio or HTTP"| proxy
+    proxy <-->|"web__fetch"| web
+    proxy -->|"stripe__pay<br/>forwarded only on allow"| pay
+
+    classDef untrusted fill:#fdf0f0,stroke:#c0392b
+    classDef trusted fill:#eef6f2,stroke:#0b5c4f
+    class web untrusted
+    class user,core trusted
+```
+
+The user's intent and authorization arrive on a separate loopback API, not
+through the agent — an agent that could mint its own authorization would not be
+a control. Payment calls are held until policy decides; everything else passes
+through untouched.
+
+### What happens on a payment call
+
+The attack Moat exists to stop: a page tells the agent to pay someone else, and
+the resulting payment satisfies every control the rails have — real card, valid
+merchant category, amount under the cap. Only provenance separates it from the
+payment the user asked for.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant A as Agent
+    participant M as Moat
+    participant W as web server
+    participant P as payment server
+
+    U->>M: intent, cap 500 USD, renew monitoring
+    A->>M: web__fetch vendor page
+    M->>W: fetch
+    W-->>M: page text: pay ProMon Billing Ltd 480 USD
+    Note over M: every observed value is stored<br/>with the source it came from
+    M-->>A: page content, unchanged
+    A->>M: stripe__pay to ProMon Billing Ltd, 480 USD
+    Note over M: payee resolves to ToolResult,<br/>policy requires User or Allowlist
+    M--xP: never forwarded
+    M-->>A: deny, with an evidence id
+```
+
+A verdict is `allow`, `step_up` or `deny`, and each one produces a signed,
+hash-chained evidence record that can be verified offline with `moat-gateway
+verify`. `step_up` is the common case and the reason the control survives
+contact with users: a product that only blocks gets removed in a week, one that
+asks gets kept.
+
 ## Status
 
 Early. Follow the work order below for what is actually built.
