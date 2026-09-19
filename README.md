@@ -39,23 +39,26 @@ flowchart LR
 
     subgraph gw["moat-gateway"]
         direction TB
-        proxy["MCP proxy<br/>namespaces tools, intercepts payments"]
+        proxy["MCP proxy<br/>namespaces tools<br/>intercepts payment calls"]
         core["moat-core<br/>provenance, policy, verdict"]
         evidence[("evidence log<br/>signed, hash-chained")]
         proxy --> core
         core --> evidence
     end
 
-    web["web MCP server<br/>untrusted content"]
-    pay["payment MCP server<br/>Stripe and others"]
+    subgraph up["upstream MCP servers"]
+        direction TB
+        web["web<br/>untrusted content"]
+        pay["payments<br/>Stripe and others"]
+    end
 
-    user -->|"intent and authorization<br/>loopback API"| core
+    user -->|"intent and authorization<br/>loopback API, never via the agent"| core
     agent <-->|"MCP over stdio or HTTP"| proxy
     proxy <-->|"web__fetch"| web
     proxy -->|"stripe__pay<br/>forwarded only on allow"| pay
 
-    classDef untrusted fill:#fdf0f0,stroke:#c0392b
-    classDef trusted fill:#eef6f2,stroke:#0b5c4f
+    classDef untrusted fill:#fdf0f0,stroke:#c0392b,color:#111
+    classDef trusted fill:#eef6f2,stroke:#0b5c4f,color:#111
     class web untrusted
     class user,core trusted
 ```
