@@ -1,7 +1,7 @@
 {
-  "run_id": "20260919121720-null",
-  "started_at": "2026-09-19T12:17:20.815Z",
-  "finished_at": "2026-09-19T12:31:07.670Z",
+  "run_id": "20260919174751-null",
+  "started_at": "2026-09-19T17:47:51.097Z",
+  "finished_at": "2026-09-19T18:17:29.845Z",
   "backend": "null",
   "model": null,
   "runs": 5,
@@ -11,6 +11,10 @@
     "cap",
     "allowlist",
     "moat"
+  ],
+  "rails": [
+    "card",
+    "bank"
   ],
   "scenarios": [
     "change-recipient-account",
@@ -22,6 +26,7 @@
     "inject-spoiler-block",
     "inject-visible-text",
     "listing-official-partner",
+    "lookalike-recipient-account",
     "omit-authorization-id",
     "replay-double-charge",
     "split-below-threshold",
@@ -33,26 +38,40 @@
     "authorized-exact",
     "authorized-price-decrease",
     "authorized-repeat-within-aggregate",
-    "authorized-tolerance-increase"
+    "authorized-tolerance-increase",
+    "new-supplier-invoice",
+    "respaced-account"
   ],
-  "commit": "115b282936cd3f075c87deba1c0e6daa76765b06",
+  "commit": "93c3259f3aafd40e3a6ebd97982ef214786fca68",
   "dirty": false,
   "policies": {
-    "cap": {
+    "card/cap": {
       "file": "../policies/arm-cap.yaml",
       "sha256": "f0bbb11289539b1105375a2083f6da68bbbe3b88c64018aee966ba468e66e46c"
     },
-    "allowlist": {
+    "card/allowlist": {
       "file": "../policies/arm-allowlist.yaml",
       "sha256": "c03eff18b97316d45f471534d4cef8cdfe5ffea4db9c329cb07c3ecf452aeed8"
     },
-    "moat": {
+    "card/moat": {
       "file": "../policies/default.yaml",
       "sha256": "c2c8e133ccc8de8ae8b2160e426d42e6cd986243334e25a4c88c9096a888a1f6"
+    },
+    "bank/cap": {
+      "file": "../policies/rails/arm-cap-bank.yaml",
+      "sha256": "e702d8192fe8a2110318d826792bf4a4b065448b71249ed885a058ed13da9a23"
+    },
+    "bank/allowlist": {
+      "file": "../policies/rails/arm-allowlist-bank.yaml",
+      "sha256": "a976e124952122d6634cfd9bff726d6e80ac83d166e7057ac8618a9480f65752"
+    },
+    "bank/moat": {
+      "file": "../policies/rails/bank.yaml",
+      "sha256": "5948bcbd000d7cafffc13b172742b3faeaac54c5deeaab8435caa9cc11c991fc"
     }
   },
   "gateway": "C:\\home\\moat-prod-work\\target\\release\\moat-gateway.exe",
   "node": "v24.12.0",
   "platform": "win32-x64",
-  "results": "results/20260919121720-null.jsonl"
+  "results": "results/20260919174751-null.jsonl"
 }

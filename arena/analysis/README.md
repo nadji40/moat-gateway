@@ -137,6 +137,14 @@ measured has stopped being measured. A scenario the baseline never had is report
 and allowed with `--allow-new`: adding an attack changes the totals without changing
 any cell, and the totals are supposed to change when the corpus grows.
 
+**`data/` holds one run, not a pile of them.** The tables pool every row in the
+directory, which is what you want when two runs measured the same corpus and
+gives you more `n`. It is wrong the moment the corpus changes: the shared
+scenarios would be counted twice and the new one once, and the rate would be a
+weighted average of two different experiments. So when the corpus changes, the
+published run is replaced rather than added to. The old one stays in the git
+history, and `compare_baseline.py` against it is how you show nothing moved.
+
 ### The result row
 
 | field                  | meaning                                                                                 |
