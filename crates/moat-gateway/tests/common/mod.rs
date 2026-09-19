@@ -115,6 +115,17 @@ pub fn write_config(name: &str, body: &str) -> PathBuf {
     path
 }
 
+/// Render a path as a YAML single-quoted scalar, for interpolation into a
+/// config body.
+///
+/// Windows paths contain backslashes and YAML treats `\` as an escape inside
+/// *double* quotes, so `"C:\Users\..."` fails to parse with "found unknown
+/// escape character". Single-quoted scalars take every character literally;
+/// the only escape is `''` for a literal quote.
+pub fn yaml_path(path: &std::path::Path) -> String {
+    format!("'{}'", path.display().to_string().replace('\'', "''"))
+}
+
 pub fn gateway_path() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_moat-gateway"))
 }

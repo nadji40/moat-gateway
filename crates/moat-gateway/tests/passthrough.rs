@@ -5,7 +5,7 @@
 
 mod common;
 
-use common::{fake_server_path, gateway_path, write_config, Peer};
+use common::{fake_server_path, gateway_path, write_config, yaml_path, Peer};
 use moat_mcp::types::{method, InitializeResult, ListToolsResult, PROTOCOL_VERSION_2025_11_25};
 use moat_mcp::{Message, Notification, Request};
 use serde_json::json;
@@ -28,10 +28,10 @@ async fn tools_call_reply_is_byte_identical() {
 upstreams:
   - name: fake
     transport: stdio
-    command: ["{}"]
+    command: [{}]
     env: {{ FAKE_MCP_PRETTY: "1" }}
 "#,
-            fake.display()
+            yaml_path(&fake)
         ),
     );
 
@@ -127,8 +127,8 @@ async fn garbage_from_client_gets_parse_error() {
     let cfg = write_config(
         "garbage",
         &format!(
-            "upstreams:\n  - {{ name: fake, transport: stdio, command: [\"{}\"] }}\n",
-            fake.display()
+            "upstreams:\n  - {{ name: fake, transport: stdio, command: [{}] }}\n",
+            yaml_path(&fake)
         ),
     );
     let mut gw = Peer::spawn(&gateway_path(), &["--config", cfg.to_str().unwrap()], &[]);

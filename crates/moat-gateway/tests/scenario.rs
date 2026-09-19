@@ -8,7 +8,7 @@ mod common;
 
 use std::time::Duration;
 
-use common::{fake_server_path, gateway_path, http, write_config, Peer};
+use common::{fake_server_path, gateway_path, http, write_config, yaml_path, Peer};
 use moat_core::verdict::code as moat_code;
 use moat_mcp::types::{method, PROTOCOL_VERSION_2025_11_25};
 use moat_mcp::{Message, Notification, Request};
@@ -76,13 +76,13 @@ session_id: "{SESSION}"
 upstreams:
   - name: stripe
     transport: stdio
-    command: ["{}"]
-policy: "{}"
+    command: [{}]
+policy: {}
 evidence: ./evidence.jsonl
 intent_api: {{ addr: "{api}" }}
 "#,
-            fake.display(),
-            policy.display()
+            yaml_path(&fake),
+            yaml_path(&policy)
         ),
     );
     let evidence_path = cfg.parent().unwrap().join("evidence.jsonl");
@@ -288,13 +288,13 @@ session_id: "{SUPPLIER_SESSION}"
 upstreams:
   - name: stripe
     transport: stdio
-    command: ["{}"]
-policy: "{}"
+    command: [{}]
+policy: {}
 evidence: ./evidence.jsonl
 intent_api: {{ addr: "{api}" }}
 "#,
-            fake.display(),
-            policy.display()
+            yaml_path(&fake),
+            yaml_path(&policy)
         ),
     );
     let mut gw = Peer::spawn(
@@ -416,8 +416,8 @@ async fn missing_policy_fails_closed_for_payments_and_open_otherwise() {
     let cfg = write_config(
         "nopolicy",
         &format!(
-            "upstreams:\n  - {{ name: stripe, transport: stdio, command: [\"{}\"] }}\npolicy: ./does-not-exist.yaml\nevidence: ./evidence.jsonl\n",
-            fake.display()
+            "upstreams:\n  - {{ name: stripe, transport: stdio, command: [{}] }}\npolicy: ./does-not-exist.yaml\nevidence: ./evidence.jsonl\n",
+            yaml_path(&fake)
         ),
     );
     let mut gw = Peer::spawn(&gateway_path(), &["--config", cfg.to_str().unwrap()], &[]);

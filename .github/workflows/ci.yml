@@ -46,8 +46,12 @@ jobs:
             echo "arena/package.json not present yet (work order step 9); skipping"
           fi
 
+      # The version must be explicit: action-setup reads `packageManager` from
+      # the repository root, and this workspace's package.json lives in arena/.
       - uses: pnpm/action-setup@v4
         if: steps.arena.outputs.present == 'true'
+        with:
+          version: 11.24.0
 
       # pnpm 11 requires Node >= 22.13; the repo is pinned to 22 everywhere.
       - uses: actions/setup-node@v4

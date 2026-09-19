@@ -1,0 +1,14 @@
+# The repository stores text as LF and checks it out as LF on every platform.
+# Without this, a Windows checkout converts to CRLF, which breaks byte-exact
+# comparisons and turns one-line edits into whole-file diffs.
+* text=auto eol=lf
+
+# Golden evidence bytes are compared verbatim by crates/moat-core/tests/golden.rs.
+# Never let git touch them.
+crates/moat-core/tests/golden/** -text
+
+# Shell scripts run on Linux; a CR would break the shebang.
+*.sh text eol=lf
+
+*.pdf binary
+*.png binary

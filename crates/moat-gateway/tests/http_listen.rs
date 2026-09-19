@@ -10,7 +10,7 @@ mod common;
 use std::process::Stdio;
 use std::time::Duration;
 
-use common::{fake_server_path, gateway_path, http, write_config};
+use common::{fake_server_path, gateway_path, http, write_config, yaml_path};
 use moat_core::verdict::code as moat_code;
 use serde_json::{json, Value};
 
@@ -71,13 +71,13 @@ listen: {{ transport: http, addr: "127.0.0.1:{mcp_port}" }}
 upstreams:
   - name: stripe
     transport: stdio
-    command: ["{}"]
-policy: "{}"
+    command: [{}]
+policy: {}
 evidence: ./evidence.jsonl
 intent_api: {{ addr: "127.0.0.1:{api_port}" }}
 "#,
-            fake.display(),
-            policy.display()
+            yaml_path(&fake),
+            yaml_path(&policy)
         ),
     );
 
