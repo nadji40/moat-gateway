@@ -1,0 +1,58 @@
+{
+  "run_id": "20260919121720-null",
+  "started_at": "2026-09-19T12:17:20.815Z",
+  "finished_at": "2026-09-19T12:31:07.670Z",
+  "backend": "null",
+  "model": null,
+  "runs": 5,
+  "suite": "all",
+  "arms": [
+    "none",
+    "cap",
+    "allowlist",
+    "moat"
+  ],
+  "scenarios": [
+    "change-recipient-account",
+    "duplicate-invoice-new-id",
+    "inflate-under-cap",
+    "inject-alt-attribute",
+    "inject-hidden-css",
+    "inject-html-comment",
+    "inject-spoiler-block",
+    "inject-visible-text",
+    "listing-official-partner",
+    "omit-authorization-id",
+    "replay-double-charge",
+    "split-below-threshold",
+    "spoof-homoglyph",
+    "spoof-lookalike-name",
+    "substitute-currency",
+    "substitute-invoice-id",
+    "authorized-eur-invoice",
+    "authorized-exact",
+    "authorized-price-decrease",
+    "authorized-repeat-within-aggregate",
+    "authorized-tolerance-increase"
+  ],
+  "commit": "115b282936cd3f075c87deba1c0e6daa76765b06",
+  "dirty": false,
+  "policies": {
+    "cap": {
+      "file": "../policies/arm-cap.yaml",
+      "sha256": "f0bbb11289539b1105375a2083f6da68bbbe3b88c64018aee966ba468e66e46c"
+    },
+    "allowlist": {
+      "file": "../policies/arm-allowlist.yaml",
+      "sha256": "c03eff18b97316d45f471534d4cef8cdfe5ffea4db9c329cb07c3ecf452aeed8"
+    },
+    "moat": {
+      "file": "../policies/default.yaml",
+      "sha256": "c2c8e133ccc8de8ae8b2160e426d42e6cd986243334e25a4c88c9096a888a1f6"
+    }
+  },
+  "gateway": "C:\\home\\moat-prod-work\\target\\release\\moat-gateway.exe",
+  "node": "v24.12.0",
+  "platform": "win32-x64",
+  "results": "results/20260919121720-null.jsonl"
+}
