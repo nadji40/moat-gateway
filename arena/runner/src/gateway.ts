@@ -6,10 +6,10 @@ import { resolve } from "node:path";
 export function gatewayBinary(arenaRoot: string): string {
   const fromEnv = process.env["MOAT_GATEWAY_BIN"];
   if (fromEnv) return fromEnv;
-  const candidates = [
-    resolve(arenaRoot, "..", "target", "release", "moat-gateway"),
-    resolve(arenaRoot, "..", "target", "debug", "moat-gateway"),
-  ];
+  const names = process.platform === "win32" ? ["moat-gateway.exe", "moat-gateway"] : ["moat-gateway"];
+  const candidates = ["release", "debug"].flatMap((profile) =>
+    names.map((name) => resolve(arenaRoot, "..", "target", profile, name)),
+  );
   const found = candidates.find((p) => existsSync(p));
   if (!found) {
     throw new Error(

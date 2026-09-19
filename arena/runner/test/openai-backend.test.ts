@@ -20,14 +20,19 @@ import { ScriptedModel } from "../src/backends/stubModel.js";
 import { contextFor } from "../src/context.js";
 
 const ARENA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const PORT = 7133;
+// The gateway's web upstream is pinned to 7100 in moat.arena.yaml, so mock-web
+// must listen there for web__fetch to exist in gateway mode (the http-listen test
+// does the same). Files run one at a time (vitest.config.ts), so the port is free.
+const PORT = 7100;
 const work = mkdtempSync(join(tmpdir(), "moat-openai-test-"));
 let mockWeb: ChildProcess;
 
 const hasGateway =
-  existsSync(resolve(ARENA_ROOT, "..", "target", "release", "moat-gateway")) ||
-  existsSync(resolve(ARENA_ROOT, "..", "target", "debug", "moat-gateway")) ||
-  Boolean(process.env["MOAT_GATEWAY_BIN"]);
+  ["moat-gateway", "moat-gateway.exe"].some((name) =>
+    ["release", "debug"].some((profile) =>
+      existsSync(resolve(ARENA_ROOT, "..", "target", profile, name)),
+    ),
+  ) || Boolean(process.env["MOAT_GATEWAY_BIN"]);
 
 beforeAll(async () => {
   process.env["MOCK_WEB_PORT"] = String(PORT);

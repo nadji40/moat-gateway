@@ -1,0 +1,27 @@
+version: 1
+
+# Evaluation arm "cap": a per-transaction spending limit and nothing else.
+# This is what a card control or a wallet budget gives you: no idea who the
+# payee is, where the amount came from, or what the user asked for.
+# Compare against default.yaml. The runner registers no intent and no
+# authorization when running this arm, so the core's mandate checks stay off.
+
+payment_tools:
+  - server: "*"
+    tool: "pay"
+  - server: "stripe"
+    tool: "create_payment"
+
+fields:
+  payee:    { args: ["payee", "recipient", "destination", "to"] }
+  amount:   { args: ["amount", "total", "value"] }
+  currency: { args: ["currency"] }
+
+rules:
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds cap"
+
+no_human_available: deny

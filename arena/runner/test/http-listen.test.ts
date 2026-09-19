@@ -25,9 +25,11 @@ let mockWeb: ChildProcess;
 let gateway: ChildProcess;
 
 const hasGateway =
-  existsSync(resolve(ARENA_ROOT, "..", "target", "release", "moat-gateway")) ||
-  existsSync(resolve(ARENA_ROOT, "..", "target", "debug", "moat-gateway")) ||
-  Boolean(process.env["MOAT_GATEWAY_BIN"]);
+  ["moat-gateway", "moat-gateway.exe"].some((name) =>
+    ["release", "debug"].some((profile) =>
+      existsSync(resolve(ARENA_ROOT, "..", "target", profile, name)),
+    ),
+  ) || Boolean(process.env["MOAT_GATEWAY_BIN"]);
 
 async function waitFor(check: () => Promise<boolean>, what: string): Promise<void> {
   const deadline = Date.now() + 15_000;

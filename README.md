@@ -330,6 +330,24 @@ Run the attack corpus and legitimate controls together:
 cd arena && pnpm --filter @moat/runner start --backend null --runs 1 --suite all
 ```
 
+### Evaluation arms
+
+`--arms` runs every scenario through each control layer in turn, under identical
+tasks and pages: `none` (the mocks directly), `cap` (the gateway with a spending
+cap only), `allowlist` (a payee allowlist only) and `moat` (the full policy with
+user intent and structured authorization). The baseline arms register no intent
+and no authorization, so they cannot borrow Moat's checks.
+
+```bash
+cd arena && pnpm --filter @moat/runner start --backend null --runs 5 --arms none,cap,allowlist,moat --suite all
+```
+
+Each run writes `results/<run_id>.jsonl` and a `results/<run_id>.manifest.json`
+recording the commit, policy hashes, model and scenarios. `arena/analysis/`
+turns any set of runs into the two tables the project rests on, with
+confidence intervals; see [`arena/analysis/README.md`](arena/analysis/README.md).
+`--modes direct,gateway` is still accepted and means `--arms none,moat`.
+
 ### Stripe sandbox demonstration
 
 The real Stripe adapter is deliberately separate from the repeatable mock

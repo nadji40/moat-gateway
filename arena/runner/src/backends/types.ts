@@ -1,5 +1,6 @@
 import type { ArenaScenario, PayCall } from "../attacks.js";
 import type { Connected, Endpoints } from "../mcp.js";
+import type { Arm } from "../results.js";
 
 /** What a `pay` call came back as. */
 export type PayOutcome =
@@ -50,6 +51,8 @@ export interface AgentTrace {
  */
 export interface RunContext {
   readonly mode: "gateway" | "direct";
+  /** Which evaluation arm this run is; `mode` is derived from it. */
+  readonly arm: Arm;
   readonly session: string;
   readonly endpoints: Endpoints;
   /** Open the runner's own MCP clients and get the two tools. */

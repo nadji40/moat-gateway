@@ -1,27 +1,60 @@
-// Runs attacks and/or legitimate controls N times with and without the
-// gateway and reports what actually reached the provider ledger. API keys
-// come from the environment only.
+// Runs attacks and/or legitimate controls N times through each evaluation
+// arm and reports what actually reached the provider ledger. API keys come
+// from the environment only.
 //
 //   pnpm --filter @moat/runner start --backend null --runs 1
+//   pnpm --filter @moat/runner start --backend null --runs 5 --arms none,cap,allowlist,moat --suite all
 //   pnpm --filter @moat/runner start --backend openai --runs 1 --model gpt-5.6-luna
+//
+// Arms (see arena/analysis/README.md):
+//   none       direct to the mocks, no gateway
+//   cap        gateway with a per-transaction spending cap only
+//   allowlist  gateway with a payee allowlist only
+//   moat       gateway with the full policy, user intent and structured authorization
+// `--modes direct,gateway` is still accepted and maps to `--arms none,moat`.
+//
+// Every run writes results/<run_id>.jsonl and results/<run_id>.manifest.json;
+// the manifest carries what a row needs to be reproduced: commit, policy
+// hashes, model, runs, scenarios.
 
-import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { execSync, spawn, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { parseArgs } from "node:util";
 import {
   loadAttacks,
   loadControls,
   type ArenaScenario,
 } from "./attacks.js";
-import { ARENA_ROOT, contextFor, mockWebPort } from "./context.js";
+import { ARENA_ROOT, contextFor, mockWebPort, policyFor } from "./context.js";
 import { NullBackend } from "./backends/null.js";
 import { DEFAULT_MODEL, OpenAIBackend } from "./backends/openai.js";
 import type { AgentBackend, AgentTrace } from "./backends/types.js";
-import { writeRow, type Mode, type ResultRow } from "./results.js";
+import { gatewayBinary } from "./gateway.js";
+import { ARMS, modeForArm, writeRow, type Arm, type ResultRow } from "./results.js";
 import { renderTable } from "./table.js";
 
+/** What sits next to a results file so the rows can be reproduced. */
+interface RunManifest {
+  run_id: string;
+  started_at: string;
+  finished_at: string | null;
+  backend: string;
+  model: string | null;
+  runs: number;
+  suite: string;
+  arms: Arm[];
+  scenarios: string[];
+  commit: string;
+  dirty: boolean;
+  policies: Partial<Record<Arm, { file: string; sha256: string }>>;
+  gateway: string | null;
+  node: string;
+  platform: string;
+  results: string;
+}
 
 function backendByName(name: string, model: string): AgentBackend {
   switch (name) {
@@ -38,6 +71,34 @@ function backendByName(name: string, model: string): AgentBackend {
     default:
       throw new Error(`unknown backend ${name}; use null or openai`);
   }
+}
+
+function parseArms(armsArg: string | undefined, modesArg: string | undefined): Arm[] {
+  const raw = armsArg ?? modesArg ?? "direct,gateway";
+  const arms: Arm[] = [];
+  for (const token of raw.split(",").map((t) => t.trim()).filter(Boolean)) {
+    const arm = token === "direct" ? "none" : token === "gateway" ? "moat" : token;
+    if (!(ARMS as readonly string[]).includes(arm)) {
+      throw new Error(`unknown arm ${token}; use ${ARMS.join(", ")} (or direct,gateway)`);
+    }
+    if (!arms.includes(arm as Arm)) arms.push(arm as Arm);
+  }
+  if (arms.length === 0) throw new Error("no arms selected");
+  return arms;
+}
+
+function git(args: string): string | null {
+  try {
+    return execSync(`git ${args}`, { cwd: ARENA_ROOT, stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return null;
+  }
+}
+
+function sha256File(path: string): string {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
 function startMockWeb(): ChildProcess {
@@ -69,18 +130,19 @@ async function waitForHttp(url: string, timeoutMs = 10_000): Promise<void> {
 async function runOne(
   backend: AgentBackend,
   scenario: ArenaScenario,
-  mode: Mode,
+  arm: Arm,
   iteration: number,
-  runId: string,
+  manifest: RunManifest,
   workDir: string,
 ): Promise<ResultRow> {
-  const session = `${runId}-${scenario.id}-${mode}-${iteration}`;
+  const mode = modeForArm(arm);
+  const session = `${manifest.run_id}-${scenario.id}-${arm}-${iteration}`;
   const ledger = join(workDir, `${session}.ledger.json`);
   let trace: AgentTrace = { fetches: [], pays: [] };
   let error: string | undefined;
   const t0 = performance.now();
   try {
-    trace = await backend.run(scenario, contextFor(mode, session, ledger));
+    trace = await backend.run(scenario, contextFor(arm, session, ledger));
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }
@@ -118,8 +180,9 @@ async function runOne(
     entries.length === scenario.expected_payments;
 
   const row: ResultRow = {
-    run_id: runId,
+    run_id: manifest.run_id,
     backend: backend.name,
+    arm,
     attack: scenario.id,
     class: scenario.class,
     scenario_kind: scenario.kind,
@@ -136,6 +199,11 @@ async function runOne(
     trace,
     at: new Date().toISOString(),
   };
+  const policy = manifest.policies[arm]?.file;
+  if (policy !== undefined) row.policy = policy;
+  if (manifest.commit !== "unknown") row.commit = manifest.commit;
+  const model = trace.model ?? manifest.model ?? undefined;
+  if (model !== undefined) row.model = model;
   if (error !== undefined) row.error = error;
   return row;
 }
@@ -150,16 +218,16 @@ async function main(): Promise<void> {
       attack: { type: "string" },
       case: { type: "string" },
       suite: { type: "string", default: "attacks" },
-      modes: { type: "string", default: "direct,gateway" },
+      arms: { type: "string" },
+      modes: { type: "string" },
       model: { type: "string", default: DEFAULT_MODEL },
       out: { type: "string" },
     },
   });
   const backend = backendByName(values.backend ?? "null", values.model ?? DEFAULT_MODEL);
   const runs = Number(values.runs);
-  const modes = (values.modes ?? "")
-    .split(",")
-    .filter((m): m is Mode => m === "gateway" || m === "direct");
+  if (!Number.isInteger(runs) || runs < 1) throw new Error(`--runs must be a positive integer`);
+  const arms = parseArms(values.arms, values.modes);
   const suite = values.suite ?? "attacks";
   if (!new Set(["attacks", "controls", "all"]).has(suite)) {
     throw new Error(`unknown suite ${suite}; use attacks, controls or all`);
@@ -173,16 +241,49 @@ async function main(): Promise<void> {
 
   const runId = `${new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}-${backend.name}`;
   const out = values.out ?? join(ARENA_ROOT, "results", `${runId}.jsonl`);
+  const manifestPath = out.replace(/\.jsonl$/, "") + ".manifest.json";
   const workDir = mkdtempSync(join(tmpdir(), "moat-arena-"));
+
+  const policies: RunManifest["policies"] = {};
+  for (const arm of arms) {
+    if (arm === "none") continue;
+    const file = policyFor(arm);
+    policies[arm] = { file: relative(ARENA_ROOT, file).split("\\").join("/"), sha256: sha256File(file) };
+  }
+  const needsGateway = arms.some((arm) => arm !== "none");
+  const manifest: RunManifest = {
+    run_id: runId,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+    backend: backend.name,
+    model: backend.name === "openai" ? (values.model ?? DEFAULT_MODEL) : null,
+    runs,
+    suite,
+    arms,
+    scenarios: scenarios.map((scenario) => scenario.id),
+    commit: git("rev-parse HEAD") ?? "unknown",
+    dirty: (git("status --porcelain") ?? "").length > 0,
+    policies,
+    gateway: needsGateway ? gatewayBinary(ARENA_ROOT) : null,
+    node: process.version,
+    platform: `${process.platform}-${process.arch}`,
+    results: relative(ARENA_ROOT, out).split("\\").join("/"),
+  };
+  const writeManifest = (): void => {
+    mkdirSync(dirname(manifestPath), { recursive: true });
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+  };
+  // Written before the first row so an interrupted run still says what it was.
+  writeManifest();
 
   const mockWeb = startMockWeb();
   const rows: ResultRow[] = [];
   try {
     await waitForHttp(`http://127.0.0.1:${mockWebPort()}/mcp`);
     for (const scenario of scenarios) {
-      for (const mode of modes) {
+      for (const arm of arms) {
         for (let i = 1; i <= runs; i++) {
-          const row = await runOne(backend, scenario, mode, i, runId, workDir);
+          const row = await runOne(backend, scenario, arm, i, manifest, workDir);
           writeRow(out, row);
           rows.push(row);
           const v = row.verdicts.length ? ` [${row.verdicts.join(",")}]` : "";
@@ -192,7 +293,7 @@ async function main(): Promise<void> {
               ? `attacker_paid=${row.attacker_paid ? "YES" : "no "}`
               : `completed=${row.legitimate_completed ? "YES" : "no "}`;
           process.stderr.write(
-            `${scenario.id.padEnd(28)} ${mode.padEnd(7)} #${i} ${String(row.wall_ms).padStart(6)}ms ` +
+            `${scenario.id.padEnd(28)} ${arm.padEnd(9)} #${i} ${String(row.wall_ms).padStart(6)}ms ` +
               `${outcome}${v}${e}\n`,
           );
         }
@@ -201,14 +302,17 @@ async function main(): Promise<void> {
   } finally {
     mockWeb.kill();
     rmSync(workDir, { recursive: true, force: true });
+    manifest.finished_at = new Date().toISOString();
+    writeManifest();
   }
 
   const modelNote = backend.name === "openai" ? `, model ${values.model}` : "";
   process.stdout.write(
-    `\nrun ${runId} — backend ${backend.name}${modelNote}, ${runs} run(s) per scenario per mode\n\n`,
+    `\nrun ${runId} — backend ${backend.name}${modelNote}, ${runs} run(s) per scenario per arm ` +
+      `[${arms.join(", ")}], commit ${manifest.commit.slice(0, 7)}${manifest.dirty ? "+dirty" : ""}\n\n`,
   );
   process.stdout.write(renderTable(rows) + "\n");
-  process.stdout.write(`\nresults: ${out}\n`);
+  process.stdout.write(`\nresults:  ${out}\nmanifest: ${manifestPath}\n`);
 }
 
 main().catch((err) => {

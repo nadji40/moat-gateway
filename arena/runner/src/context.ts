@@ -1,18 +1,51 @@
-// Where each mode's MCP endpoints live, and the RunContext handed to a
+// Where each arm's MCP endpoints live, and the RunContext handed to a
 // backend. Kept free of side effects so tests can import it without
 // starting a run.
+//
+// An arm is one control layer under evaluation:
+//   none       the mocks directly; nothing between the agent and the money
+//   cap        the gateway with policies/arm-cap.yaml: a per-transaction cap, nothing else
+//   allowlist  the gateway with policies/arm-allowlist.yaml: a payee allowlist, nothing else
+//   moat       the gateway with policies/default.yaml plus user intent and structured authorization
+//
+// The baseline arms never register intent or an authorization. The core only
+// enforces mandates once one exists in the session (moat-core policy.rs,
+// `structured_authorization_required`), so registering it would hand those
+// arms Moat's checks and spoil the comparison.
 
-import { dirname, join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parse } from "yaml";
 import type { RunContext } from "./backends/types.js";
 import { gatewayBinary, IntentApi } from "./gateway.js";
 import { connect, type Endpoints } from "./mcp.js";
-import type { Mode } from "./results.js";
+import { armForMode, modeForArm, type Arm, type Mode } from "./results.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** The arena directory, which is also the web root the mocks serve. */
 export const ARENA_ROOT = resolve(here, "..", "..");
+
+/** Gateway config per gateway arm, relative to the arena root. */
+export const ARM_CONFIGS: Record<Exclude<Arm, "none">, string> = {
+  cap: "moat.arena-cap.yaml",
+  allowlist: "moat.arena-allowlist.yaml",
+  moat: "moat.arena.yaml",
+};
+
+/** Accepts the old mode names too: direct is the none arm, gateway is the moat arm. */
+export function armOf(value: Arm | Mode): Arm {
+  return value === "direct" || value === "gateway" ? armForMode(value) : value;
+}
+
+/** The policy file an arm's gateway config points at, resolved the way the gateway resolves it. */
+export function policyFor(arm: Exclude<Arm, "none">): string {
+  const config = join(ARENA_ROOT, ARM_CONFIGS[arm]);
+  const doc = parse(readFileSync(config, "utf8")) as { policy?: string };
+  if (!doc.policy) throw new Error(`${config} has no policy`);
+  return resolve(dirname(config), doc.policy);
+}
 
 export function mockWebPort(): number {
   return Number(process.env["MOCK_WEB_PORT"] ?? "7100");
@@ -22,16 +55,19 @@ function intentApiBase(): string {
   return process.env["MOAT_INTENT_API"] ?? "http://127.0.0.1:7072";
 }
 
-export function endpointsFor(mode: Mode, session: string, ledger: string): Endpoints {
+export function endpointsFor(value: Arm | Mode, session: string, ledger: string): Endpoints {
+  const arm = armOf(value);
   const stripeCmd = [join(ARENA_ROOT, "mock-stripe", "src", "server.ts")];
   // The gateway spawns `node` from PATH; make sure it is the same Node that
-  // runs this process, so tsx and the SDK resolve identically.
+  // runs this process, so tsx and the SDK resolve identically. Windows spells
+  // the variable `Path`, so reuse whatever key is already there.
+  const pathKey = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
   const env = {
     ...(process.env as Record<string, string>),
-    PATH: `${dirname(process.execPath)}:${process.env["PATH"] ?? ""}`,
+    [pathKey]: `${dirname(process.execPath)}${delimiter}${process.env[pathKey] ?? ""}`,
     MOCK_STRIPE_LEDGER: ledger,
   };
-  if (mode === "direct") {
+  if (arm === "none") {
     return {
       stdio: {
         command: process.execPath,
@@ -46,7 +82,7 @@ export function endpointsFor(mode: Mode, session: string, ledger: string): Endpo
   return {
     stdio: {
       command: gatewayBinary(ARENA_ROOT),
-      args: ["--config", join(ARENA_ROOT, "moat.arena.yaml"), "--session-id", session],
+      args: ["--config", join(ARENA_ROOT, ARM_CONFIGS[arm]), "--session-id", session],
       env: { ...env, RUST_LOG: process.env["RUST_LOG"] ?? "moat_gateway=warn" },
       cwd: ARENA_ROOT,
     },
@@ -54,21 +90,24 @@ export function endpointsFor(mode: Mode, session: string, ledger: string): Endpo
   };
 }
 
-export function contextFor(mode: Mode, session: string, ledger: string): RunContext {
-  const endpoints = endpointsFor(mode, session, ledger);
+export function contextFor(value: Arm | Mode, session: string, ledger: string): RunContext {
+  const arm = armOf(value);
+  const mode = modeForArm(arm);
+  const endpoints = endpointsFor(arm, session, ledger);
   return {
     mode,
+    arm,
     session,
     endpoints,
     connect: () => connect(endpoints),
     async registerIntent(text: string) {
-      if (mode !== "gateway") return;
+      if (arm !== "moat") return;
       const api = new IntentApi(intentApiBase());
       await api.waitUntilUp();
       await api.intent(session, text);
     },
     async registerAuthorization(scenario) {
-      if (mode !== "gateway") return undefined;
+      if (arm !== "moat") return undefined;
       const api = new IntentApi(intentApiBase());
       await api.waitUntilUp();
       const authorization_id = `auth-${session}`;
