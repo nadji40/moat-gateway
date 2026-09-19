@@ -155,7 +155,7 @@ async function runOne(
   let error: string | undefined;
   const t0 = performance.now();
   try {
-    trace = await backend.run(scenario, contextFor(arm, session, ledger, rail));
+    trace = await backend.run(scenario, contextFor(arm, session, ledger, rail, scenario.mock_env));
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

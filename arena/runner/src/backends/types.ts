@@ -62,6 +62,12 @@ export interface RunContext {
   connect(): Promise<Connected>;
   /** Tell Moat what the human asked for. No-op in direct mode. */
   registerIntent(text: string): Promise<void>;
+  /**
+   * Report to Moat what the provider actually did with whatever it is
+   * still holding, as an operator would after checking. A no-op on the
+   * arms that hold nothing.
+   */
+  reconcileOpenOutcomes(status: string): Promise<number>;
   /** Register trusted payment authority and return the ids a payment call must carry. */
   registerAuthorization(scenario: ArenaScenario): Promise<PaymentMetadata | undefined>;
 }

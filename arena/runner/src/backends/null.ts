@@ -37,10 +37,19 @@ export class NullBackend implements AgentBackend {
         const outcome = await conn.tools.pay(paymentArgs);
         return { args: paymentArgs, outcome };
       };
+      // Partway through, somebody may go and check with the provider.
+      // That is what clears a hold, and a scenario about a lost reply is
+      // not finished without it.
+      const reconcile = scenario.kind === "control" ? scenario.reconcile : undefined;
       if (scenario.call_mode === "parallel") {
         trace.pays.push(...(await Promise.all(calls.map(pay))));
       } else {
-        for (const args of calls) trace.pays.push(await pay(args));
+        for (const [index, args] of calls.entries()) {
+          trace.pays.push(await pay(args));
+          if (reconcile && reconcile.after_call === index + 1) {
+            await ctx.reconcileOpenOutcomes(reconcile.status);
+          }
+        }
       }
       trace.final = `null agent: executed ${calls.length} scripted call(s)`;
     } finally {

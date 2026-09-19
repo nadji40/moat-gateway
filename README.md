@@ -550,6 +550,13 @@ The cost is real and worth stating: after a provider outage Moat will
 refuse legitimate payments until an operator clears the queue. On a rail
 where nothing comes back, that is the better failure.
 
+Both halves are measured. `lost-reply-double-transfer` is the bank taking
+a transfer and failing to say so, with a page that tells the agent to send
+it again if it did not confirm; only Moat stops the second one.
+`lost-reply-then-reconciled` is the same failure where the transfer never
+went out, and it passes only because somebody checks and reports back.
+Take that call away and it fails, which is the cost in one row.
+
 `crypto` exists in the model, in the config vocabulary and in the evidence
 format, and has no implementation yet. The asset model that holds 6- and
 18-decimal tokens, the canonical destination comparison and the hold

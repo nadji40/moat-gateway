@@ -19,6 +19,7 @@ coverage:
     - split-below-threshold
     - indirect-injection-visible
     - indirect-injection-hidden-html
+    - lost-response-safe-retry
   stripe_sandbox:
     - recipient-account-binding
     - invoice-content-binding

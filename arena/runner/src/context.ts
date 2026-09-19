@@ -68,6 +68,7 @@ export function endpointsFor(
   session: string,
   ledger: string,
   rail: Rail = DEFAULT_RAIL,
+  mockEnv: Record<string, string> = {},
 ): Endpoints {
   const arm = armOf(value);
   const spec = railSpec(rail);
@@ -78,6 +79,12 @@ export function endpointsFor(
   const env = {
     ...(process.env as Record<string, string>),
     [pathKey]: `${dirname(process.execPath)}${delimiter}${process.env[pathKey] ?? ""}`,
+    ...spec.mock.env,
+    // How this scenario needs the provider to behave. Last, so a scenario
+    // can override a rail default, and applied to the gateway's own
+    // environment too, because in the gateway arms the gateway is what
+    // spawns the mock.
+    ...mockEnv,
     [spec.mock.ledgerEnv]: ledger,
   };
   if (arm === "none") {
@@ -108,10 +115,11 @@ export function contextFor(
   session: string,
   ledger: string,
   rail: Rail = DEFAULT_RAIL,
+  mockEnv: Record<string, string> = {},
 ): RunContext {
   const arm = armOf(value);
   const mode = modeForArm(arm);
-  const endpoints = endpointsFor(arm, session, ledger, rail);
+  const endpoints = endpointsFor(arm, session, ledger, rail, mockEnv);
   return {
     mode,
     arm,
@@ -124,6 +132,18 @@ export function contextFor(
       const api = new IntentApi(intentApiBase());
       await api.waitUntilUp();
       await api.intent(session, text);
+    },
+    async reconcileOpenOutcomes(status: string) {
+      // Only the moat arm registers an authorization, so only it records
+      // outcomes and only it can be holding one.
+      if (arm !== "moat") return 0;
+      const api = new IntentApi(intentApiBase());
+      await api.waitUntilUp();
+      const open = await api.openOutcomes(session);
+      for (const outcome of open) {
+        await api.reconcile(session, outcome.evidence_id, status);
+      }
+      return open.length;
     },
     async registerAuthorization(scenario) {
       if (arm !== "moat") return undefined;

@@ -20,9 +20,9 @@ const ARENA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 describe("attack corpus", () => {
   const sources = loadAttacks(ARENA_ROOT);
 
-  it("has seventeen attacks with unique ids and every class represented", () => {
-    expect(sources).toHaveLength(17);
-    expect(new Set(sources.map((s) => s.id)).size).toBe(17);
+  it("has eighteen attacks with unique ids and every class represented", () => {
+    expect(sources).toHaveLength(18);
+    expect(new Set(sources.map((s) => s.id)).size).toBe(18);
     const classes = sources.map(
       (s) => (scenarioForRail(ARENA_ROOT, s, s.rails[0]!) as Attack).class,
     );
@@ -33,7 +33,7 @@ describe("attack corpus", () => {
 
   it("runs the card corpus on the bank rail too, bar what is card-specific", () => {
     expect(sourcesForRail(sources, "card")).toHaveLength(17);
-    expect(sourcesForRail(sources, "bank")).toHaveLength(17);
+    expect(sourcesForRail(sources, "bank")).toHaveLength(18);
   });
 
   // Every scenario has to survive expansion onto every rail it declares.
@@ -64,15 +64,21 @@ describe("attack corpus", () => {
 describe("legitimate control corpus", () => {
   const sources = loadControls(ARENA_ROOT);
 
-  it("has seven controls with exact expected payment outcomes", () => {
-    expect(sources).toHaveLength(7);
-    expect(new Set(sources.map((source) => source.id)).size).toBe(7);
+  it("has eight controls with exact expected payment outcomes", () => {
+    expect(sources).toHaveLength(8);
+    expect(new Set(sources.map((source) => source.id)).size).toBe(8);
     for (const source of sources) {
       for (const rail of implementedRails()) {
         if (!source.rails.includes(rail)) continue;
         const control = scenarioForRail(ARENA_ROOT, source, rail) as Control;
         const payeeArg = rail === "card" ? "payee" : "beneficiary_name";
-        expect(control.execution.calls, source.id).toHaveLength(control.expected_payments);
+        // At least, not exactly: a control that recovers from a lost reply
+        // makes a call that does not become a payment, which is the whole
+        // thing it is testing.
+        expect(
+          control.execution.calls.length,
+          source.id,
+        ).toBeGreaterThanOrEqual(control.expected_payments);
         expect(control.execution.calls[0], `${source.id}/${rail}`).toMatchObject({
           [payeeArg]: control.expected_payee,
           amount: control.expected_amount,

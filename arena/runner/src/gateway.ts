@@ -47,6 +47,38 @@ export class IntentApi {
     return body.turn;
   }
 
+  /** Payments Moat is still waiting on, newest state first. */
+  async openOutcomes(session: string): Promise<{ evidence_id: string; status_kind: string }[]> {
+    const res = await fetch(
+      `${this.base}/v1/session/${encodeURIComponent(session)}/outcomes`,
+      { method: "GET" },
+    );
+    if (!res.ok) throw new Error(`open outcomes failed: ${res.status} ${await res.text()}`);
+    const body = (await res.json()) as {
+      open?: { evidence_id: string; status_kind: string }[];
+    };
+    return body.open ?? [];
+  }
+
+  /**
+   * Tell Moat what the provider actually did, the way an operator would
+   * after checking. The outcome is addressed by the evidence id of the
+   * verdict that allowed it.
+   */
+  async reconcile(session: string, evidenceId: string, status: string): Promise<void> {
+    const res = await fetch(
+      `${this.base}/v1/session/${encodeURIComponent(session)}/outcomes/${encodeURIComponent(
+        evidenceId,
+      )}/reconcile`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status }),
+      },
+    );
+    if (!res.ok) throw new Error(`reconcile failed: ${res.status} ${await res.text()}`);
+  }
+
   async authorization(
     session: string,
     body: {

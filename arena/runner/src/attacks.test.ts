@@ -19,7 +19,7 @@ const attackOnCard = (id: string): Attack => {
 describe("attack corpus authorizations", () => {
   it("carries trusted payment authority for every attack", () => {
     const sources = loadAttacks(ARENA_ROOT);
-    expect(sources).toHaveLength(17);
+    expect(sources).toHaveLength(18);
     for (const source of sources) {
       const scenario = scenarioForRail(ARENA_ROOT, source, source.rails[0]!) as Attack;
       expect(Number(scenario.authorization.amount), source.id).toBeGreaterThan(0);
@@ -41,7 +41,7 @@ describe("attack corpus authorizations", () => {
 
   it("loads legitimate controls separately from hostile scenarios", () => {
     const sources = loadControls(ARENA_ROOT);
-    expect(sources).toHaveLength(7);
+    expect(sources).toHaveLength(8);
     expect(sources.every((source) => source.kind === "control")).toBe(true);
   });
 

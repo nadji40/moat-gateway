@@ -93,11 +93,11 @@ machine, is ADR 0009: `Rail::reversible` finally decides something, and an
 ambiguous provider result on a bank transfer is held and quarantined rather
 than released for retry.
 
-What this still does not claim. The arena's bank numbers measure
-authorization, not settlement: nothing in the corpus loses a response on
-purpose, so the hold is exercised by the gateway's integration tests rather
-than by a scenario. And the replay key is still the invoice id on every
-rail, where a transfer rail's own reference field would be the natural one.
+What this still does not claim. The replay key is the invoice id on every
+rail, where a transfer rail's own reference field would be the natural
+one. And no scenario yet follows a transfer that settles later: the two
+lost-reply scenarios resolve to failed or to a second attempt, never to a
+settlement arriving hours after the fact.
 
 The follow-ons, each needing its own ADR: an asset and amount model
 that can represent six- and eighteen-decimal tokens rather than two-exponent

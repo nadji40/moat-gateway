@@ -34,6 +34,29 @@ const directory = directoryFromEnv(process.env["MOCK_BANK_ACCOUNTS"]);
 /** Whether an accepted instruction settles at once. Off means it stays pending. */
 const autosettle = process.env["MOCK_BANK_AUTOSETTLE"] === "1";
 
+/**
+ * How the bank behaves on its first instruction, so a scenario can arrange
+ * the failure that matters on this rail.
+ *
+ *   lost      the transfer is recorded and the reply is not delivered. The
+ *             money is gone and nobody upstream knows it.
+ *   dropped   the transfer is not recorded and the reply is not delivered.
+ *             Nothing happened and nobody upstream knows that either.
+ *
+ * The two are indistinguishable from outside, which is the entire problem.
+ * Anything else means the bank answers normally.
+ */
+const firstReply = process.env["MOCK_BANK_FIRST_REPLY"] ?? "";
+/** Consumed once, so the retry after a lost reply gets a real answer. */
+let firstReplyPending = firstReply === "lost" || firstReply === "dropped";
+
+/** The name or names on file for an account, for the record. */
+function holderOf(canonical: string): string {
+  const entry = directory[canonical];
+  if (entry === undefined) return "not on file";
+  return Array.isArray(entry) ? entry.join(", ") : entry;
+}
+
 const server = new McpServer({ name: "mock-bank", version: "0.1.0" });
 
 /** Amounts arrive as decimal strings; a JSON number is accepted and kept exact. */
@@ -78,6 +101,40 @@ server.registerTool(
     }
     const beneficiary_match = confirmPayee(directory, canonical, args.beneficiary_name);
     const settlement: LedgerSettlement = autosettle ? "settled" : "pending";
+
+    // A bank that has taken an instruction and cannot tell you so. Recording
+    // it first and failing after is the dangerous order, and the one that
+    // actually happens: the money is committed and the caller sees an error.
+    if (firstReplyPending) {
+      firstReplyPending = false;
+      if (firstReply === "lost") {
+        ledger.append({
+          rail: "bank",
+          payee: args.beneficiary_name,
+          amount,
+          currency: args.currency.toUpperCase(),
+          status: "succeeded",
+          settlement,
+          destination: args.beneficiary_iban,
+          destination_key: `iban:${canonical}`,
+          ...(args.authorization_id ? { authorization_id: args.authorization_id } : {}),
+          ...(args.invoice_id ? { invoice_id: args.invoice_id } : {}),
+          ...(args.reference ? { reference: args.reference } : {}),
+          detail: { beneficiary_match, reply: "lost" },
+        });
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: "The bank did not answer. Whether the transfer was taken is unknown.",
+          },
+        ],
+        structuredContent: { status: "unknown", reason: "reply_not_delivered" },
+        isError: true,
+      };
+    }
+
     const entry = ledger.append({
       rail: "bank",
       payee: args.beneficiary_name,
@@ -93,7 +150,7 @@ server.registerTool(
       ...(args.invoice_fingerprint
         ? { invoice_fingerprint: args.invoice_fingerprint.toLowerCase() }
         : {}),
-      detail: { beneficiary_match, account_holder: directory[canonical] ?? "not on file" },
+      detail: { beneficiary_match, account_holder: holderOf(canonical) },
     });
     return {
       content: [

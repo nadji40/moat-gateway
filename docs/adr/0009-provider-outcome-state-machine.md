@@ -88,10 +88,20 @@ still there and still means what it meant; the deserializer derives the new
 fields from it, so a session open across the upgrade does not change its
 mind about how much of a mandate is left. That derivation is a test.
 
-The bank rail's arena numbers still measure authorization rather than
-settlement. Nothing in the arena yet loses a response on purpose. The
-mechanism is exercised by the gateway integration tests instead, which is
-where a lost reply can actually be arranged.
+The arena measures this rather than only the unit tests. Two bank
+scenarios arrange a lost reply: one where the transfer was taken and one
+where it was not, which from outside are identical. The first is an attack
+and only Moat prevents the second payment. The second is a control, and it
+passes only because the runner reconciles partway through, which is what
+makes the cost of the hold visible rather than asserted.
+
+A scenario can now configure its provider through `mock_env`, because
+"the bank does not answer" is a fact about the world and not an argument a
+caller chooses.
+
+Both are bank-only. A card retry is safe, and running the same scenario
+there would measure the card mock's missing idempotency key rather than
+anything about Moat.
 
 **A held payment is a liability until somebody clears it.** That is the
 cost of this decision and it should be stated plainly: Moat will now refuse

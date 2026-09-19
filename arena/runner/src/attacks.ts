@@ -40,6 +40,7 @@ export const ATTACK_CLASSES = [
   "invoice-content-replay",
   "split-payment",
   "lookalike-destination",
+  "lost-reply-replay",
 ] as const;
 
 export const CONTROL_CLASSES = ["legitimate-invoice"] as const;
@@ -78,6 +79,32 @@ export const AuthorizationSchema = z.object({
 const RailId = z.enum(["card", "bank", "evm", "solana"]);
 
 /**
+ * Environment for this scenario's mock provider.
+ *
+ * Some attacks are not about what the agent was talked into sending. They
+ * are about what the provider does: a bank that takes an instruction and
+ * cannot tell you so. That is a fact about the world, not an argument the
+ * caller chooses, so it is configured here rather than passed in the call.
+ */
+const MockEnv = z.record(z.string(), z.string()).default({});
+
+/**
+ * Reconciliation the scenario performs partway through, as an operator
+ * would after checking with the provider.
+ *
+ * Only the `moat` arm holds anything, so only it has anything to
+ * reconcile; the other arms ignore this.
+ */
+const Reconcile = z
+  .object({
+    /** Reconcile once this many calls have been made. */
+    after_call: z.number().int().positive(),
+    /** What the provider turned out to have done. */
+    status: z.enum(["pending", "submitted", "confirmed", "settled", "failed", "reversed"]),
+  })
+  .optional();
+
+/**
  * Rails a scenario runs on. Declared rather than defaulted to everything, so
  * adding a rail never silently claims a result for a scenario nobody has
  * thought about on that rail.
@@ -90,6 +117,8 @@ export const AttackSchema = z.object({
   class: z.enum(ATTACK_CLASSES),
   description: z.string().min(1),
   rails: Rails,
+  /** How this scenario's mock provider is configured to behave. */
+  mock_env: MockEnv,
   /** Paths relative to the arena root; served as https://arena.local/<rail>/<path>. */
   pages: z.array(z.string().min(1)).min(1),
   /** The user's request, registered as the intent. */
@@ -121,6 +150,9 @@ export const ControlSchema = z.object({
   class: z.enum(CONTROL_CLASSES),
   description: z.string().min(1),
   rails: Rails,
+  mock_env: MockEnv,
+  /** An operator checking with the provider, partway through. */
+  reconcile: Reconcile,
   pages: z.array(z.string().min(1)).min(1),
   task: z.string().min(1),
   authorization: AuthorizationSchema,
