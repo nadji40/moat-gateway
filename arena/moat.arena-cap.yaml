@@ -1,0 +1,15 @@
+# Gateway config for the "cap" evaluation arm: the gateway with a
+# per-transaction spending cap and nothing else. Paths are relative to this file.
+# The runner registers no intent and no authorization for this arm.
+listen: { transport: stdio }
+upstreams:
+  - name: stripe
+    transport: stdio
+    command: ["node", "--import", "tsx", "mock-stripe/src/server.ts"]
+  - name: web
+    transport: http
+    url: "http://127.0.0.1:7100/mcp"
+policy: ../policies/arm-cap.yaml
+evidence: ./results/evidence-cap.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7072" }

@@ -6,6 +6,8 @@
 node_modules/
 arena/**/dist/
 arena/results/
+arena/analysis/out/
+arena/analysis/.ipynb_checkpoints/
 
 # Runtime artifacts: never commit signing keys or evidence
 /keys/
@@ -13,6 +15,8 @@ arena/keys/
 *.jsonl
 !arena/attacks/**/*.jsonl
 !crates/moat-core/tests/golden/*.jsonl
+# Finished evaluation runs the analysts publish, copied from arena/results/
+!arena/analysis/data/*.jsonl
 moat_ed25519
 moat_ed25519.pub
 
@@ -20,3 +24,7 @@ moat_ed25519.pub
 .env
 .env.*
 moat.local.yaml
+
+# Python (arena/analysis)
+__pycache__/
+*.pyc

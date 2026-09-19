@@ -1,4 +1,4 @@
-import { percentile, type ResultRow } from "./results.js";
+import { ARMS, armForMode, percentile, type Arm, type ResultRow } from "./results.js";
 
 export interface SummaryLine {
   attack: string;
@@ -84,7 +84,7 @@ function markdownTable(header: string[], body: string[][]): string[] {
   return [format(header), separator, ...body.map(format)];
 }
 
-export function renderTable(rows: ResultRow[]): string {
+function renderLegacyTable(rows: ResultRow[]): string {
   const lines = summarize(rows);
   const controls = summarizeControls(rows);
   const header = ["attack", "class", "runs", "paid (direct)", "paid (gateway)", "gateway verdicts"];
@@ -149,4 +149,109 @@ export function renderTable(rows: ResultRow[]): string {
     );
   }
   return out.join("\n");
+}
+
+function armOfRow(row: ResultRow): Arm {
+  return row.arm ?? armForMode(row.mode);
+}
+
+/** Arms present in a set of rows, in canonical order. */
+export function armsIn(rows: ResultRow[]): Arm[] {
+  const present = new Set(rows.map(armOfRow));
+  return ARMS.filter((arm) => present.has(arm));
+}
+
+export interface ArmCell {
+  /** Attacker paid (attacks) or legitimate completed (controls). */
+  hit: number;
+  runs: number;
+  verdicts: string;
+}
+
+export interface ArmSummaryLine {
+  scenario: string;
+  class: string;
+  kind: "attack" | "control";
+  byArm: Partial<Record<Arm, ArmCell>>;
+}
+
+export function summarizeByArm(rows: ResultRow[]): ArmSummaryLine[] {
+  const byScenario = new Map<string, ResultRow[]>();
+  for (const row of rows) {
+    const list = byScenario.get(row.attack) ?? [];
+    list.push(row);
+    byScenario.set(row.attack, list);
+  }
+  const out: ArmSummaryLine[] = [];
+  for (const [scenario, list] of [...byScenario.entries()].sort()) {
+    const kind = list[0]?.scenario_kind ?? "attack";
+    const byArm: ArmSummaryLine["byArm"] = {};
+    for (const arm of ARMS) {
+      const subset = list.filter((row) => armOfRow(row) === arm);
+      if (subset.length === 0) continue;
+      const counts = new Map<string, number>();
+      for (const row of subset) {
+        for (const verdict of row.verdicts) counts.set(verdict, (counts.get(verdict) ?? 0) + 1);
+      }
+      byArm[arm] = {
+        hit: subset.filter((row) => (kind === "attack" ? row.attacker_paid : row.legitimate_completed))
+          .length,
+        runs: subset.length,
+        verdicts: [...counts.entries()].map(([key, value]) => `${key}×${value}`).join(" ") || "-",
+      };
+    }
+    out.push({ scenario, class: list[0]?.class ?? "?", kind, byArm });
+  }
+  return out;
+}
+
+function renderArmTable(rows: ResultRow[], arms: Arm[]): string {
+  const lines = summarizeByArm(rows);
+  const out: string[] = [];
+  for (const kind of ["attack", "control"] as const) {
+    const subset = lines.filter((line) => line.kind === kind);
+    if (subset.length === 0) continue;
+    const label = kind === "attack" ? "paid" : "completed";
+    const header = [kind, "class", ...arms.map((arm) => `${label} (${arm})`)];
+    const body = subset.map((line) => [
+      line.scenario,
+      line.class,
+      ...arms.map((arm) => {
+        const cell = line.byArm[arm];
+        if (!cell) return "-";
+        return arm === "none" ? `${cell.hit}/${cell.runs}` : `${cell.hit}/${cell.runs} ${cell.verdicts}`;
+      }),
+    ]);
+    if (out.length > 0) out.push("");
+    out.push(...markdownTable(header, body));
+    const totals = arms.map((arm) => {
+      const hit = subset.reduce((sum, line) => sum + (line.byArm[arm]?.hit ?? 0), 0);
+      const runs = subset.reduce((sum, line) => sum + (line.byArm[arm]?.runs ?? 0), 0);
+      return `${arm} ${hit}/${runs}`;
+    });
+    out.push("", `${kind === "attack" ? "attacker paid" : "legitimate completed"}: ${totals.join(", ")}`);
+  }
+  // Only calls that reached the provider count: a deny returns in a millisecond
+  // because nothing was forwarded. verdicts[] and pay_ms[] are aligned.
+  const forwarded = (row: ResultRow): number[] =>
+    armOfRow(row) === "none" ? row.pay_ms : row.pay_ms.filter((_, i) => row.verdicts[i] === "paid");
+  const base = rows.filter((row) => armOfRow(row) === "none").flatMap(forwarded);
+  const latency = arms.map((arm) => {
+    const values = rows.filter((row) => armOfRow(row) === arm).flatMap(forwarded);
+    if (values.length === 0) return `${arm} n/a`;
+    const p50 = percentile(values, 50) ?? 0;
+    const p95 = percentile(values, 95) ?? 0;
+    const added =
+      base.length && arm !== "none" ? ` (+${(p50 - (percentile(base, 50) ?? 0)).toFixed(1)} p50)` : "";
+    return `${arm} p50 ${p50.toFixed(1)} p95 ${p95.toFixed(1)}${added} n=${values.length}`;
+  });
+  out.push("", `forwarded pay latency (ms): ${latency.join(" | ")}`);
+  return out.join("\n");
+}
+
+/** Two-arm runs render the way they always have; anything else gets one column per arm. */
+export function renderTable(rows: ResultRow[]): string {
+  const arms = armsIn(rows);
+  const legacy = arms.every((arm) => arm === "none" || arm === "moat");
+  return legacy ? renderLegacyTable(rows) : renderArmTable(rows, arms);
 }

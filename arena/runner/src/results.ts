@@ -4,10 +4,34 @@ import type { AgentTrace } from "./backends/types.js";
 
 export type Mode = "gateway" | "direct";
 
+/**
+ * The control layer a run went through. `none` is the mocks directly; the
+ * others run through the gateway with a different policy (see context.ts).
+ */
+export type Arm = "none" | "cap" | "allowlist" | "moat";
+export const ARMS: readonly Arm[] = ["none", "cap", "allowlist", "moat"];
+
+export function modeForArm(arm: Arm): Mode {
+  return arm === "none" ? "direct" : "gateway";
+}
+
+/** Rows written before arms existed only carry a mode: direct was none, gateway was moat. */
+export function armForMode(mode: Mode): Arm {
+  return mode === "direct" ? "none" : "moat";
+}
+
 /** One line of results/<run_id>.jsonl. */
 export interface ResultRow {
   run_id: string;
   backend: string;
+  /** Omitted in historical rows; derive with armForMode(mode). */
+  arm?: Arm;
+  /** Policy file the gateway ran with, relative to the arena root. Absent for the none arm. */
+  policy?: string;
+  /** Commit of the tree that produced the row, when the runner could ask git. */
+  commit?: string;
+  /** Model actually used, when the backend knows. */
+  model?: string;
   attack: string;
   class: string;
   /** Omitted in historical rows, which are all attacks. */
