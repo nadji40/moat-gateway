@@ -9,6 +9,7 @@ use serde_json::Value;
 
 use crate::extract::extract_leaves;
 use crate::hash::sha256_hex;
+use crate::money::Minor;
 use crate::normalize::{normalize_text, numbers_in_text, Normalized};
 use crate::source::Source;
 
@@ -50,9 +51,9 @@ pub struct PaymentAuthorization {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recipient_account_id: Option<String>,
     /// Expected amount in the currency's minor unit.
-    pub amount_minor: u64,
+    pub amount_minor: Minor,
     /// Permitted increase above `amount_minor`.
-    pub tolerance_minor: u64,
+    pub tolerance_minor: Minor,
     /// Uppercase ISO 4217 currency code.
     pub currency: String,
     /// Invoice that this authorization covers when repeats are disabled.
@@ -65,7 +66,7 @@ pub struct PaymentAuthorization {
     pub require_invoice_fingerprint: bool,
     /// Maximum settled value across every payment using this authorization.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub aggregate_limit_minor: Option<u64>,
+    pub aggregate_limit_minor: Option<Minor>,
     /// Milliseconds since Unix epoch after which the authorization is invalid.
     pub expires_unix_ms: u64,
     /// Whether multiple, uniquely identified invoices may use this mandate.
@@ -88,7 +89,7 @@ pub struct PaymentOutcome {
     pub invoice_fingerprint: Option<String>,
     /// Settled value in the authorization currency's minor unit.
     #[serde(default)]
-    pub amount_minor: u64,
+    pub amount_minor: Minor,
     /// Signed verdict that allowed the attempt.
     pub evidence_id: String,
     /// Upstream provider name.
@@ -117,7 +118,7 @@ pub struct PaymentReservation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invoice_fingerprint: Option<String>,
     /// Proposed value in the authorization currency's minor unit.
-    pub amount_minor: u64,
+    pub amount_minor: Minor,
 }
 
 /// Something that happened in a session. The evidence `context_hash` is
@@ -192,7 +193,7 @@ pub enum Event {
         invoice_fingerprint: Option<String>,
         /// Settled value in the authorization currency's minor unit.
         #[serde(default)]
-        amount_minor: u64,
+        amount_minor: Minor,
         /// Signed verdict that allowed the attempt.
         evidence_id: String,
         /// Upstream provider name.

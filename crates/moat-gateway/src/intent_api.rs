@@ -12,6 +12,7 @@ use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use moat_core::money::parse_major;
 use moat_core::session::{lock, PaymentAuthorization};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -41,21 +42,27 @@ struct AuthorizationBody {
     payee: String,
     #[serde(default)]
     recipient_account_id: Option<String>,
-    amount: f64,
-    #[serde(default)]
-    tolerance: f64,
+    /// Major units, as a decimal string or a JSON number. Strings are the
+    /// only exact form once an asset has more than a few decimal places.
+    amount: Value,
+    #[serde(default = "zero_amount")]
+    tolerance: Value,
     currency: String,
     #[serde(default)]
     invoice_fingerprint: Option<String>,
     #[serde(default)]
     require_invoice_fingerprint: bool,
     #[serde(default)]
-    aggregate_limit: Option<f64>,
+    aggregate_limit: Option<Value>,
     expires_at: String,
     #[serde(default)]
     repeat_payments: bool,
     #[serde(default = "one_payment")]
     max_payments: u32,
+}
+
+fn zero_amount() -> Value {
+    Value::from(0)
 }
 
 fn one_payment() -> u32 {
@@ -254,12 +261,12 @@ async fn post_authorization(
             "authorization_id, invoice_id and payee are required",
         ));
     }
-    if currency.len() != 3 || !currency.bytes().all(|c| c.is_ascii_alphabetic()) {
+    let Some(asset) = shared.policies.assets().lookup(&currency, None) else {
         return Err(err(
             StatusCode::BAD_REQUEST,
-            "currency must be a three-letter ISO code",
+            "unknown asset; declare it under `assets` in the policy",
         ));
-    }
+    };
     if body.max_payments == 0 || (!body.repeat_payments && body.max_payments != 1) {
         return Err(err(
             StatusCode::BAD_REQUEST,
@@ -274,28 +281,16 @@ async fn post_authorization(
             ));
         }
     }
-    let amount_minor = major_to_minor(body.amount, &currency).ok_or_else(|| {
-        err(
-            StatusCode::BAD_REQUEST,
-            "amount is invalid for this currency",
-        )
-    })?;
-    let tolerance_minor =
-        major_to_minor_allow_zero(body.tolerance, &currency).ok_or_else(|| {
-            err(
-                StatusCode::BAD_REQUEST,
-                "tolerance is invalid for this currency",
-            )
-        })?;
+    let amount_minor = parse_major(&body.amount, &asset, false)
+        .map_err(|e| err(StatusCode::BAD_REQUEST, format!("amount: {e}")))?;
+    let tolerance_minor = parse_major(&body.tolerance, &asset, true)
+        .map_err(|e| err(StatusCode::BAD_REQUEST, format!("tolerance: {e}")))?;
     let aggregate_limit_minor = body
         .aggregate_limit
+        .as_ref()
         .map(|limit| {
-            major_to_minor(limit, &currency).ok_or_else(|| {
-                err(
-                    StatusCode::BAD_REQUEST,
-                    "aggregate_limit is invalid for this currency",
-                )
-            })
+            parse_major(limit, &asset, false)
+                .map_err(|e| err(StatusCode::BAD_REQUEST, format!("aggregate_limit: {e}")))
         })
         .transpose()?;
     if aggregate_limit_minor.is_some_and(|limit| limit < amount_minor) {
@@ -402,48 +397,6 @@ async fn get_workflow(
         "events": events,
         "evidence": evidence,
     })))
-}
-
-fn currency_factor(currency: &str) -> f64 {
-    if matches!(
-        currency,
-        "BIF"
-            | "CLP"
-            | "DJF"
-            | "GNF"
-            | "JPY"
-            | "KMF"
-            | "KRW"
-            | "MGA"
-            | "PYG"
-            | "RWF"
-            | "UGX"
-            | "VND"
-            | "VUV"
-            | "XAF"
-            | "XOF"
-            | "XPF"
-    ) {
-        1.0
-    } else {
-        100.0
-    }
-}
-
-fn major_to_minor(amount: f64, currency: &str) -> Option<u64> {
-    if !amount.is_finite() || amount <= 0.0 {
-        return None;
-    }
-    major_to_minor_allow_zero(amount, currency)
-}
-
-fn major_to_minor_allow_zero(amount: f64, currency: &str) -> Option<u64> {
-    if !amount.is_finite() || amount < 0.0 {
-        return None;
-    }
-    let minor = amount * currency_factor(currency);
-    let rounded = minor.round();
-    ((minor - rounded).abs() <= 1e-7 && rounded <= u64::MAX as f64).then_some(rounded as u64)
 }
 
 async fn get_evidence(

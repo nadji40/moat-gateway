@@ -8,6 +8,7 @@
 //! - [`source`]: the [`Source`] label every value carries.
 //! - [`normalize`]: the canonical forms values are compared in.
 //! - [`extract`]: pulling leaves out of a tool result.
+//! - [`money`]: assets, their exponents, and amounts in minor units.
 //! - [`session`]: per-session intents, observed values and the event log.
 //! - [`provenance`]: resolving where a payment argument came from.
 //! - [`rail`]: which settlement rail an upstream moves money on.
@@ -22,6 +23,7 @@ pub mod evidence;
 pub mod extract;
 pub mod hash;
 pub mod keys;
+pub mod money;
 pub mod normalize;
 pub mod policy;
 pub mod provenance;
@@ -30,6 +32,7 @@ pub mod session;
 pub mod source;
 pub mod verdict;
 
+pub use money::{Asset, AssetRegistry, Minor};
 pub use policy::{
     evaluate, evaluate_with, EvalContext, Evaluation, PaymentCall, Policy, PolicyError,
 };

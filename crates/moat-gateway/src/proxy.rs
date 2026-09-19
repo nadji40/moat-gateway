@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::Result;
+use moat_core::money::Minor;
 use moat_core::rail::Rail;
 use moat_mcp::jsonrpc::code;
 use moat_mcp::stdio::{Frame, FrameReader, FrameWriter};
@@ -34,7 +35,7 @@ struct AuthorizedPayment {
     authorization_id: Option<String>,
     invoice_id: Option<String>,
     invoice_fingerprint: Option<String>,
-    amount_minor: u64,
+    amount_minor: Minor,
     reservation_fingerprint: Option<String>,
 }
 
@@ -859,7 +860,7 @@ impl Gateway {
         args: Map<String, Value>,
     ) -> Option<AuthorizedPayment> {
         use moat_core::policy::{
-            evaluate_with, payment_amount_minor, payment_fingerprint, EvalContext, PaymentCall,
+            evaluate_with, payment_amount, payment_fingerprint, EvalContext, PaymentCall,
         };
         use moat_core::session::PaymentReservation;
         use moat_core::verdict::{code as moat_code, Decision};
@@ -873,24 +874,26 @@ impl Gateway {
         let session = self.shared.store.get_or_create(&self.session_id);
         let now = now_unix_ms();
 
-        let (eval, reservation_fingerprint) = match self.shared.policies.for_upstream(server) {
-            PolicyState::Loaded(policy) => {
-                let mut s = moat_core::session::lock(&session);
-                let mut eval = evaluate_with(policy, &s, call, now, &EvalContext::for_rail(rail));
-                let mut reservation_fingerprint = None;
-                if eval.verdict.decision == Decision::Allow {
-                    let authorization_id = eval
-                        .call
-                        .args
-                        .get("authorization_id")
-                        .and_then(Value::as_str);
-                    let invoice_id = eval.call.args.get("invoice_id").and_then(Value::as_str);
-                    if let (Some(authorization_id), Some(invoice_id)) =
-                        (authorization_id, invoice_id)
-                    {
-                        let fingerprint = payment_fingerprint(&eval.call);
-                        let reservation = payment_amount_minor(&eval.call).map(|amount_minor| {
-                            PaymentReservation {
+        let (eval, reservation_fingerprint, proposed_minor) =
+            match self.shared.policies.for_upstream(server) {
+                PolicyState::Loaded(policy) => {
+                    let mut s = moat_core::session::lock(&session);
+                    let mut eval =
+                        evaluate_with(policy, &s, call, now, &EvalContext::for_rail(rail));
+                    let amount = payment_amount(policy, &eval.call).map(|(_, minor)| minor);
+                    let mut reservation_fingerprint = None;
+                    if eval.verdict.decision == Decision::Allow {
+                        let authorization_id = eval
+                            .call
+                            .args
+                            .get("authorization_id")
+                            .and_then(Value::as_str);
+                        let invoice_id = eval.call.args.get("invoice_id").and_then(Value::as_str);
+                        if let (Some(authorization_id), Some(invoice_id)) =
+                            (authorization_id, invoice_id)
+                        {
+                            let fingerprint = payment_fingerprint(&eval.call);
+                            let reservation = amount.map(|amount_minor| PaymentReservation {
                                 fingerprint: fingerprint.clone(),
                                 authorization_id: authorization_id.to_owned(),
                                 invoice_id: invoice_id.to_owned(),
@@ -901,35 +904,35 @@ impl Gateway {
                                     .and_then(Value::as_str)
                                     .map(|value| value.trim().to_ascii_lowercase()),
                                 amount_minor,
-                            }
-                        });
-                        if reservation.is_some_and(|reservation| s.reserve_payment(reservation)) {
-                            reservation_fingerprint = Some(fingerprint);
-                        } else {
-                            eval.verdict.decision = Decision::Deny;
-                            eval.verdict.reasons.push(moat_core::verdict::RuleOutcome {
-                                id: "authorization-reservation".to_owned(),
-                                field: None,
-                                passed: false,
-                                source: None,
-                                on_fail: Decision::Deny,
-                                message: "payment could not be reserved atomically".to_owned(),
                             });
+                            if reservation.is_some_and(|reservation| s.reserve_payment(reservation))
+                            {
+                                reservation_fingerprint = Some(fingerprint);
+                            } else {
+                                eval.verdict.decision = Decision::Deny;
+                                eval.verdict.reasons.push(moat_core::verdict::RuleOutcome {
+                                    id: "authorization-reservation".to_owned(),
+                                    field: None,
+                                    passed: false,
+                                    source: None,
+                                    on_fail: Decision::Deny,
+                                    message: "payment could not be reserved atomically".to_owned(),
+                                });
+                            }
                         }
                     }
+                    (eval, reservation_fingerprint, amount)
                 }
-                (eval, reservation_fingerprint)
-            }
-            PolicyState::Missing(why) => {
-                tracing::error!(
-                    server,
-                    tool,
-                    %rail,
-                    "payment tool called with no usable policy: DENIED ({why})"
-                );
-                (policy_missing_evaluation(call, why, now, rail), None)
-            }
-        };
+                PolicyState::Missing(why) => {
+                    tracing::error!(
+                        server,
+                        tool,
+                        %rail,
+                        "payment tool called with no usable policy: DENIED ({why})"
+                    );
+                    (policy_missing_evaluation(call, why, now, rail), None, None)
+                }
+            };
 
         let record = match self.shared.record(&session, &eval) {
             Ok(r) => r,
@@ -1014,7 +1017,7 @@ impl Gateway {
                     .get("invoice_fingerprint")
                     .and_then(Value::as_str)
                     .map(|value| value.trim().to_ascii_lowercase()),
-                amount_minor: moat_core::policy::payment_amount_minor(&eval.call).unwrap_or(0),
+                amount_minor: proposed_minor.unwrap_or(Minor::ZERO),
                 reservation_fingerprint,
             }),
             Decision::StepUp => {

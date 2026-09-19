@@ -8,6 +8,7 @@ use std::sync::{Mutex, PoisonError};
 use anyhow::{Context, Result};
 use moat_core::evidence::Record;
 use moat_core::keys::Keys;
+use moat_core::money::{Asset, AssetRegistry};
 use moat_core::policy::{Evaluation, Policy, PolicyError};
 use moat_core::session::{lock, Event, Session, SessionStore};
 use serde::{Deserialize, Serialize};
@@ -127,6 +128,22 @@ impl Policies {
     /// policy governs `server`.
     pub fn is_payment_tool(&self, server: &str, tool: &str) -> bool {
         self.for_upstream(server).is_payment_tool(server, tool)
+    }
+
+    /// Every asset any loaded policy declares, over the built-in table.
+    ///
+    /// An authorization is registered against a session rather than an
+    /// upstream, so it cannot consult one policy; the union is what lets a
+    /// deployment declare a token in the policy that uses it and still
+    /// authorize a payment in it.
+    pub fn assets(&self) -> AssetRegistry {
+        let mut declared: Vec<Asset> = Vec::new();
+        for state in std::iter::once(&self.default).chain(self.per_upstream.values()) {
+            if let PolicyState::Loaded(policy) = state {
+                declared.extend(policy.assets.iter().cloned());
+            }
+        }
+        AssetRegistry::new().with_declared(&declared)
     }
 }
 

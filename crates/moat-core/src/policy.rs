@@ -12,6 +12,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::money::{parse_major, Asset, AssetRegistry, Minor};
 use crate::provenance::{resolve, Resolution};
 use crate::rail::Rail;
 use crate::session::{Event, Session};
@@ -153,6 +154,11 @@ pub struct Policy {
     /// Rate limits.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub velocity: Option<Velocity>,
+    /// Assets this deployment uses that are not built in, or whose exponent
+    /// differs on its network. A token must be known before it can be paid:
+    /// nothing about the name `USDC` says it has six decimal places.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<Asset>,
     /// What `step_up` becomes when the host said no human is present.
     #[serde(default = "default_no_human")]
     pub no_human_available: Decision,
@@ -225,6 +231,11 @@ impl Policy {
             }
         }
         Ok(())
+    }
+
+    /// The assets this policy can price, built in plus whatever it declares.
+    pub fn assets(&self) -> AssetRegistry {
+        AssetRegistry::new().with_declared(&self.assets)
     }
 
     /// Whether a call to `tool` on `server` is a payment under this policy.
@@ -355,7 +366,9 @@ pub fn evaluate_with(
     let structured_authorization_required = !session.payment_authorizations().is_empty();
 
     if has_authorization_id {
-        for outcome in structured_authorization_checks(session, &call, &mapped, now_unix_ms) {
+        for outcome in
+            structured_authorization_checks(session, &call, &mapped, now_unix_ms, &policy.assets())
+        {
             if !outcome.passed {
                 decision = decision.max(outcome.on_fail);
             }
@@ -447,6 +460,7 @@ fn structured_authorization_checks(
     call: &PaymentCall,
     mapped: &BTreeMap<String, (String, &Value)>,
     now_unix_ms: u64,
+    assets: &AssetRegistry,
 ) -> Vec<RuleOutcome> {
     let mut outcomes = Vec::new();
     let authorization_id = call
@@ -600,9 +614,12 @@ fn structured_authorization_checks(
 
     let fingerprint = payment_fingerprint(call);
     let human_approved = session.is_payment_proposal_approved(&fingerprint);
-    let proposed_minor = mapped
-        .get("amount")
-        .and_then(|(_, value)| amount_to_minor(value, &currency));
+    let asset = assets.lookup(&authorization.currency, None);
+    let proposed_minor = asset.as_ref().and_then(|asset| {
+        mapped
+            .get("amount")
+            .and_then(|(_, value)| amount_in(value, asset))
+    });
     let maximum = authorization
         .amount_minor
         .saturating_add(authorization.tolerance_minor);
@@ -634,20 +651,20 @@ fn structured_authorization_checks(
         .payment_outcomes()
         .iter()
         .filter(|outcome| outcome.authorization_id == authorization.id && outcome.succeeded)
-        .fold(0_u64, |total, outcome| {
+        .fold(Minor::ZERO, |total, outcome| {
             total.saturating_add(outcome.amount_minor)
         });
     let reserved_minor = session
         .payment_reservations()
         .iter()
         .filter(|reservation| reservation.authorization_id == authorization.id)
-        .fold(0_u64, |total, reservation| {
+        .fold(Minor::ZERO, |total, reservation| {
             total.saturating_add(reservation.amount_minor)
         });
     let committed_minor = settled_minor.saturating_add(reserved_minor);
     let aggregate_limit = authorization
         .aggregate_limit_minor
-        .unwrap_or_else(|| maximum.saturating_mul(u64::from(authorization.max_payments)));
+        .unwrap_or_else(|| maximum.saturating_mul(u128::from(authorization.max_payments)));
     let aggregate_after = proposed_minor.map(|amount| committed_minor.saturating_add(amount));
     let aggregate_ok =
         aggregate_after.is_some_and(|total| total <= aggregate_limit) || human_approved;
@@ -754,54 +771,24 @@ fn structured_outcome(
     }
 }
 
-fn amount_to_minor(value: &Value, currency: &str) -> Option<u64> {
-    let amount = match value {
-        Value::Number(number) => number.as_f64()?,
-        Value::String(text) => text.trim().parse::<f64>().ok()?,
-        _ => return None,
-    };
-    if !amount.is_finite() || amount <= 0.0 {
-        return None;
-    }
-    let factor = if matches!(
-        currency,
-        "BIF"
-            | "CLP"
-            | "DJF"
-            | "GNF"
-            | "JPY"
-            | "KMF"
-            | "KRW"
-            | "MGA"
-            | "PYG"
-            | "RWF"
-            | "UGX"
-            | "VND"
-            | "VUV"
-            | "XAF"
-            | "XOF"
-            | "XPF"
-    ) {
-        1.0
-    } else {
-        100.0
-    };
-    let minor = amount * factor;
-    let rounded = minor.round();
-    ((minor - rounded).abs() <= 1e-7 && rounded <= u64::MAX as f64).then_some(rounded as u64)
+/// The amount a call proposes, in the minor units of `asset`.
+///
+/// `None` when the amount is missing, malformed, or written with more
+/// precision than the asset has. Every one of those denies rather than
+/// guesses: see `money::parse_major`.
+fn amount_in(value: &Value, asset: &Asset) -> Option<Minor> {
+    parse_major(value, asset, false).ok()
 }
 
 /// Amount carried by a payment call, normalized to the currency's minor unit.
-pub fn payment_amount_minor(call: &PaymentCall) -> Option<u64> {
-    let currency = call
-        .args
-        .get("currency")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_ascii_uppercase();
-    call.args
-        .get("amount")
-        .and_then(|amount| amount_to_minor(amount, &currency))
+/// The asset and amount a call proposes, resolved through the policy's
+/// registry so a six-decimal token is not read as two-decimal fiat.
+pub fn payment_amount(policy: &Policy, call: &PaymentCall) -> Option<(Asset, Minor)> {
+    let currency = call.args.get("currency").and_then(Value::as_str)?;
+    let network = call.args.get("network").and_then(Value::as_str);
+    let asset = policy.assets().lookup(currency, network)?;
+    let minor = amount_in(call.args.get("amount")?, &asset)?;
+    Some((asset, minor))
 }
 
 fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleOutcome {
@@ -1014,8 +1001,8 @@ mod tests {
                 id: "auth-1".into(),
                 payee: "Monitoring Pro Inc".into(),
                 recipient_account_id: None,
-                amount_minor: 10_000,
-                tolerance_minor: 500,
+                amount_minor: Minor(10_000),
+                tolerance_minor: Minor(500),
                 currency: "USD".into(),
                 invoice_id: "INV-100".into(),
                 invoice_fingerprint: None,
@@ -1204,8 +1191,8 @@ mod tests {
                 id: "auth-price-regression".into(),
                 payee: "Monitoring Pro Inc".into(),
                 recipient_account_id: None,
-                amount_minor: 9_900,
-                tolerance_minor: 500,
+                amount_minor: Minor(9_900),
+                tolerance_minor: Minor(500),
                 currency: "USD".into(),
                 invoice_id: "INV-PRICE".into(),
                 invoice_fingerprint: None,
@@ -1238,6 +1225,155 @@ mod tests {
             .any(|reason| reason.id == "amount-cap" && reason.passed));
     }
 
+    /// A six-decimal token is priced by its own exponent, not by the
+    /// two-decimal assumption fiat gets. 100 USDC is 100_000_000 minor units,
+    /// and a tolerance of 0.50 is 500_000 of them.
+    #[test]
+    fn a_six_decimal_token_is_priced_by_its_exponent() {
+        let p = policy();
+        let mut session = session_with_page();
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-usdc".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: None,
+                amount_minor: Minor(100_000_000),
+                tolerance_minor: Minor(500_000),
+                currency: "USDC".into(),
+                invoice_id: "INV-USDC".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let within = call(json!({
+            "authorization_id": "auth-usdc", "invoice_id": "INV-USDC",
+            "payee": "Monitoring Pro Inc", "amount": "100.25", "currency": "USDC"
+        }));
+        let evaluation = evaluate(&p, &session, within, 10_000);
+        assert!(
+            evaluation
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-amount" && r.passed),
+            "100.25 USDC is inside 100 + 0.50: {:?}",
+            evaluation.verdict.failures().collect::<Vec<_>>()
+        );
+
+        let above = call(json!({
+            "authorization_id": "auth-usdc", "invoice_id": "INV-USDC",
+            "payee": "Monitoring Pro Inc", "amount": "100.75", "currency": "USDC"
+        }));
+        let evaluation = evaluate(&p, &session, above, 10_000);
+        assert!(evaluation
+            .verdict
+            .failures()
+            .any(|r| r.id == "authorization-amount"));
+    }
+
+    /// Unit confusion: seven decimal places on a six-decimal asset. Rounding
+    /// it would evaluate an amount the caller did not write, so the amount is
+    /// unreadable and the payment is denied rather than stepped up.
+    #[test]
+    fn more_precision_than_the_asset_has_is_denied_not_rounded() {
+        let p = policy();
+        let mut session = session_with_page();
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-precision".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: None,
+                amount_minor: Minor(100_000_000),
+                tolerance_minor: Minor(0),
+                currency: "USDC".into(),
+                invoice_id: "INV-PRECISION".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "authorization_id": "auth-precision", "invoice_id": "INV-PRECISION",
+                "payee": "Monitoring Pro Inc", "amount": "100.0000001", "currency": "USDC"
+            })),
+            10_000,
+        );
+        assert_eq!(evaluation.verdict.decision, Decision::Deny);
+        let amount = evaluation
+            .verdict
+            .reasons
+            .iter()
+            .find(|r| r.id == "authorization-amount")
+            .expect("the amount check ran");
+        assert!(!amount.passed);
+        assert_eq!(
+            amount.on_fail,
+            Decision::Deny,
+            "unreadable, not merely high"
+        );
+    }
+
+    /// Eighteen decimal places overflow `u64` at about eighteen whole units.
+    /// The aggregate has to hold them, or a cap would silently saturate.
+    #[test]
+    fn an_eighteen_decimal_asset_does_not_overflow_the_aggregate() {
+        let p = policy();
+        let mut session = session_with_page();
+        let one_eth = Minor(1_000_000_000_000_000_000);
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-eth".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: None,
+                amount_minor: one_eth,
+                tolerance_minor: Minor(0),
+                currency: "ETH".into(),
+                invoice_id: "INV-ETH".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "authorization_id": "auth-eth", "invoice_id": "INV-ETH",
+                "payee": "Monitoring Pro Inc", "amount": "1", "currency": "ETH"
+            })),
+            10_000,
+        );
+        assert!(
+            evaluation
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-amount" && r.passed),
+            "one ether is exactly the approved amount: {:?}",
+            evaluation.verdict.failures().collect::<Vec<_>>()
+        );
+        assert!(
+            one_eth.0 > u128::from(u64::MAX) / 20,
+            "beyond comfortable u64 range"
+        );
+    }
+
     #[test]
     fn structured_authorization_cannot_be_bypassed_by_omitting_its_id() {
         let p = policy();
@@ -1268,7 +1404,7 @@ mod tests {
             authorization_id: "auth-1".into(),
             invoice_id: "INV-100".into(),
             invoice_fingerprint: None,
-            amount_minor: 10_000,
+            amount_minor: Minor(10_000),
             evidence_id: "ev_paid".into(),
             provider: "stripe".into(),
             receipt: Some("pi_paid".into()),
@@ -1317,13 +1453,13 @@ mod tests {
                 id: "auth-bound".into(),
                 payee: "Monitoring Pro Inc".into(),
                 recipient_account_id: Some("acct_supplier_001".into()),
-                amount_minor: 10_000,
-                tolerance_minor: 0,
+                amount_minor: Minor(10_000),
+                tolerance_minor: Minor(0),
                 currency: "USD".into(),
                 invoice_id: "INV-BASE".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: true,
-                aggregate_limit_minor: Some(10_000),
+                aggregate_limit_minor: Some(Minor(10_000)),
                 expires_unix_ms: 20_000,
                 repeat_payments: true,
                 max_payments: 3,
@@ -1355,7 +1491,7 @@ mod tests {
             authorization_id: "auth-bound".into(),
             invoice_id: "INV-A".into(),
             invoice_fingerprint: Some(FP_A.into()),
-            amount_minor: 6_000,
+            amount_minor: Minor(6_000),
         }));
 
         let concurrent_split = evaluate(
@@ -1388,7 +1524,7 @@ mod tests {
                 authorization_id: "auth-bound".into(),
                 invoice_id: "INV-A".into(),
                 invoice_fingerprint: Some(FP_A.into()),
-                amount_minor: 6_000,
+                amount_minor: Minor(6_000),
                 evidence_id: "ev-first".into(),
                 provider: "stripe".into(),
                 receipt: Some("pi_first".into()),
