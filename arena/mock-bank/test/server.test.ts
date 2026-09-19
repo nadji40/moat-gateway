@@ -67,7 +67,9 @@ describe("mock-bank", () => {
       invoice_id: "INV-2001",
     });
     expect(result.isError).toBeFalsy();
-    expect(result.structuredContent?.["status"]).toBe("succeeded");
+    // Not "succeeded": the bank has taken the instruction and has not moved
+    // the money. Claiming otherwise is what makes a lost reply dangerous.
+    expect(result.structuredContent?.["status"]).toBe("pending");
     expect(result.structuredContent?.["destination"]).toBe(AUTHORIZED_COMPACT);
     expect(result.structuredContent?.["beneficiary_match"]).toBe("match");
     // The receipt has to be readable out of the text too: some hosts hand a

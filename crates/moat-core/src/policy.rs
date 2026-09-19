@@ -691,10 +691,15 @@ fn structured_authorization_checks(
         amount_message,
     ));
 
+    // Committed, not settled. On a rail where money does not come back, a
+    // transfer that was accepted and never confirmed has to count against
+    // the limit, because it may already be gone. On a card it does not,
+    // which is what `committed` encodes and why this is one field rather
+    // than a rail check here. See `crate::outcome`.
     let settled_minor = session
         .payment_outcomes()
         .iter()
-        .filter(|outcome| outcome.authorization_id == authorization.id && outcome.succeeded)
+        .filter(|outcome| outcome.authorization_id == authorization.id && outcome.committed)
         .fold(Minor::ZERO, |total, outcome| {
             total.saturating_add(outcome.amount_minor)
         });
@@ -737,7 +742,7 @@ fn structured_authorization_checks(
     let succeeded_for_authorization = session
         .payment_outcomes()
         .iter()
-        .filter(|outcome| outcome.authorization_id == authorization.id && outcome.succeeded)
+        .filter(|outcome| outcome.authorization_id == authorization.id && outcome.committed)
         .count();
     let reserved_for_authorization = session
         .payment_reservations()
@@ -749,13 +754,13 @@ fn structured_authorization_checks(
     let duplicate = session.payment_outcomes().iter().any(|outcome| {
         outcome.authorization_id == authorization.id
             && outcome.invoice_id == invoice_id
-            && outcome.succeeded
+            && outcome.committed
     }) || session.payment_reservations().iter().any(|reservation| {
         reservation.authorization_id == authorization.id && reservation.invoice_id == invoice_id
     });
     let duplicate_fingerprint = !invoice_fingerprint.is_empty()
         && (session.payment_outcomes().iter().any(|outcome| {
-            outcome.succeeded
+            outcome.committed
                 && outcome.invoice_fingerprint.as_deref() == Some(invoice_fingerprint.as_str())
         }) || session.payment_reservations().iter().any(|reservation| {
             reservation.invoice_fingerprint.as_deref() == Some(invoice_fingerprint.as_str())
@@ -778,6 +783,24 @@ fn structured_authorization_checks(
             "invoice content was already settled under this session".to_owned()
         } else {
             "ok: invoice content has no successful settlement".to_owned()
+        },
+    ));
+    // The check that makes holding a transfer useful rather than merely
+    // conservative. While Moat cannot say what happened to an earlier
+    // payment under this mandate, it cannot say how much of the mandate is
+    // left either, and the safe reading of "I do not know" is to stop.
+    // Cleared by reconciling the outcome, which is somebody going to the
+    // provider and finding out.
+    let quarantined = session.has_quarantined_outcome(&authorization.id);
+    outcomes.push(structured_outcome(
+        "authorization-quarantine",
+        !quarantined,
+        Decision::Deny,
+        if quarantined {
+            "an earlier payment under this authorization is unaccounted for; reconcile it first"
+                .to_owned()
+        } else {
+            "ok: every payment under this authorization is accounted for".to_owned()
         },
     ));
     outcomes.push(structured_outcome(
@@ -1020,6 +1043,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::outcome::OutcomeStatus;
     use crate::session::{PaymentAuthorization, PaymentOutcome, PaymentReservation};
     use serde_json::json;
 
@@ -1072,6 +1096,184 @@ mod tests {
             .unwrap();
         session.register_intent("Authorize invoice INV-100 to Monitoring Pro Inc for 100 USD");
         session
+    }
+
+    /// An outcome as the gateway records one: the status and the rail
+    /// decide how Moat counts it, and nothing else may set those fields.
+    fn outcome_on(rail: Rail, status: OutcomeStatus, amount: Minor) -> PaymentOutcome {
+        let disposition = status.disposition(rail);
+        PaymentOutcome {
+            authorization_id: "auth-1".into(),
+            invoice_id: "INV-100".into(),
+            invoice_fingerprint: None,
+            amount_minor: amount,
+            evidence_id: "ev_lost".into(),
+            provider: "bank".into(),
+            receipt: None,
+            status: status.as_str().into(),
+            succeeded: status == OutcomeStatus::Succeeded,
+            status_kind: status,
+            committed: disposition.committed,
+            quarantined: disposition.quarantined,
+            rail,
+            unix_ms: 10_000,
+            reconciled_unix_ms: None,
+        }
+    }
+
+    /// The phase in one test. The bank took the instruction, the response
+    /// was lost, and Moat does not know whether the supplier has the money.
+    /// Sending it again is the thing that must not happen.
+    #[test]
+    fn a_lost_transfer_is_held_and_the_retry_is_refused() {
+        let p = policy();
+        let mut session = authorized_session(20_000);
+        session.record_payment_outcome(outcome_on(
+            Rail::Bank,
+            OutcomeStatus::Unknown,
+            Minor(10_000),
+        ));
+
+        let retry = evaluate(&p, &session, authorized_call(100.0), 11_000);
+        assert_eq!(retry.verdict.decision, Decision::Deny);
+        assert!(
+            retry
+                .verdict
+                .failures()
+                .any(|reason| reason.id == "authorization-quarantine"),
+            "the retry must be refused for the reason that is true: {:?}",
+            retry.verdict.failures().collect::<Vec<_>>()
+        );
+    }
+
+    /// And the hold is not permanent. Somebody rings the bank, finds the
+    /// transfer never went out, and says so; the mandate is usable again.
+    #[test]
+    fn reconciling_a_lost_transfer_as_failed_frees_the_mandate() {
+        let p = policy();
+        let mut session = authorized_session(20_000);
+        session.record_payment_outcome(outcome_on(
+            Rail::Bank,
+            OutcomeStatus::Unknown,
+            Minor(10_000),
+        ));
+        let reconciled = session
+            .reconcile_payment_outcome("ev_lost", OutcomeStatus::Failed, None, 12_000)
+            .expect("the outcome is reconcilable");
+        assert!(!reconciled.quarantined);
+        assert!(!reconciled.committed, "a failed transfer moved no money");
+
+        let retry = evaluate(&p, &session, authorized_call(100.0), 13_000);
+        assert_eq!(
+            retry.verdict.decision,
+            Decision::Allow,
+            "{:?}",
+            retry.verdict.failures().collect::<Vec<_>>()
+        );
+    }
+
+    /// Reconciled the other way, the money is gone and the mandate is
+    /// spent. The retry is still refused, for a different and equally true
+    /// reason.
+    #[test]
+    fn reconciling_a_lost_transfer_as_settled_spends_the_mandate() {
+        let p = policy();
+        let mut session = authorized_session(20_000);
+        session.record_payment_outcome(outcome_on(
+            Rail::Bank,
+            OutcomeStatus::Unknown,
+            Minor(10_000),
+        ));
+        session
+            .reconcile_payment_outcome("ev_lost", OutcomeStatus::Succeeded, None, 12_000)
+            .unwrap();
+
+        let retry = evaluate(&p, &session, authorized_call(100.0), 13_000);
+        assert_eq!(retry.verdict.decision, Decision::Deny);
+        let failed: Vec<&str> = retry
+            .verdict
+            .failures()
+            .map(|reason| reason.id.as_str())
+            .collect();
+        assert!(!failed.contains(&"authorization-quarantine"), "{failed:?}");
+        assert!(failed.contains(&"authorization-duplicate"), "{failed:?}");
+    }
+
+    /// The card rail is unmoved, which is the constraint the whole phase
+    /// works under. The same lost response leaves the mandate usable,
+    /// because a card authorization that took can be reversed.
+    #[test]
+    fn a_lost_card_authorization_stays_retryable() {
+        let p = policy();
+        let mut session = authorized_session(20_000);
+        session.record_payment_outcome(outcome_on(
+            Rail::Card,
+            OutcomeStatus::Unknown,
+            Minor(10_000),
+        ));
+
+        let retry = evaluate(&p, &session, authorized_call(100.0), 11_000);
+        assert_eq!(
+            retry.verdict.decision,
+            Decision::Allow,
+            "{:?}",
+            retry.verdict.failures().collect::<Vec<_>>()
+        );
+    }
+
+    /// A transfer the bank accepted is accounted for: it counts against
+    /// the mandate, so the second payment is refused as a duplicate rather
+    /// than quarantined. Nobody needs to go and ask.
+    #[test]
+    fn an_accepted_transfer_counts_without_being_quarantined() {
+        let p = policy();
+        let mut session = authorized_session(20_000);
+        session.record_payment_outcome(outcome_on(
+            Rail::Bank,
+            OutcomeStatus::Pending,
+            Minor(10_000),
+        ));
+        assert!(session.open_payment_outcomes().len() == 1, "still open");
+
+        let retry = evaluate(&p, &session, authorized_call(100.0), 11_000);
+        let failed: Vec<&str> = retry
+            .verdict
+            .failures()
+            .map(|reason| reason.id.as_str())
+            .collect();
+        assert!(!failed.contains(&"authorization-quarantine"), "{failed:?}");
+        assert!(failed.contains(&"authorization-duplicate"), "{failed:?}");
+    }
+
+    /// An outcome written before any of this existed has to keep meaning
+    /// what it meant, or a session open across the upgrade changes its
+    /// mind about how much of a mandate is left.
+    #[test]
+    fn an_outcome_from_before_this_phase_reads_as_it_did() {
+        let settled: PaymentOutcome = serde_json::from_value(json!({
+            "authorization_id": "auth-1", "invoice_id": "INV-100",
+            "amount_minor": "10000", "evidence_id": "ev_old", "provider": "stripe",
+            "receipt": "pi_old", "status": "succeeded", "succeeded": true,
+            "unix_ms": 10_000
+        }))
+        .unwrap();
+        assert_eq!(settled.status_kind, OutcomeStatus::Succeeded);
+        assert!(settled.committed, "a settled payment always counted");
+        assert!(!settled.quarantined);
+        assert_eq!(settled.rail, Rail::Card);
+
+        let lost: PaymentOutcome = serde_json::from_value(json!({
+            "authorization_id": "auth-1", "invoice_id": "INV-100",
+            "amount_minor": "10000", "evidence_id": "ev_old2", "provider": "stripe",
+            "status": "transport_error", "succeeded": false, "unix_ms": 10_000
+        }))
+        .unwrap();
+        assert_eq!(lost.status_kind, OutcomeStatus::Failed);
+        assert!(
+            !lost.committed,
+            "a card deployment treated this as not having happened, and still must"
+        );
+        assert!(!lost.quarantined);
     }
 
     fn authorized_call(amount: f64) -> PaymentCall {
@@ -1781,7 +1983,12 @@ rules:
             receipt: Some("pi_paid".into()),
             status: "succeeded".into(),
             succeeded: true,
+            status_kind: OutcomeStatus::Succeeded,
+            committed: true,
+            quarantined: false,
+            rail: Rail::Card,
             unix_ms: 10_000,
+            reconciled_unix_ms: None,
         });
         let duplicate = evaluate(&p, &session, authorized_call(100.0), 11_000);
         assert_eq!(duplicate.verdict.decision, Decision::Deny);
@@ -1901,7 +2108,12 @@ rules:
                 receipt: Some("pi_first".into()),
                 status: "succeeded".into(),
                 succeeded: true,
+                status_kind: OutcomeStatus::Succeeded,
+                committed: true,
+                quarantined: false,
+                rail: Rail::Card,
                 unix_ms: 10_000,
+                reconciled_unix_ms: None,
             },
         );
         assert!(session.payment_reservations().is_empty());

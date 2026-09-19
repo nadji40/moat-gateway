@@ -58,7 +58,7 @@ fn main() {
                         "protocolVersion": requested,
                         "capabilities": {"tools": {"listChanged": false}},
                         "serverInfo": {"name": "moat-fake-mcp-server", "version": "0.1.0"},
-                        "instructions": "Test fixture. Two tools: echo and pay."
+                        "instructions": "Test fixture. Three tools: echo, pay and transfer."
                     }
                 })
             }
@@ -72,6 +72,24 @@ fn main() {
                             "name": "echo",
                             "description": "Echo the arguments back as text.",
                             "inputSchema": {"type": "object"}
+                        },
+                        {
+                            "name": "transfer",
+                            "description": "Instruct a bank transfer. Fake: moves nothing. `simulate_status` chooses the status it reports; `simulate_error` makes it answer with an error instead, which is how a lost reply is exercised.",
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": {
+                                    "beneficiary_name": {"type": "string"},
+                                    "beneficiary_iban": {"type": "string"},
+                                    "amount": {"type": "number"},
+                                    "currency": {"type": "string"},
+                                    "authorization_id": {"type": "string"},
+                                    "invoice_id": {"type": "string"},
+                                    "simulate_status": {"type": "string"},
+                                    "simulate_error": {"type": "boolean"}
+                                },
+                                "required": ["beneficiary_name", "amount"]
+                            }
                         },
                         {
                             "name": "pay",
@@ -130,6 +148,43 @@ fn main() {
                             "isError": false
                         }
                     }),
+                    "transfer" => {
+                        if args
+                            .get("simulate_error")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false)
+                        {
+                            // The provider answered with nothing usable. Moat
+                            // asked it to move money and does not know whether
+                            // it did.
+                            error(id, -32000, "simulated provider failure")
+                        } else {
+                            let status = args
+                                .get("simulate_status")
+                                .and_then(Value::as_str)
+                                .unwrap_or("pending");
+                            json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "result": {
+                                    "content": [{"type": "text", "text": format!(
+                                        "Transfer instructed: {} {} to {}. Receipt bank_{calls}.",
+                                        args.get("amount").cloned().unwrap_or(Value::Null),
+                                        args.get("currency").and_then(Value::as_str).unwrap_or("EUR"),
+                                        args.get("beneficiary_name").and_then(Value::as_str).unwrap_or("?")
+                                    )}],
+                                    "structuredContent": {
+                                        "receipt": format!("bank_{calls}"),
+                                        "status": status,
+                                        "authorization_id": args.get("authorization_id"),
+                                        "invoice_id": args.get("invoice_id"),
+                                        "call": calls
+                                    },
+                                    "isError": false
+                                }
+                            })
+                        }
+                    }
                     other => error(id, -32602, &format!("Unknown tool: {other}")),
                 }
             }

@@ -106,9 +106,12 @@ server.registerTool(
         },
       ],
       structuredContent: {
-        // The bank has accepted the instruction. Whether the money arrives
-        // is `settlement`, and on this rail that is not reversible.
-        status: "succeeded",
+        // What the bank can honestly say. It has taken the instruction; it
+        // has not moved the money, and on this rail it cannot take it back
+        // once it does. Reporting "succeeded" here would be the mock
+        // claiming an outcome it does not have, and the gateway now has a
+        // vocabulary that can say the true thing instead.
+        status: settlement === "settled" ? "settled" : "pending",
         receipt: entry.receipt,
         settlement,
         beneficiary_name: args.beneficiary_name,

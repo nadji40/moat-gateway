@@ -13,10 +13,12 @@ use axum::http::{header, HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use moat_core::money::parse_major;
+use moat_core::outcome::OutcomeStatus;
 use moat_core::session::{lock, PaymentAuthorization};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::proxy::now_unix_ms;
 use crate::state::Shared;
 
 #[derive(Deserialize)]
@@ -374,6 +376,118 @@ async fn cancel_authorization(
     })))
 }
 
+/// What a reconciliation reports.
+#[derive(Debug, Deserialize)]
+struct ReconcileBody {
+    /// What the provider says actually happened, in Moat's vocabulary:
+    /// pending, submitted, confirmed, succeeded, failed or reversed.
+    status: String,
+    /// The provider's transaction identifier, if the check turned one up.
+    #[serde(default)]
+    receipt: Option<String>,
+}
+
+/// Payments Moat is still waiting on.
+///
+/// An operator's work queue: everything that has not reached a final state,
+/// and everything Moat could not account for and has therefore blocked.
+async fn get_outcomes(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let session = session_for_request(&shared, &tenant_id, &id).await?;
+    let (open, all) = {
+        let session = lock(&session);
+        (
+            session
+                .open_payment_outcomes()
+                .into_iter()
+                .cloned()
+                .collect::<Vec<_>>(),
+            session.payment_outcomes().len(),
+        )
+    };
+    Ok(Json(json!({
+        "session": id,
+        "open": open,
+        "open_count": open.len(),
+        "total": all
+    })))
+}
+
+/// Tell Moat what the provider actually did.
+///
+/// This exists because of what an irreversible rail does to a lost
+/// response. Moat holds the payment, counts it, and refuses to send
+/// another under the same authorization, because it cannot tell whether
+/// the first one went. Somebody has to go and look; this is where they say
+/// what they found. Whatever the answer, the hold is cleared: the reason
+/// for it was that nobody knew.
+///
+/// The outcome is addressed by the evidence id of the verdict that allowed
+/// it, so the reconciliation is tied to the signed record rather than to
+/// an identifier Moat invented for the purpose.
+async fn reconcile_outcome(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    Path((id, evidence_id)): Path<(String, String)>,
+    Json(body): Json<ReconcileBody>,
+) -> ApiResult {
+    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let session = session_for_request(&shared, &tenant_id, &id).await?;
+    let status = OutcomeStatus::from_provider(&body.status);
+    if status == OutcomeStatus::Unknown {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            format!(
+                "status {:?} is not a state Moat recognises; reconciling to \"unknown\" \
+                 would report having learned nothing",
+                body.status
+            ),
+        ));
+    }
+    let receipt = body
+        .receipt
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    // Distinguished before the mutation, because `mutate` reports every
+    // refusal as a conflict and an outcome that does not exist is a
+    // different mistake from one that cannot move.
+    {
+        let session = lock(&session);
+        if !session
+            .payment_outcomes()
+            .iter()
+            .any(|outcome| outcome.evidence_id == evidence_id)
+        {
+            return Err(err(
+                StatusCode::NOT_FOUND,
+                "no payment outcome in this session carries that evidence id",
+            ));
+        }
+    }
+    let now = now_unix_ms();
+    let outcome = mutate(&shared, &tenant_id, &id, move |session| {
+        session
+            .reconcile_payment_outcome(&evidence_id, status, receipt.clone(), now)
+            .map_err(|error| error.to_string())
+    })
+    .await?;
+    tracing::info!(
+        session = %id,
+        evidence_id = %outcome.evidence_id,
+        authorization_id = %outcome.authorization_id,
+        status = %outcome.status_kind,
+        committed = outcome.committed,
+        "payment outcome reconciled"
+    );
+    Ok(Json(json!({ "session": id, "outcome": outcome })))
+}
+
 async fn get_workflow(
     State(shared): State<Arc<Shared>>,
     headers: HeaderMap,
@@ -452,6 +566,11 @@ pub fn router(shared: Arc<Shared>) -> Router {
         .route(
             "/v1/session/{id}/authorizations/{authorization_id}/cancel",
             post(cancel_authorization),
+        )
+        .route("/v1/session/{id}/outcomes", get(get_outcomes))
+        .route(
+            "/v1/session/{id}/outcomes/{evidence_id}/reconcile",
+            post(reconcile_outcome),
         )
         .route("/v1/session/{id}/workflow", get(get_workflow))
         .route("/v1/session/{id}/evidence", get(get_evidence))

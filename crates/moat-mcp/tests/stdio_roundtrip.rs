@@ -76,7 +76,7 @@ async fn initialize_then_list_then_call() {
     assert_eq!(r.id, RequestId::from("list-1"));
     let list: ListToolsResult = serde_json::from_value(r.result).expect("list shape");
     let names: Vec<&str> = list.tools.iter().map(|t| t.name.as_str()).collect();
-    assert_eq!(names, ["echo", "pay"]);
+    assert_eq!(names, ["echo", "transfer", "pay"]);
 
     // tools/call
     let reply = call(

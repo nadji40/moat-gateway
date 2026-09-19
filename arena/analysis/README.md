@@ -64,6 +64,21 @@ whether the user asked at all.
 Read a rail's rows against that rail's baselines. Reading `moat` on one rail against
 `allowlist` on another compares two different controls.
 
+## What the bank numbers do not cover
+
+They measure **authorization**, not settlement. Every transfer in the corpus gets an
+answer from the mock bank. None of them lose one.
+
+That gap is real and it is where a transfer rail is most dangerous. A bank transfer is
+not finished when the request returns, and if the reply is lost Moat does not know
+whether the money left. It now holds such a payment rather than letting it be retried,
+and refuses everything else under that mandate until somebody checks. None of that is
+visible in these tables, because nothing here arranges a lost reply; it is covered by
+the gateway's own tests instead.
+
+If you are writing the methods note, say this rather than letting a reader assume the
+bank column covers the whole life of a transfer.
+
 Before arms existed the runner had two modes, `direct` and `gateway`. Old result rows
 carry only a `mode`; `direct` reads as `none` and `gateway` as `moat`.
 

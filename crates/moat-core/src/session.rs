@@ -11,6 +11,8 @@ use crate::extract::extract_leaves;
 use crate::hash::sha256_hex;
 use crate::money::Minor;
 use crate::normalize::{normalize_text, numbers_in_text, Normalized};
+use crate::outcome::{may_reconcile, OutcomeStatus};
+use crate::rail::Rail;
 use crate::source::Source;
 
 /// A registered statement of what the human asked for.
@@ -78,7 +80,17 @@ pub struct PaymentAuthorization {
 }
 
 /// The provider-side result observed after Moat allowed a payment.
+///
+/// `succeeded` is kept, means what it always meant, and is what every
+/// existing reader looks at. The fields after it separate what the
+/// provider said from how Moat is treating it, which are two questions
+/// that used to be one. See [`crate::outcome`].
+///
+/// Reading one back goes through [`PaymentOutcomeWire`], so the per-field
+/// `default` attributes that would normally fill in the new fields are not
+/// what does it; that type is.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "PaymentOutcomeWire")]
 pub struct PaymentOutcome {
     /// Authorization that permitted the attempt.
     pub authorization_id: String,
@@ -101,8 +113,87 @@ pub struct PaymentOutcome {
     pub status: String,
     /// True only for a provider-confirmed successful settlement.
     pub succeeded: bool,
+    /// What the provider said, in one vocabulary across rails.
+    pub status_kind: OutcomeStatus,
+    /// Whether Moat counts this payment against the mandate's limits and
+    /// usage. Not the same question as whether it settled: on a rail where
+    /// money does not come back, a transfer Moat cannot account for counts.
+    pub committed: bool,
+    /// Whether Moat cannot account for this payment. While one of these
+    /// exists, nothing further moves under the same authorization. Always
+    /// serialized, because an operator reading this over the API needs a
+    /// yes or a no and an absent field is neither.
+    pub quarantined: bool,
+    /// The rail the payment went out on, which is what decided the two
+    /// fields above.
+    pub rail: Rail,
     /// Milliseconds since Unix epoch when Moat observed the outcome.
     pub unix_ms: u64,
+    /// When the outcome was last reconciled against the provider, if ever.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciled_unix_ms: Option<u64>,
+}
+
+/// How a [`PaymentOutcome`] is read off the wire.
+///
+/// A record written before the outcome state machine carries `succeeded`
+/// and nothing else, and `succeeded` is exactly two states, both terminal:
+/// the money settled, or Moat treated it as not having happened. Deriving
+/// the new fields from it rather than defaulting them is what keeps a
+/// session that was open across the upgrade evaluating the way it was
+/// evaluated when it started.
+#[derive(Deserialize)]
+struct PaymentOutcomeWire {
+    authorization_id: String,
+    invoice_id: String,
+    #[serde(default)]
+    invoice_fingerprint: Option<String>,
+    #[serde(default)]
+    amount_minor: Minor,
+    evidence_id: String,
+    provider: String,
+    #[serde(default)]
+    receipt: Option<String>,
+    status: String,
+    succeeded: bool,
+    #[serde(default)]
+    status_kind: Option<OutcomeStatus>,
+    #[serde(default)]
+    committed: Option<bool>,
+    #[serde(default)]
+    quarantined: bool,
+    #[serde(default)]
+    rail: Rail,
+    unix_ms: u64,
+    #[serde(default)]
+    reconciled_unix_ms: Option<u64>,
+}
+
+impl From<PaymentOutcomeWire> for PaymentOutcome {
+    fn from(wire: PaymentOutcomeWire) -> PaymentOutcome {
+        let status_kind = wire.status_kind.unwrap_or(if wire.succeeded {
+            OutcomeStatus::Succeeded
+        } else {
+            OutcomeStatus::Failed
+        });
+        PaymentOutcome {
+            authorization_id: wire.authorization_id,
+            invoice_id: wire.invoice_id,
+            invoice_fingerprint: wire.invoice_fingerprint,
+            amount_minor: wire.amount_minor,
+            evidence_id: wire.evidence_id,
+            provider: wire.provider,
+            receipt: wire.receipt,
+            status: wire.status,
+            succeeded: wire.succeeded,
+            status_kind,
+            committed: wire.committed.unwrap_or(wire.succeeded),
+            quarantined: wire.quarantined,
+            rail: wire.rail,
+            unix_ms: wire.unix_ms,
+            reconciled_unix_ms: wire.reconciled_unix_ms,
+        }
+    }
 }
 
 /// A payment that passed policy and is currently in flight to its provider.
@@ -203,7 +294,51 @@ pub enum Event {
         /// True only for a provider-confirmed successful settlement.
         succeeded: bool,
     },
+    /// Somebody went to the provider, found out what actually happened, and
+    /// told Moat. This is the only way an outcome's state ever changes
+    /// after it is first observed.
+    PaymentOutcomeReconciled {
+        /// Authorization the payment was made under.
+        authorization_id: String,
+        /// Signed verdict that allowed the payment, which is its handle.
+        evidence_id: String,
+        /// What Moat believed before.
+        from: OutcomeStatus,
+        /// What the provider says is true.
+        to: OutcomeStatus,
+        /// Provider transaction identifier, if reconciliation supplied one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        receipt: Option<String>,
+    },
 }
+
+/// Why a reconciliation was refused.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReconcileError {
+    /// No outcome in this session carries that evidence id.
+    NotFound,
+    /// The provider has already given a final answer that this would
+    /// contradict.
+    NotAllowed {
+        /// What Moat already believes.
+        from: OutcomeStatus,
+        /// What was asked for.
+        to: OutcomeStatus,
+    },
+}
+
+impl std::fmt::Display for ReconcileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ReconcileError::NotFound => f.write_str("no payment outcome with that evidence id"),
+            ReconcileError::NotAllowed { from, to } => {
+                write!(f, "cannot reconcile a {from} outcome to {to}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for ReconcileError {}
 
 /// An [`Event`] with its position and time.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -412,6 +547,84 @@ impl Session {
         self.payment_reservations
             .retain(|reservation| reservation.fingerprint != fingerprint);
         self.payment_reservations.len() != before
+    }
+
+    /// Outcomes somebody has to do something about.
+    ///
+    /// Two kinds. One Moat cannot account for at all, which is blocking its
+    /// authorization. And one Moat is counting against a mandate without a
+    /// final answer from the provider, which will need checking before the
+    /// books balance.
+    ///
+    /// A payment Moat has decided did not happen is not here even when the
+    /// provider never said so. On a card that is most transient errors, and
+    /// listing them would bury the two that matter.
+    pub fn open_payment_outcomes(&self) -> Vec<&PaymentOutcome> {
+        self.payment_outcomes
+            .iter()
+            .filter(|outcome| {
+                outcome.quarantined || (outcome.committed && !outcome.status_kind.terminal())
+            })
+            .collect()
+    }
+
+    /// Whether anything under this authorization is unaccounted for.
+    pub fn has_quarantined_outcome(&self, authorization_id: &str) -> bool {
+        self.payment_outcomes
+            .iter()
+            .any(|outcome| outcome.quarantined && outcome.authorization_id == authorization_id)
+    }
+
+    /// Record what the provider actually did, as reported by somebody who
+    /// went and asked.
+    ///
+    /// The outcome is addressed by the evidence id of the verdict that
+    /// allowed it, so an operator reconciles against the signed record
+    /// rather than against an identifier Moat invented. Reconciling always
+    /// clears the quarantine: the reason for the quarantine was that nobody
+    /// knew, and now somebody does.
+    pub fn reconcile_payment_outcome(
+        &mut self,
+        evidence_id: &str,
+        to: OutcomeStatus,
+        receipt: Option<String>,
+        now_unix_ms: u64,
+    ) -> Result<PaymentOutcome, ReconcileError> {
+        let index = self
+            .payment_outcomes
+            .iter()
+            .position(|outcome| outcome.evidence_id == evidence_id)
+            .ok_or(ReconcileError::NotFound)?;
+        let from = self.payment_outcomes[index].status_kind;
+        if !may_reconcile(from, to) {
+            return Err(ReconcileError::NotAllowed { from, to });
+        }
+        let (authorization_id, updated) = {
+            let outcome = &mut self.payment_outcomes[index];
+            let disposition = to.disposition(outcome.rail);
+            outcome.status_kind = to;
+            outcome.status = to.as_str().to_owned();
+            outcome.succeeded = to == OutcomeStatus::Succeeded;
+            outcome.committed = disposition.committed;
+            // Somebody checked. Whatever they found, it is accounted for.
+            outcome.quarantined = false;
+            outcome.reconciled_unix_ms = Some(now_unix_ms);
+            if receipt.is_some() {
+                outcome.receipt = receipt.clone();
+            }
+            (outcome.authorization_id.clone(), outcome.clone())
+        };
+        self.log_at(
+            Event::PaymentOutcomeReconciled {
+                authorization_id,
+                evidence_id: evidence_id.to_owned(),
+                from,
+                to,
+                receipt,
+            },
+            now_unix_ms,
+        );
+        Ok(updated)
     }
 
     /// Atomically replace an in-flight reservation with its provider outcome.

@@ -10,9 +10,10 @@
 //! is reversible and its destination is a merchant the network already knows.
 //! A bank transfer and an on-chain transfer are irreversible, and the
 //! destination — an IBAN, an address — *is* the payment. Later phases hang
-//! those differences off this enum: whether a destination is mandatory,
-//! whether an ambiguous provider result may be retried, which replay key
-//! identifies a duplicate. This phase only records it.
+//! those differences off this enum. [`Rail::reversible`] is the one that
+//! decides how an ambiguous provider result is treated: see
+//! [`crate::outcome`], where a transfer nobody can recall is counted as
+//! having happened and a card authorization is not.
 //!
 //! The set is closed on purpose. An unrecognised rail in a config is a load
 //! error, never a silent fall back to card semantics.

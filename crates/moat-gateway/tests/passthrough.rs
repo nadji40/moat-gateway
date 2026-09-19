@@ -77,9 +77,16 @@ upstreams:
     };
     let list: ListToolsResult = serde_json::from_value(r.result).unwrap();
     let names: Vec<&str> = list.tools.iter().map(|t| t.name.as_str()).collect();
-    assert_eq!(names, ["fake__echo", "fake__pay"]);
+    assert_eq!(names, ["fake__echo", "fake__transfer", "fake__pay"]);
+    // By name rather than by position: the fixture gains tools over time
+    // and what is being asserted is that this one's schema is untouched.
+    let pay = list
+        .tools
+        .iter()
+        .find(|tool| tool.name == "fake__pay")
+        .expect("the pay tool is advertised");
     assert_eq!(
-        list.tools[1].input_schema["required"],
+        pay.input_schema["required"],
         json!(["payee", "amount"]),
         "tool schemas must pass through untouched"
     );

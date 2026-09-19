@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use moat_core::money::Minor;
+use moat_core::outcome::OutcomeStatus;
 use moat_core::rail::Rail;
 use moat_mcp::jsonrpc::code;
 use moat_mcp::stdio::{Frame, FrameReader, FrameWriter};
@@ -37,6 +38,10 @@ struct AuthorizedPayment {
     invoice_fingerprint: Option<String>,
     amount_minor: Minor,
     reservation_fingerprint: Option<String>,
+    /// How the money is leaving. Decided by the deployment at authorize
+    /// time and carried here, because it is what says whether an ambiguous
+    /// reply from the provider may be retried.
+    rail: Rail,
 }
 
 /// How long an HTTP caller waits for the reply to one request before the
@@ -740,7 +745,15 @@ impl Gateway {
             .pointer("/structuredContent/receipt")
             .and_then(Value::as_str)
             .map(str::to_owned);
-        let succeeded = !is_error && status == "succeeded";
+        // An error reply tells Moat nothing about the money, whatever
+        // status string came with it.
+        let kind = if is_error {
+            OutcomeStatus::Unknown
+        } else {
+            OutcomeStatus::from_provider(status)
+        };
+        let succeeded = kind == OutcomeStatus::Succeeded;
+        let disposition = kind.disposition(authorized.rail);
         let session = self.shared.store.get_or_create(&self.session_id);
         let outcome = moat_core::session::PaymentOutcome {
             authorization_id: authorization_id.clone(),
@@ -752,7 +765,12 @@ impl Gateway {
             receipt,
             status: status.to_owned(),
             succeeded,
+            status_kind: kind,
+            committed: disposition.committed,
+            quarantined: disposition.quarantined,
+            rail: authorized.rail,
             unix_ms: now_unix_ms(),
+            reconciled_unix_ms: None,
         };
         {
             let mut session = moat_core::session::lock(&session);
@@ -770,6 +788,10 @@ impl Gateway {
             provider,
             status,
             succeeded,
+            kind = %kind,
+            committed = disposition.committed,
+            quarantined = disposition.quarantined,
+            rail = authorized.rail.as_str(),
             "payment provider outcome recorded"
         );
         if let Err(error) = self
@@ -781,6 +803,15 @@ impl Gateway {
         }
     }
 
+    /// Record the absence of an answer.
+    ///
+    /// A transport error or a malformed reply means Moat asked a provider
+    /// to move money and does not know whether it did. On a card that is
+    /// safe to treat as "it did not": the authorization either never took
+    /// or can be reversed, and the agent may try again. On a rail where
+    /// nothing comes back it is not safe, so the payment is counted and
+    /// quarantined, and no further payment goes out under that
+    /// authorization until somebody reconciles it.
     async fn record_provider_failure(
         &self,
         authorized: &AuthorizedPayment,
@@ -793,6 +824,7 @@ impl Gateway {
         let Some(invoice_id) = &authorized.invoice_id else {
             return;
         };
+        let disposition = OutcomeStatus::Unknown.disposition(authorized.rail);
         let session = self.shared.store.get_or_create(&self.session_id);
         let outcome = moat_core::session::PaymentOutcome {
             authorization_id: authorization_id.clone(),
@@ -804,7 +836,12 @@ impl Gateway {
             receipt: None,
             status: status.to_owned(),
             succeeded: false,
+            status_kind: OutcomeStatus::Unknown,
+            committed: disposition.committed,
+            quarantined: disposition.quarantined,
+            rail: authorized.rail,
             unix_ms: now_unix_ms(),
+            reconciled_unix_ms: None,
         };
         {
             let mut session = moat_core::session::lock(&session);
@@ -814,15 +851,30 @@ impl Gateway {
                 session.record_payment_outcome(outcome);
             }
         }
-        tracing::warn!(
-            session = %self.session_id,
-            %authorization_id,
-            %invoice_id,
-            evidence_id = %authorized.evidence_id,
-            provider,
-            status,
-            "payment provider failure recorded; authorization remains retryable"
-        );
+        if disposition.quarantined {
+            tracing::warn!(
+                session = %self.session_id,
+                %authorization_id,
+                %invoice_id,
+                evidence_id = %authorized.evidence_id,
+                provider,
+                status,
+                rail = authorized.rail.as_str(),
+                "payment outcome is unknown on an irreversible rail; held and \
+                 quarantined, and this authorization is blocked until it is reconciled"
+            );
+        } else {
+            tracing::warn!(
+                session = %self.session_id,
+                %authorization_id,
+                %invoice_id,
+                evidence_id = %authorized.evidence_id,
+                provider,
+                status,
+                rail = authorized.rail.as_str(),
+                "payment provider failure recorded; authorization remains retryable"
+            );
+        }
         if let Err(error) = self
             .shared
             .persist_session(&self.tenant_id, &self.session_id)
@@ -1019,6 +1071,7 @@ impl Gateway {
                     .map(|value| value.trim().to_ascii_lowercase()),
                 amount_minor: proposed_minor.unwrap_or(Minor::ZERO),
                 reservation_fingerprint,
+                rail,
             }),
             Decision::StepUp => {
                 let values: Vec<(String, Value)> = eval
@@ -1115,7 +1168,9 @@ fn gateway_info() -> Implementation {
     Implementation::new("moat-gateway", env!("CARGO_PKG_VERSION"))
 }
 
-fn now_unix_ms() -> u64 {
+/// Milliseconds since the Unix epoch. Shared with the intent API so the
+/// two never disagree about what "now" is within a session.
+pub(crate) fn now_unix_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))

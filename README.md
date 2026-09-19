@@ -127,10 +127,12 @@ Early. Follow the work order below for what is actually built.
 - [x] 16. `arena`: the bank-transfer rail. A mock bank with IBANs and
       confirmation of payee, one scenario corpus rendered per rail, and the
       four-arm table on a second rail.
+- [x] 17. The provider outcome state machine (ADR 0009). A payment Moat
+      cannot account for is held and quarantined rather than released for
+      retry, and cleared by reconciliation.
 
 The first prototype phase and the durable authenticated pilot foundation are
-built. The next piece is the outcome state machine: on a rail where money does
-not come back, a sent-but-unconfirmed transfer has to count as committed.
+built.
 
 ## Quickstart
 
@@ -516,11 +518,43 @@ renames the arguments to the ones the rail's tool takes and supplies the
 account a transfer has to name. The card fixtures are the literals the card
 scenarios always used, so a card row is the same row it was.
 
+#### When the provider does not answer
+
+A transfer is not finished when the request returns, and if the reply is
+lost Moat does not know whether the money left. On a card that is safe to
+read as "it did not": the authorization either never took or can be
+reversed, so the reservation is released and a retry is safe. On a bank
+transfer it is not safe, so the payment is **held** — counted against the
+mandate, and quarantined because nothing is known about it.
+
+While a quarantined payment exists, every further payment under the same
+authorization is denied, naming `authorization-quarantine`. The hold is
+cleared by somebody checking with the provider and saying what they found:
+
+```bash
+curl -s "$MOAT/v1/session/$SESSION/outcomes"
+```
+
+```bash
+curl -s -XPOST "$MOAT/v1/session/$SESSION/outcomes/$EVIDENCE_ID/reconcile" -d '{"status":"failed"}'
+```
+
+Whatever the answer, the quarantine clears; what the mandate then allows
+depends on it. Reconciled as failed, the money never moved and the mandate
+is intact. Reconciled as settled, it is spent and the next attempt is
+refused as a duplicate. An outcome is addressed by the evidence id of the
+verdict that allowed it, so the reconciliation is tied to the signed
+record. See [ADR 0009](docs/adr/0009-provider-outcome-state-machine.md).
+
+The cost is real and worth stating: after a provider outage Moat will
+refuse legitimate payments until an operator clears the queue. On a rail
+where nothing comes back, that is the better failure.
+
 `crypto` exists in the model, in the config vocabulary and in the evidence
 format, and has no implementation yet. The asset model that holds 6- and
-18-decimal tokens and the canonical destination comparison it needs are
-already in the core; what it still wants is a chain mock, a network check and
-the outcome state machine above.
+18-decimal tokens, the canonical destination comparison and the hold
+semantics it needs are all in the core; what it still wants is a chain mock
+and a network check.
 
 ### Stripe sandbox demonstration
 

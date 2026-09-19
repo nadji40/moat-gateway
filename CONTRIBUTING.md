@@ -110,6 +110,24 @@ The card numbers are the regression: `--rails card` across all four arms must
 reproduce the published run cell for cell. Compare against the committed
 baseline in `arena/analysis/data/` before opening a pull request.
 
+## Outcomes
+
+Two questions about a payment are not the same question, and the code keeps
+them apart deliberately. *What did the provider say* is an observation and
+lives in `OutcomeStatus`. *Does this count against the mandate* is a
+decision, depends on whether the rail can reverse, and is made in exactly
+one place: `OutcomeStatus::disposition`. If you find yourself deciding it
+anywhere else, move the logic there instead.
+
+Anything a provider says that Moat does not recognise is `Unknown`, never
+`Failed`. Adding a synonym to the mapping table is fine. Making the
+fallback anything other than `Unknown` is how a lost reply becomes a second
+payment.
+
+A change that touches this must show both rails: the same provider failure,
+held on a transfer and retryable on a card. That pair is in
+`crates/moat-gateway/tests/hold.rs` and a new behaviour belongs beside it.
+
 ## Policy changes
 
 A change to `policies/default.yaml` changes the published numbers. It ships

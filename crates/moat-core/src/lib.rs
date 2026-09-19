@@ -27,6 +27,7 @@ pub mod hash;
 pub mod keys;
 pub mod money;
 pub mod normalize;
+pub mod outcome;
 pub mod policy;
 pub mod provenance;
 pub mod rail;

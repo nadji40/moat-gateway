@@ -139,7 +139,10 @@ intent_api: {{ addr: "127.0.0.1:{api_port}" }}
         .iter()
         .map(|t| t["name"].as_str().unwrap())
         .collect();
-    assert_eq!(names, ["stripe__echo", "stripe__pay"]);
+    // Every tool the upstream advertises, namespaced, in the upstream's own
+    // order. The fixture gained `transfer` when the outcome state machine
+    // needed a provider that could answer something other than "succeeded".
+    assert_eq!(names, ["stripe__echo", "stripe__transfer", "stripe__pay"]);
 
     // The Moat session id is the Mcp-Session-Id: register an intent with it.
     let api = format!("127.0.0.1:{api_port}");

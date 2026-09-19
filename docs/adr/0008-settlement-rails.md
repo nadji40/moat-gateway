@@ -88,15 +88,18 @@ a beneficiary name and an IBAN, and the policy is its own document. Nothing in
 the card path moved, which the cell-by-cell comparison against the published
 run is there to keep true.
 
-Two things this addendum does not claim. The bank rail is still evaluated with
-card settlement semantics: an ambiguous provider result releases the
-reservation, and a transfer the bank has accepted but not settled is treated
-as finished. The mock records acceptance and settlement separately so the core
-can start reading the difference, but the core does not read it yet. That is
-the third follow-on, and until it lands the bank rail measures authorization,
-not settlement.
+All three follow-ons below are now done. The third, the outcome state
+machine, is ADR 0009: `Rail::reversible` finally decides something, and an
+ambiguous provider result on a bank transfer is held and quarantined rather
+than released for retry.
 
-The immediate follow-ons, each needing its own ADR: an asset and amount model
+What this still does not claim. The arena's bank numbers measure
+authorization, not settlement: nothing in the corpus loses a response on
+purpose, so the hold is exercised by the gateway's integration tests rather
+than by a scenario. And the replay key is still the invoice id on every
+rail, where a transfer rail's own reference field would be the natural one.
+
+The follow-ons, each needing its own ADR: an asset and amount model
 that can represent six- and eighteen-decimal tokens rather than two-exponent
 fiat minor units; a typed destination with canonical comparison and
 exact-only provenance matching, because substring matching an address is how
