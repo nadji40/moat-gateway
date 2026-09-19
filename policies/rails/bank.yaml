@@ -1,0 +1,73 @@
+version: 1
+
+# The full Moat policy for the bank-transfer rail.
+#
+# Same mechanism as policies/default.yaml, three differences that come from
+# the rail rather than from taste:
+#
+#   The tool is `transfer` and its arguments are a beneficiary name and an
+#   IBAN. Field mapping is what makes one core read both, so nothing below
+#   this line knows which provider it is talking to.
+#
+#   The account is a declared `destination` field, so it is compared on its
+#   canonical form and matched exactly. Substring matching an identifier is
+#   how address poisoning succeeds, and an account whose digits normalize
+#   onto a number the user happened to mention would inherit the user's own
+#   authority.
+#
+#   Sending to the wrong account is a deny, not a step up. A card payment to
+#   the wrong merchant can be reversed and the network will hear about it; a
+#   transfer to the wrong account is gone, and the whole of business email
+#   compromise is one changed account number on a real invoice.
+
+payment_tools:
+  - server: "*"
+    tool: "transfer"
+
+fields:
+  payee:       { args: ["beneficiary_name"] }
+  amount:      { args: ["amount"] }
+  currency:    { args: ["currency"] }
+  destination: { kind: destination, args: ["beneficiary_iban"] }
+
+allowlist:
+  payees:
+    - "Acme Cloud Ltd"
+    - "Monitoring Pro Inc"
+  # Accounts approved out of band, the way a beneficiary is added to a
+  # corporate banking profile: by someone who is not the agent.
+  accounts:
+    - "DE63 1133 5142 2523 8085 09"
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User, Allowlist]
+    on_fail: step_up
+    message: "beneficiary name did not come from the user or the allowlist"
+
+  - id: destination-provenance
+    when: field == destination
+    require_source: [User, Allowlist]
+    on_fail: deny
+    message: "beneficiary account did not come from the user or the allowlist"
+
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds cap"
+
+  - id: amount-provenance
+    when: field == amount
+    # Prices legitimately come from the invoice the agent read, so ToolResult
+    # is allowed here even though it is untrusted for the beneficiary.
+    require_source: [User, Allowlist, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 5
+  max_calls_per_minute: 3
+  on_exceed: deny
+
+no_human_available: deny

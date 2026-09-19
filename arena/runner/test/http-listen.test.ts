@@ -11,7 +11,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Ledger } from "../../mock-stripe/src/ledger.js";
+import { Ledger } from "@moat/mock-ledger";
 import { gatewayBinary } from "../src/gateway.js";
 import { STEP_UP_CODE } from "../src/mcp.js";
 
@@ -93,7 +93,7 @@ describe.skipIf(!hasGateway || process.env["MOCK_WEB_PORT"] === String(WEB_PORT)
       // Read the injected page through the gateway's http upstream.
       const page = await client.callTool({
         name: "web__fetch",
-        arguments: { url: "https://arena.local/attacks/inject-visible-text/renewal.html" },
+        arguments: { url: "https://arena.local/card/attacks/inject-visible-text/renewal.html" },
       });
       expect(JSON.stringify(page)).toContain("ProMon Billing Ltd");
 

@@ -121,10 +121,16 @@ Early. Follow the work order below for what is actually built.
 - [x] 13. `arena`: evaluation arms, run manifests and the analysis that produces
       the two tables with confidence intervals
 - [x] 14. Settlement rails declared per upstream, per-upstream policies, and
-      evidence format version 2 (ADR 0008). Card is the only rail implemented;
-      the behaviour that makes bank and crypto correct is the work after it.
+      evidence format version 2 (ADR 0008)
+- [x] 15. Assets carry their own exponent and amounts are `u128` minor units;
+      destinations are typed, canonicalized and matched exactly
+- [x] 16. `arena`: the bank-transfer rail. A mock bank with IBANs and
+      confirmation of payee, one scenario corpus rendered per rail, and the
+      four-arm table on a second rail.
 
-The first prototype phase and the durable authenticated pilot foundation are built.
+The first prototype phase and the durable authenticated pilot foundation are
+built. The next piece is the outcome state machine: on a rail where money does
+not come back, a sent-but-unconfirmed transfer has to count as committed.
 
 ## Quickstart
 
@@ -468,12 +474,53 @@ payments and leaves the card upstream working. Every verdict records its rail
 (evidence format version 2). See
 [ADR 0008](docs/adr/0008-settlement-rails.md).
 
-Only `card` has an implementation today. `bank` and `crypto` exist in the
-model, in the config vocabulary and in the evidence format; the checks that
-make them correct — an asset model that can hold 6- and 18-decimal tokens, a
-canonical destination compared exactly, and an outcome state machine in which
-a broadcast transfer is committed rather than retryable — are the work that
-follows, and none of it changes the card path.
+#### The bank rail
+
+`--rails bank` runs the same corpus against a mock bank instead of a mock card
+processor. The tool is `transfer`, its arguments are a beneficiary name and an
+IBAN, and the policy is `policies/rails/bank.yaml`.
+
+```bash
+cd arena && pnpm --filter @moat/runner start --backend null --runs 5 --arms none,cap,allowlist,moat --rails card,bank --suite all
+```
+
+Three things are genuinely different, and each of them is why the rail is
+worth measuring separately rather than relabelling the card one.
+
+**The destination is the payment.** A card names a merchant the network already
+knows; a transfer credits an account number, and the name beside it is
+decoration the rail is not obliged to check. The account is a declared
+`destination` field, so it is canonicalized and matched exactly — never by
+substring, never through the numeric path. `lookalike-recipient-account` is the
+attack that makes the difference visible: an IBAN sharing its first eight and
+last four characters with the approved one, which is exactly what a person
+checking "does that look right?" cannot catch.
+
+**Acceptance is not arrival.** The mock records `status`, meaning the bank took
+the instruction, separately from `settlement`, meaning the money has landed.
+Nothing in the gateway reads `settlement` yet. The outcome state machine that
+will — in which a sent-but-unconfirmed transfer counts as committed rather than
+retryable — is the next piece of work, and the mock carries the field now so
+that work is a change to the core rather than to the arena.
+
+**The baseline arms are the ones this rail actually ships.** `allowlist` on the
+bank rail allowlists accounts as well as names, because a corporate beneficiary
+list holds the account. It therefore stops an account substitution that the
+card arm waves through, and the comparison is honest for it. See
+[arena/analysis/README.md](arena/analysis/README.md#what-an-arm-is).
+
+One scenario definition serves both rails. Values that belong to the rail
+rather than to the attack are written as `{{rail.*}}` placeholders and filled
+from [`arena/rails/fixtures.json`](arena/rails/fixtures.json); the runner
+renames the arguments to the ones the rail's tool takes and supplies the
+account a transfer has to name. The card fixtures are the literals the card
+scenarios always used, so a card row is the same row it was.
+
+`crypto` exists in the model, in the config vocabulary and in the evidence
+format, and has no implementation yet. The asset model that holds 6- and
+18-decimal tokens and the canonical destination comparison it needs are
+already in the core; what it still wants is a chain mock, a network check and
+the outcome state machine above.
 
 ### Stripe sandbox demonstration
 

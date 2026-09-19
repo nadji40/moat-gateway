@@ -1,0 +1,15 @@
+{
+  "name": "@moat/mock-ledger",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The append-only record every arena mock writes, in one shape the runner can score whatever the rail.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./destination": "./src/destination.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

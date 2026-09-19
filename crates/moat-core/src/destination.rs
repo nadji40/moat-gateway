@@ -330,7 +330,92 @@ pub fn destinations_in_text(text: &str) -> Vec<Destination> {
             });
         }
     }
+    for found in grouped_ibans(text) {
+        push(found);
+    }
     out
+}
+
+/// The longest run of groups an IBAN is ever printed as: a leading group
+/// plus eight of four covers all thirty-four characters.
+const MAX_IBAN_GROUPS: usize = 9;
+
+/// IBANs printed the way people print them, in groups separated by spaces.
+///
+/// An invoice prints `DE89 3704 0044 0532 0130 00`, and so does the person
+/// who asks for it to be paid. Reading only the compact form would mean the
+/// account a user named in their own request resolved to `Unknown`, and the
+/// legitimate payment would then be refused for looking exactly like the
+/// fraud it is meant to be distinguished from.
+///
+/// Every span that passes mod-97 is returned, rather than one span chosen by
+/// a tie-break rule. The check digits are the arbitration: a span that
+/// validates and is not the printed IBAN can only ever matter if it is
+/// canonically equal to the destination being resolved, and that makes it
+/// the same account.
+fn grouped_ibans(text: &str) -> Vec<Destination> {
+    let tokens: Vec<&str> = text
+        .split_whitespace()
+        .map(|raw| raw.trim_matches(|c: char| !c.is_ascii_alphanumeric()))
+        .collect();
+    let mut out = Vec::new();
+    for start in 0..tokens.len() {
+        collect_grouped_iban(&tokens[start..], &mut out);
+    }
+    out
+}
+
+/// The size of every group but the last, which is what the printed
+/// convention uses and what makes this tight enough to run over prose.
+const IBAN_GROUP: usize = 4;
+
+/// Append every IBAN that starts at `tokens[0]` and spans whole groups.
+///
+/// The shape accepted is the printed one: a first group of the country code
+/// and check digits, then groups of four, then a final group of one to four.
+/// Requiring the interior groups to be full is what keeps short prose words
+/// from being spliced into a candidate at all, rather than relying on mod-97
+/// alone to reject them afterwards.
+fn collect_grouped_iban(tokens: &[&str], out: &mut Vec<Destination>) {
+    let Some(&head) = tokens.first() else {
+        return;
+    };
+    let bytes = head.as_bytes();
+    if head.len() != IBAN_GROUP
+        || !bytes[0].is_ascii_alphabetic()
+        || !bytes[1].is_ascii_alphabetic()
+        || !bytes[2].is_ascii_digit()
+        || !bytes[3].is_ascii_digit()
+    {
+        return;
+    }
+    let mut joined = head.to_owned();
+    let mut display = head.to_owned();
+    for &group in tokens[1..].iter().take(MAX_IBAN_GROUPS - 1) {
+        if group.is_empty()
+            || group.len() > IBAN_GROUP
+            || !group.bytes().all(|b| b.is_ascii_alphanumeric())
+        {
+            return;
+        }
+        joined.push_str(group);
+        if joined.len() > 34 {
+            return;
+        }
+        display.push(' ');
+        display.push_str(group);
+        if let Some(canonical) = canonical_iban(&joined) {
+            out.push(Destination {
+                kind: DestinationKind::Iban,
+                canonical,
+                display: display.clone(),
+            });
+        }
+        // A short group can only have been the last one.
+        if group.len() < IBAN_GROUP {
+            return;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -460,11 +545,46 @@ mod tests {
         let kinds: Vec<_> = found.iter().map(|d| d.kind).collect();
         assert!(kinds.contains(&DestinationKind::EvmAddress), "{found:?}");
         assert!(kinds.contains(&DestinationKind::SolanaAddress), "{found:?}");
-        // The spaced IBAN is several tokens in prose, so it is not detected
-        // there; the compact form is.
+        assert!(kinds.contains(&DestinationKind::Iban), "{found:?}");
         let compact_found = destinations_in_text(&format!("remit to {IBAN} today"));
         assert_eq!(compact_found.len(), 1);
         assert_eq!(compact_found[0].kind, DestinationKind::Iban);
+    }
+
+    /// An invoice prints an IBAN in groups and a person types it the same
+    /// way. Both are the account the compact form names, so a user who
+    /// writes it out has named it and a page that prints it is where it came
+    /// from. Reading only the compact form would refuse the legitimate
+    /// payment for looking like the fraud.
+    #[test]
+    fn an_iban_is_found_however_it_is_grouped_in_text() {
+        let want = Destination::parse(IBAN).key();
+        for text in [
+            format!("Please remit to {IBAN_SPACED} before Friday."),
+            format!("IBAN: {IBAN_SPACED}"),
+            format!("Beneficiary account {IBAN_SPACED}, reference INV-2001."),
+            format!("(remit: {IBAN})"),
+        ] {
+            let found = destinations_in_text(&text);
+            assert!(
+                found.iter().any(|d| d.key() == want),
+                "{text:?} produced {found:?}"
+            );
+        }
+    }
+
+    /// The groups have to be adjacent. Two unrelated accounts printed on one
+    /// line must not be spliced into a third that neither party named.
+    #[test]
+    fn groups_belonging_to_different_accounts_are_not_spliced() {
+        let text = format!("old {IBAN_SPACED} new GB33 BUKB 2020 1555 5555 55");
+        let found = destinations_in_text(&text);
+        let keys: Vec<String> = found.iter().map(Destination::key).collect();
+        assert!(keys.contains(&Destination::parse(IBAN).key()), "{keys:?}");
+        assert!(
+            keys.contains(&Destination::parse("GB33BUKB20201555555555").key()),
+            "{keys:?}"
+        );
     }
 
     /// Scanning must not invent destinations out of ordinary prose, or the
@@ -478,6 +598,10 @@ mod tests {
             "Invoice INV-1001 from Monitoring Pro Inc for 99 USD",
             "",
             "0012345 12345 000",
+            // Words that begin like a country code and check digits, in
+            // runs short enough to look like groups.
+            "IN20 19 we paid 4 of 5 invoices late",
+            "GB12 3456 7890 1234 and the rest of the sentence",
         ] {
             assert!(
                 destinations_in_text(text).is_empty(),

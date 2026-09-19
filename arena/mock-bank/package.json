@@ -1,0 +1,17 @@
+{
+  "name": "@moat/mock-bank",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fake bank-transfer MCP server over stdio. Records instructions to a JSON file, never touches the network.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@moat/mock-ledger": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

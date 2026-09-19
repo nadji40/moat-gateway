@@ -53,8 +53,10 @@ export class IntentApi {
       authorization_id: string;
       invoice_id: string;
       payee: string;
-      amount: number;
-      tolerance: number;
+      // Decimal strings as well as JSON numbers: a rail with more than two
+      // decimal places cannot round-trip through a double.
+      amount: string | number;
+      tolerance: string | number;
       currency: string;
       expires_at: string;
       repeat_payments: boolean;
@@ -62,7 +64,7 @@ export class IntentApi {
       recipient_account_id?: string;
       invoice_fingerprint?: string;
       require_invoice_fingerprint: boolean;
-      aggregate_limit?: number;
+      aggregate_limit?: string | number;
     },
   ): Promise<void> {
     const res = await fetch(

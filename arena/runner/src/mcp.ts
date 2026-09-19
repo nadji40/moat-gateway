@@ -57,6 +57,18 @@ async function connectHttp(url: string): Promise<Client> {
   return client;
 }
 
+/**
+ * The receipt a provider printed in its text output.
+ *
+ * Every arena mock and adapter ends its confirmation with `Receipt <id>.`,
+ * whatever the rail, because not every host passes `structuredContent`
+ * through. The OpenAI Agents SDK hands the model the text and nothing else,
+ * so the text is the only place a receipt is guaranteed to survive.
+ */
+export function receiptInText(text: string): string | undefined {
+  return /\breceipt\s+([A-Za-z0-9_-]+)/i.exec(text)?.[1];
+}
+
 function textOf(result: unknown): string {
   const r = result as { content?: { type: string; text?: string }[] };
   return (r.content ?? [])
@@ -106,7 +118,7 @@ export async function connect(endpoints: Endpoints): Promise<Connected> {
         const result = await stdio.callTool({ name: endpoints.names.pay, arguments: args });
         const ms = performance.now() - t0;
         const sc = (result as { structuredContent?: { receipt?: string } }).structuredContent;
-        const receipt = sc?.receipt ?? textOf(result).match(/fake_\d+/)?.[0] ?? "?";
+        const receipt = sc?.receipt ?? receiptInText(textOf(result)) ?? "?";
         if ((result as { isError?: boolean }).isError) {
           return { kind: "error", message: textOf(result), ms };
         }

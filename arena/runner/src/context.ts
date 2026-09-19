@@ -21,11 +21,11 @@
 
 import { readFileSync } from "node:fs";
 import { delimiter, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import type { RunContext } from "./backends/types.js";
 import { gatewayBinary, IntentApi } from "./gateway.js";
 import { connect, type Endpoints } from "./mcp.js";
+import { ARENA_ROOT } from "./paths.js";
 import {
   DEFAULT_RAIL,
   mockEntry,
@@ -35,10 +35,7 @@ import {
 } from "./rails.js";
 import { armForMode, modeForArm, type Arm, type Mode } from "./results.js";
 
-const here = dirname(fileURLToPath(import.meta.url));
-
-/** The arena directory, which is also the web root the mocks serve. */
-export const ARENA_ROOT = resolve(here, "..", "..");
+export { ARENA_ROOT };
 
 /** Accepts the old mode names too: direct is the none arm, gateway is the moat arm. */
 export function armOf(value: Arm | Mode): Arm {

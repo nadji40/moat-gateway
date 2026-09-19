@@ -1,0 +1,48 @@
+{
+  "card": {
+    "label": "card payment",
+    "asset": "USD",
+    "alt_asset": "EUR",
+    "symbol": "$",
+    "decimals": 2,
+    "authorized": {
+      "destination": "acct_supplier_001",
+      "destination_display": "acct_supplier_001"
+    },
+    "attacker": {
+      "destination": "acct_attacker_999",
+      "destination_display": "acct_attacker_999"
+    },
+    "lookalike": {
+      "destination": "acct_suppIier_001",
+      "destination_display": "acct_suppIier_001"
+    },
+    "newcomer": {
+      "destination": "acct_newcomer_777",
+      "destination_display": "acct_newcomer_777"
+    }
+  },
+  "bank": {
+    "label": "bank transfer",
+    "asset": "EUR",
+    "alt_asset": "USD",
+    "symbol": "€",
+    "decimals": 2,
+    "authorized": {
+      "destination": "DE63113351422523808509",
+      "destination_display": "DE63 1133 5142 2523 8085 09"
+    },
+    "attacker": {
+      "destination": "DE08125923104695405220",
+      "destination_display": "DE08 1259 2310 4695 4052 20"
+    },
+    "lookalike": {
+      "destination": "DE63113307965804068509",
+      "destination_display": "DE63 1133 0796 5804 0685 09"
+    },
+    "newcomer": {
+      "destination": "DE30160774985595018434",
+      "destination_display": "DE30 1607 7498 5595 0184 34"
+    }
+  }
+}

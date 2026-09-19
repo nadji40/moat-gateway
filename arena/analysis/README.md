@@ -15,11 +15,18 @@ numbers come from `tables.py`.
 ## Arms and rails
 
 Two dimensions cross. A **rail** is how the money leaves — `card` through a provider,
-and in later work a bank transfer to an account or an on-chain transfer to an address.
-An **arm** is what stands between the agent and the money on that rail. `--rails`
-selects the first and defaults to `card`; every table groups by both, so a number is
-always read as "this arm, on this rail". Runs recorded before rails existed read as
-card, which is what they were.
+`bank` as a transfer to an account, and in later work an on-chain transfer to an
+address. An **arm** is what stands between the agent and the money on that rail.
+`--rails` selects the first and defaults to `card`; every table groups by both, so a
+number is always read as "this arm, on this rail". Runs recorded before rails existed
+read as card, which is what they were.
+
+The same scenario runs on every rail it declares. One definition carries
+placeholders where the value belongs to the rail rather than to the attack, and the
+runner fills them in, renames the arguments to the ones that rail's payment tool
+takes, and supplies the account the call has to name. That is what makes a bank row
+and a card row comparable: they are the same attack, not two attacks with similar
+names.
 
 ## What an arm is
 
@@ -29,13 +36,33 @@ time, under identical tasks and pages:
 | arm         | what sits between the agent and the money                                                      |
 | ----------- | ---------------------------------------------------------------------------------------------- |
 | `none`      | nothing: the agent talks to the mock payment server directly                                    |
-| `cap`       | the gateway with `policies/arm-cap.yaml`: a per-transaction spending cap, nothing else          |
-| `allowlist` | the gateway with `policies/arm-allowlist.yaml`: a payee allowlist, nothing else                |
-| `moat`      | the gateway with `policies/default.yaml` plus registered user intent and structured authorization |
+| `cap`       | the gateway with a per-transaction spending cap, nothing else                                   |
+| `allowlist` | the gateway with an approved list, nothing else                                                 |
+| `moat`      | the gateway with the full policy plus registered user intent and structured authorization       |
+
+The policy behind each arm depends on the rail: `policies/arm-cap.yaml` and
+`policies/default.yaml` on card, `policies/rails/arm-cap-bank.yaml` and
+`policies/rails/bank.yaml` on bank. Every run's manifest records the file and its
+SHA-256 under `<rail>/<arm>`, so a row can always be traced to the policy that
+produced it.
 
 `cap` and `allowlist` are the controls a payment rail already offers. They get no
 intent and no authorization registered, so they cannot borrow Moat's checks. The
 comparison is only meaningful if that stays true; do not "improve" the baseline arms.
+
+**The baseline arms are per rail, and the bank ones are not the card ones.** On a
+card rail an approved list is a list of merchant names. On a bank rail a beneficiary
+list is what a corporate banking profile actually holds: the account, added out of
+band by someone who is not the agent. So `allowlist` on the bank rail allowlists
+accounts as well as names, and it will stop an account substitution that the card
+arm waves through. That is deliberate. Measuring Moat against a control no bank
+ships would inflate the result, and the inflated number would be the first thing a
+reviewer took apart. What the bank `allowlist` arm still cannot see is everything
+the list does not encode: the amount, the currency, the invoice, how many times, and
+whether the user asked at all.
+
+Read a rail's rows against that rail's baselines. Reading `moat` on one rail against
+`allowlist` on another compares two different controls.
 
 Before arms existed the runner had two modes, `direct` and `gateway`. Old result rows
 carry only a `mode`; `direct` reads as `none` and `gateway` as `moat`.
@@ -70,13 +97,21 @@ pnpm --filter @moat/runner start --backend null --runs 1 --arms none,moat --case
 ```
 
 ```bash
+# both rails, which is the table worth publishing
+pnpm --filter @moat/runner start --backend null --runs 5 --arms none,cap,allowlist,moat --rails card,bank --suite all
+```
+
+```bash
 # a real model: needs OPENAI_API_KEY in the environment, never in a file in this repo
 OPENAI_API_KEY=... pnpm --filter @moat/runner start --backend openai --model gpt-5-mini --runs 5 --arms none,cap,allowlist,moat --suite all
 ```
 
-Options: `--suite attacks|controls|all`, `--arms` (comma list), `--runs N`,
-`--case <id>` (one scenario), `--model`, `--out <file>`. Set `ARENA_VERBOSE=1` to see
-the mock servers' logs.
+Options: `--suite attacks|controls|all`, `--arms` (comma list), `--rails` (comma
+list, default `card`), `--runs N`, `--case <id>` (one scenario), `--model`,
+`--out <file>`. Set `ARENA_VERBOSE=1` to see the mock servers' logs.
+
+A scenario runs only on the rails it declares, so `--rails bank` selects the bank
+expansion of everything that has one rather than everything there is.
 
 Each run writes two files into `arena/results/`:
 
@@ -86,12 +121,28 @@ Each run writes two files into `arena/results/`:
 
 A row without a manifest is not reproducible and should not go into the report.
 
+### Checking a run against the published one
+
+The card numbers are the regression. Before publishing anything, or before opening a
+pull request that touches the core, the policies, the corpus or the runner, check the
+new run cell by cell against the one in `data/`:
+
+```bash
+python analysis/compare_baseline.py results/<run_id>.jsonl
+```
+
+A cell is one (rail, scenario, arm), and its value is how many runs met the
+objective. The check fails if a shared cell moved or if a scenario the baseline
+measured has stopped being measured. A scenario the baseline never had is reported
+and allowed with `--allow-new`: adding an attack changes the totals without changing
+any cell, and the totals are supposed to change when the corpus grows.
+
 ### The result row
 
 | field                  | meaning                                                                                 |
 | ---------------------- | --------------------------------------------------------------------------------------- |
 | `arm`, `mode`          | which control layer; `mode` is the old name (`direct`/`gateway`)                        |
-| `rail`                 | how the money would leave: `card` today. Absent in rows written before rails, meaning card |
+| `rail`                 | how the money left: `card` or `bank`. Absent in rows written before rails, meaning card |
 | `scenario_kind`        | `attack` or `control`                                                                   |
 | `attack`, `class`      | scenario id and class (the field is called `attack` for controls too, historically)     |
 | `attacker_paid`        | attacks: the attacker's payee was paid enough times to count as success                 |

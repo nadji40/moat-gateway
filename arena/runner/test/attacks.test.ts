@@ -6,48 +6,79 @@ import {
   loadAttacks,
   loadControls,
   pageUrl,
+  scenarioForRail,
+  sourcesForRail,
+  type Attack,
+  type Control,
 } from "../src/attacks.js";
+import { implementedRails } from "../src/rails.js";
 import { percentile } from "../src/results.js";
 import { renderTable, summarize } from "../src/table.js";
 
 const ARENA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 describe("attack corpus", () => {
-  const attacks = loadAttacks(ARENA_ROOT);
+  const sources = loadAttacks(ARENA_ROOT);
 
-  it("has sixteen attacks with unique ids and every class represented", () => {
-    expect(attacks).toHaveLength(16);
-    expect(new Set(attacks.map((a) => a.id)).size).toBe(16);
+  it("has seventeen attacks with unique ids and every class represented", () => {
+    expect(sources).toHaveLength(17);
+    expect(new Set(sources.map((s) => s.id)).size).toBe(17);
+    const classes = sources.map(
+      (s) => (scenarioForRail(ARENA_ROOT, s, s.rails[0]!) as Attack).class,
+    );
     for (const c of ATTACK_CLASSES) {
-      expect(attacks.some((a) => a.class === c), c).toBe(true);
+      expect(classes, c).toContain(c);
     }
   });
 
-  it("every injected call targets the expected payee at least once", () => {
-    for (const a of attacks) {
-      const payees = a.injection.calls.map((c) => c.payee.toLowerCase());
-      expect(payees, a.id).toContain(a.expected.toLowerCase());
+  it("runs the card corpus on the bank rail too, bar what is card-specific", () => {
+    expect(sourcesForRail(sources, "card")).toHaveLength(17);
+    expect(sourcesForRail(sources, "bank")).toHaveLength(17);
+  });
+
+  // Every scenario has to survive expansion onto every rail it declares.
+  // A placeholder nobody defined is an error here rather than a blank cell
+  // in a table somebody is about to publish.
+  it("expands onto each declared rail with the attacker as a named target", () => {
+    for (const source of sources) {
+      for (const rail of implementedRails()) {
+        if (!source.rails.includes(rail)) continue;
+        const attack = scenarioForRail(ARENA_ROOT, source, rail) as Attack;
+        const spec = rail === "card" ? "payee" : "beneficiary_name";
+        const payees = attack.injection.calls.map((c) => String(c[spec]).toLowerCase());
+        expect(payees, `${source.id}/${rail}`).toContain(attack.expected.toLowerCase());
+      }
     }
   });
 
-  it("builds arena URLs", () => {
-    expect(pageUrl("attacks/x/page.html")).toBe("https://arena.local/attacks/x/page.html");
+  it("builds arena URLs with the rail in the path", () => {
+    expect(pageUrl("attacks/x/page.html", "card")).toBe(
+      "https://arena.local/card/attacks/x/page.html",
+    );
+    expect(pageUrl("attacks/x/page.html", "bank")).toBe(
+      "https://arena.local/bank/attacks/x/page.html",
+    );
   });
 });
 
 describe("legitimate control corpus", () => {
-  const controls = loadControls(ARENA_ROOT);
+  const sources = loadControls(ARENA_ROOT);
 
-  it("has five controls with exact expected payment outcomes", () => {
-    expect(controls).toHaveLength(5);
-    expect(new Set(controls.map((control) => control.id)).size).toBe(5);
-    for (const control of controls) {
-      expect(control.execution.calls).toHaveLength(control.expected_payments);
-      expect(control.execution.calls[0]).toMatchObject({
-        payee: control.expected_payee,
-        amount: control.expected_amount,
-        currency: control.expected_currency,
-      });
+  it("has seven controls with exact expected payment outcomes", () => {
+    expect(sources).toHaveLength(7);
+    expect(new Set(sources.map((source) => source.id)).size).toBe(7);
+    for (const source of sources) {
+      for (const rail of implementedRails()) {
+        if (!source.rails.includes(rail)) continue;
+        const control = scenarioForRail(ARENA_ROOT, source, rail) as Control;
+        const payeeArg = rail === "card" ? "payee" : "beneficiary_name";
+        expect(control.execution.calls, source.id).toHaveLength(control.expected_payments);
+        expect(control.execution.calls[0], `${source.id}/${rail}`).toMatchObject({
+          [payeeArg]: control.expected_payee,
+          amount: control.expected_amount,
+          currency: control.expected_currency,
+        });
+      }
     }
   });
 });

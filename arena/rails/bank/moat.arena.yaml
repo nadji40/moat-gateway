@@ -1,0 +1,16 @@
+# Gateway config for the bank rail, "moat" arm: the full policy, user intent
+# and structured authorization. Paths are relative to this file; the upstream
+# command is spawned with the arena root as its working directory.
+listen: { transport: stdio }
+upstreams:
+  - name: bank
+    rail: bank
+    transport: stdio
+    command: ["node", "--import", "tsx", "mock-bank/src/server.ts"]
+  - name: web
+    transport: http
+    url: "http://127.0.0.1:7100/mcp"
+policy: ../../../policies/rails/bank.yaml
+evidence: ../../results/evidence-bank.jsonl
+keys: ../../keys
+intent_api: { addr: "127.0.0.1:7072" }

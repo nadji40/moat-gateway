@@ -1,0 +1,25 @@
+version: 1
+
+# Evaluation arm "cap" on the bank rail: a per-transaction limit and nothing
+# else. This is what a payment-initiation limit or a wallet budget gives you:
+# no idea who the beneficiary is, which account is being credited, or what
+# the user asked for. Compare against rails/bank.yaml.
+# The runner registers no intent and no authorization for this arm.
+
+payment_tools:
+  - server: "*"
+    tool: "transfer"
+
+fields:
+  payee:    { args: ["beneficiary_name"] }
+  amount:   { args: ["amount"] }
+  currency: { args: ["currency"] }
+
+rules:
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds cap"
+
+no_human_available: deny

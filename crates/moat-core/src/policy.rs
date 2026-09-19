@@ -561,9 +561,16 @@ fn structured_authorization_checks(
         },
     ));
 
-    let recipient_account_id = call
-        .args
-        .get("recipient_account_id")
+    // Where the money goes is whichever argument the policy declared as the
+    // destination field, because that is the argument the rail's provider
+    // actually credits: `recipient_account_id` on a card, `beneficiary_iban`
+    // on a bank transfer, `to_address` on chain. A policy that declares no
+    // destination field keeps reading the literal argument, which is what
+    // every card policy has always meant.
+    let recipient_account_id = mapped
+        .get("destination")
+        .map(|(_, value)| *value)
+        .or_else(|| call.args.get("recipient_account_id"))
         .and_then(Value::as_str)
         .map(str::trim)
         .unwrap_or("");
@@ -1501,6 +1508,92 @@ rules:
             .verdict
             .failures()
             .any(|r| r.id == "authorization-recipient-account"));
+    }
+
+    /// A bank transfer does not call its destination `recipient_account_id`,
+    /// and the check has to follow the policy's field mapping rather than a
+    /// literal argument name. Reading the literal one here would compare an
+    /// empty string against the bound account and refuse every legitimate
+    /// transfer on the rail; worse, a policy that mapped the destination
+    /// somewhere the check could not see would bind nothing at all.
+    #[test]
+    fn the_bound_account_is_read_from_whichever_argument_the_policy_declares() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent("Pay invoice INV-BANK for the monitoring renewal");
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-bank".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("DE89370400440532013000".into()),
+                amount_minor: Minor(10_000),
+                tolerance_minor: Minor(0),
+                currency: "EUR".into(),
+                invoice_id: "INV-BANK".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        // `iban` is one of the destination field's declared arguments and is
+        // not the name the card path reads.
+        let proposal = |account: &str| {
+            call(json!({
+                "authorization_id": "auth-bank", "invoice_id": "INV-BANK",
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "EUR",
+                "iban": account
+            }))
+        };
+        let agreed = evaluate(
+            &p,
+            &session,
+            proposal("DE89 3704 0044 0532 0130 00"),
+            10_000,
+        );
+        assert!(
+            agreed
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-recipient-account" && r.passed),
+            "the declared destination argument is the bound account: {:?}",
+            agreed.verdict.failures().collect::<Vec<_>>()
+        );
+        let diverted = evaluate(&p, &session, proposal("DE89370400440532013001"), 10_000);
+        assert!(diverted
+            .verdict
+            .failures()
+            .any(|r| r.id == "authorization-recipient-account"));
+    }
+
+    /// The account a user writes out in their own request is theirs, spaces
+    /// and all. Without this the legitimate transfer resolves to `Unknown`
+    /// and is refused for looking exactly like the fraud.
+    #[test]
+    fn an_account_the_user_wrote_in_groups_is_the_users_own() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent("Pay 100 EUR to Monitoring Pro Inc at DE89 3704 0044 0532 0130 00");
+        let evaluation = evaluate(
+            &p,
+            &session,
+            call(json!({
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "EUR",
+                "iban": "DE89370400440532013000"
+            })),
+            0,
+        );
+        assert_eq!(
+            evaluation.provenance["destination"]
+                .resolution
+                .source
+                .kind(),
+            SourceKind::User
+        );
     }
 
     /// A six-decimal token is priced by its own exponent, not by the

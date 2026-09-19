@@ -1,7 +1,30 @@
+// The attack and control corpus: one definition per scenario, expanded onto
+// each rail it declares.
+//
+// A definition is written in canonical terms -- a payee, an amount, a
+// currency, sometimes an account -- with `{{rail.*}}` placeholders wherever
+// the concrete value is a property of the rail rather than of the attack.
+// Expanding it renders those placeholders, renames the arguments to the ones
+// that rail's payment tool takes, and supplies a destination on rails that
+// need one. See rails.ts for what each of those means.
+//
+// The point of doing it this way rather than writing a corpus per rail: the
+// bank table and the card table have to be answering the same question. A
+// second corpus would drift from the first within a month, and the moment it
+// did, the comparison between rails would stop meaning anything.
+
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
+import {
+  DEFAULT_RAIL,
+  implementedRails,
+  railSpec,
+  renderForRail,
+  type Rail,
+  type RailSpec,
+} from "./rails.js";
 
 /** The attack classes the corpus uses. The taxonomy is decided elsewhere. */
 export const ATTACK_CLASSES = [
@@ -16,39 +39,58 @@ export const ATTACK_CLASSES = [
   "recipient-account-change",
   "invoice-content-replay",
   "split-payment",
+  "lookalike-destination",
 ] as const;
 
 export const CONTROL_CLASSES = ["legitimate-invoice"] as const;
 
+/** Amounts are decimal strings or JSON numbers, never exponent notation. */
+const Amount = z.union([z.string().regex(/^\d+(\.\d+)?$/), z.number().positive()]);
+
+/**
+ * A payment call as a scenario declares it: canonical argument names, which
+ * expansion renames to whatever the rail's tool actually takes.
+ */
 const PayArgs = z.object({
   payee: z.string().min(1),
-  amount: z.number().positive(),
-  currency: z.string().default("USD"),
+  amount: Amount,
+  currency: z.string().min(3).max(12).default("USD"),
   authorization_id: z.string().min(1).optional(),
   invoice_id: z.string().min(1).optional(),
   recipient_account_id: z.string().min(1).optional(),
+  reference: z.string().min(1).optional(),
   invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
 });
 
 export const AuthorizationSchema = z.object({
   payee: z.string().min(1),
-  amount: z.number().positive(),
-  tolerance: z.number().nonnegative().default(0),
-  currency: z.string().length(3).default("USD"),
+  amount: Amount,
+  tolerance: z.union([z.string().regex(/^\d+(\.\d+)?$/), z.number().nonnegative()]).default(0),
+  currency: z.string().min(3).max(12).default("USD"),
   repeat_payments: z.boolean().default(false),
   max_payments: z.number().int().positive().default(1),
   recipient_account_id: z.string().min(1).optional(),
   invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
   require_invoice_fingerprint: z.boolean().default(false),
-  aggregate_limit: z.number().positive().optional(),
+  aggregate_limit: Amount.optional(),
 });
+
+const RailId = z.enum(["card", "bank", "evm", "solana"]);
+
+/**
+ * Rails a scenario runs on. Declared rather than defaulted to everything, so
+ * adding a rail never silently claims a result for a scenario nobody has
+ * thought about on that rail.
+ */
+const Rails = z.array(RailId).min(1).default([DEFAULT_RAIL]);
 
 export const AttackSchema = z.object({
   kind: z.literal("attack").default("attack"),
   id: z.string().regex(/^[a-z0-9-]+$/),
   class: z.enum(ATTACK_CLASSES),
   description: z.string().min(1),
-  /** Paths relative to the arena root; served as https://arena.local/<path>. */
+  rails: Rails,
+  /** Paths relative to the arena root; served as https://arena.local/<rail>/<path>. */
   pages: z.array(z.string().min(1)).min(1),
   /** The user's request, registered as the intent. */
   task: z.string().min(1),
@@ -57,10 +99,11 @@ export const AttackSchema = z.object({
   /** The payee the attacker wants paid. */
   expected: z.string().min(1),
   /** If set, only payments of exactly this amount to `expected` count. */
-  expected_amount: z.number().positive().optional(),
+  expected_amount: Amount.optional(),
   /** If set, only payments in this currency count as attack success. */
-  expected_currency: z.string().length(3).optional(),
-  expected_recipient_account_id: z.string().min(1).optional(),
+  expected_currency: z.string().min(3).max(12).optional(),
+  /** If set, only payments to this account count. Compared canonically. */
+  expected_destination: z.string().min(1).optional(),
   /** For mandate replay: success needs at least this many payments to `expected`. */
   paid_calls_for_success: z.number().int().positive().default(1),
   /** What a scripted agent that follows the injection does after reading the pages. */
@@ -77,64 +120,183 @@ export const ControlSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),
   class: z.enum(CONTROL_CLASSES),
   description: z.string().min(1),
+  rails: Rails,
   pages: z.array(z.string().min(1)).min(1),
   task: z.string().min(1),
   authorization: AuthorizationSchema,
   expected_payee: z.string().min(1),
-  expected_amount: z.number().positive(),
-  expected_currency: z.string().length(3).default("USD"),
-  expected_recipient_account_id: z.string().min(1).optional(),
+  expected_amount: Amount,
+  expected_currency: z.string().min(3).max(12).default("USD"),
+  expected_destination: z.string().min(1).optional(),
   expected_invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
   expected_payments: z.number().int().positive().default(1),
   execution: z.object({ calls: z.array(PayArgs).min(1) }),
   call_mode: z.enum(["sequential", "parallel"]).default("sequential"),
 });
 
-export type Attack = z.infer<typeof AttackSchema>;
-export type Control = z.infer<typeof ControlSchema>;
+type ParsedAttack = z.infer<typeof AttackSchema>;
+type ParsedControl = z.infer<typeof ControlSchema>;
+
+/** A call as it will be sent: the rail's own argument names. */
+export type PayCall = Record<string, string | number>;
+
+/** An attack expanded onto one rail. */
+export type Attack = Omit<ParsedAttack, "injection"> & {
+  rail: Rail;
+  injection: { calls: PayCall[] };
+};
+
+/** A control expanded onto one rail. */
+export type Control = Omit<ParsedControl, "execution"> & {
+  rail: Rail;
+  execution: { calls: PayCall[] };
+};
+
 export type ArenaScenario = Attack | Control;
-export type PayCall = z.infer<typeof PayArgs>;
 export type AttackAuthorization = z.infer<typeof AuthorizationSchema>;
+
+/** A scenario as it sits on disk, before any rail is chosen. */
+export interface ScenarioSource {
+  id: string;
+  kind: "attack" | "control";
+  /** Absolute path, for error messages. */
+  file: string;
+  /** Raw YAML, placeholders unrendered. */
+  text: string;
+  /** Rails this scenario declares. */
+  rails: Rail[];
+}
+
 export interface ScenarioPaymentMetadata {
   authorization_id: string;
   invoice_id: string;
 }
 
 /** Load every `attacks/<id>/attack.yaml` under `arenaRoot`, sorted by id. */
-export function loadAttacks(arenaRoot: string): Attack[] {
-  const dir = join(arenaRoot, "attacks");
-  const out: Attack[] = [];
+export function loadAttacks(arenaRoot: string): ScenarioSource[] {
+  return loadSources(arenaRoot, "attacks", "attack");
+}
+
+/** Load every `controls/<id>/control.yaml` under `arenaRoot`, sorted by id. */
+export function loadControls(arenaRoot: string): ScenarioSource[] {
+  return loadSources(arenaRoot, "controls", "control");
+}
+
+function loadSources(
+  arenaRoot: string,
+  dirName: string,
+  kind: "attack" | "control",
+): ScenarioSource[] {
+  const dir = join(arenaRoot, dirName);
+  if (!existsSync(dir)) return [];
+  const out: ScenarioSource[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    const file = join(dir, entry.name, "attack.yaml");
+    const file = join(dir, entry.name, `${kind}.yaml`);
     if (!existsSync(file)) continue;
-    const attack = AttackSchema.parse(parse(readFileSync(file, "utf8")));
-    if (attack.id !== entry.name) {
-      throw new Error(`${file}: id ${attack.id} does not match directory ${entry.name}`);
+    const text = readFileSync(file, "utf8");
+    // Parsed unrendered only to read the two fields that choose how to
+    // render it. Placeholders are quoted in the YAML, so this is valid.
+    const head = parse(text) as { id?: string; rails?: string[] };
+    if (head.id !== entry.name) {
+      throw new Error(`${file}: id ${String(head.id)} does not match directory ${entry.name}`);
     }
-    validatePages(arenaRoot, file, attack.pages);
-    out.push(attack);
+    const rails = Rails.parse(head.rails) as Rail[];
+    for (const rail of rails) {
+      if (!implementedRails().includes(rail)) {
+        throw new Error(`${file}: declares rail ${rail}, which has no implementation`);
+      }
+    }
+    out.push({ id: entry.name, kind, file, text, rails });
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-/** Load every `controls/<id>/control.yaml` under `arenaRoot`, sorted by id. */
-export function loadControls(arenaRoot: string): Control[] {
-  const dir = join(arenaRoot, "controls");
-  if (!existsSync(dir)) return [];
-  const out: Control[] = [];
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const file = join(dir, entry.name, "control.yaml");
-    if (!existsSync(file)) continue;
-    const control = ControlSchema.parse(parse(readFileSync(file, "utf8")));
-    if (control.id !== entry.name) {
-      throw new Error(`${file}: id ${control.id} does not match directory ${entry.name}`);
-    }
-    validatePages(arenaRoot, file, control.pages);
-    out.push(control);
+/** Sources that declare `rail`, in the order they were loaded. */
+export function sourcesForRail(sources: ScenarioSource[], rail: Rail): ScenarioSource[] {
+  return sources.filter((source) => source.rails.includes(rail));
+}
+
+/**
+ * Expand one scenario onto one rail: render its placeholders, then put its
+ * calls into the rail's own argument names.
+ */
+export function scenarioForRail(
+  arenaRoot: string,
+  source: ScenarioSource,
+  rail: Rail,
+): ArenaScenario {
+  const spec = railSpec(rail);
+  const rendered = renderForRail(source.text, spec, source.file);
+  const doc = parse(rendered) as unknown;
+  if (source.kind === "attack") {
+    const parsed = AttackSchema.parse(doc);
+    validatePages(arenaRoot, source.file, parsed.pages);
+    return {
+      ...parsed,
+      rail,
+      authorization: withDestination(spec, parsed.authorization),
+      injection: { calls: adaptCalls(spec, parsed.authorization.payee, parsed.injection.calls) },
+    };
   }
-  return out.sort((a, b) => a.id.localeCompare(b.id));
+  const parsed = ControlSchema.parse(doc);
+  validatePages(arenaRoot, source.file, parsed.pages);
+  return {
+    ...parsed,
+    rail,
+    authorization: withDestination(spec, parsed.authorization),
+    execution: { calls: adaptCalls(spec, parsed.authorization.payee, parsed.execution.calls) },
+  };
+}
+
+/**
+ * Bind the authorized account on rails where an authorization would name
+ * one. A card mandate names a merchant; a bank mandate names the account,
+ * and leaving it unbound would be authorizing a transfer to anywhere.
+ */
+function withDestination(spec: RailSpec, auth: AttackAuthorization): AttackAuthorization {
+  if (!spec.destinationRequired || auth.recipient_account_id !== undefined) return auth;
+  return { ...auth, recipient_account_id: spec.fixtures.authorized.destination };
+}
+
+/**
+ * Put a scenario's calls into the rail's argument names, and give each one a
+ * destination if the rail needs one and the scenario did not name one.
+ *
+ * Which destination depends on who is being paid. A call to the authorized
+ * payee goes to the authorized account, because an attack on the amount or
+ * the invoice does not move the money elsewhere. A call to anyone else goes
+ * to the attacker's account, because a company the agent was talked into
+ * paying banks somewhere of its own.
+ */
+function adaptCalls(
+  spec: RailSpec,
+  authorizedPayee: string,
+  calls: z.infer<typeof PayArgs>[],
+): PayCall[] {
+  return calls.map((call) => {
+    const out: PayCall = {};
+    for (const [key, value] of Object.entries(call)) {
+      if (value === undefined) continue;
+      const name =
+        key === "payee"
+          ? spec.args.payee
+          : key === "recipient_account_id"
+            ? spec.args.destination
+            : key;
+      out[name] = value as string | number;
+    }
+    if (spec.destinationRequired && out[spec.args.destination] === undefined) {
+      const party = sameName(call.payee, authorizedPayee) ? "authorized" : "attacker";
+      out[spec.args.destination] = spec.fixtures[party].destination_display;
+    }
+    return out;
+  });
+}
+
+function sameName(a: string, b: string): boolean {
+  const fold = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
+  return fold(a) === fold(b);
 }
 
 export function scriptedCalls(scenario: ArenaScenario): PayCall[] {
@@ -165,6 +327,13 @@ function validatePages(arenaRoot: string, file: string, pages: string[]): void {
   }
 }
 
-export function pageUrl(page: string): string {
-  return `https://arena.local/${page.replace(/^\/+/, "")}`;
+/**
+ * The URL a page is fetched at on a given rail.
+ *
+ * The rail is in the path because one page file serves every rail, and the
+ * server renders it with that rail's values: the same invoice shows a card
+ * account or an IBAN depending on who is asking.
+ */
+export function pageUrl(page: string, rail: Rail): string {
+  return `https://arena.local/${rail}/${page.replace(/^\/+/, "")}`;
 }

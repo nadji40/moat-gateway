@@ -21,8 +21,25 @@ importers:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@22.20.2)(tsx@4.23.13)(yaml@2.9.1)
 
+  mock-bank:
+    dependencies:
+      '@moat/mock-ledger':
+        specifier: workspace:*
+        version: link:../mock-ledger
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.6.5)
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
+  mock-ledger: {}
+
   mock-stripe:
     dependencies:
+      '@moat/mock-ledger':
+        specifier: workspace:*
+        version: link:../mock-ledger
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.6.5)
@@ -32,6 +49,9 @@ importers:
 
   mock-web:
     dependencies:
+      '@moat/arena-rails':
+        specifier: workspace:*
+        version: link:../rails
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.6.5)
@@ -39,8 +59,16 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
+  rails: {}
+
   runner:
     dependencies:
+      '@moat/arena-rails':
+        specifier: workspace:*
+        version: link:../rails
+      '@moat/mock-ledger':
+        specifier: workspace:*
+        version: link:../mock-ledger
       '@modelcontextprotocol/sdk':
         specifier: ^1.30.0
         version: 1.30.0(zod@4.6.5)

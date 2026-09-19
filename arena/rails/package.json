@@ -1,0 +1,14 @@
+{
+  "name": "@moat/arena-rails",
+  "private": true,
+  "version": "0.1.0",
+  "description": "What differs between settlement rails: the fixtures a scenario is rendered with, and the renderer.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}

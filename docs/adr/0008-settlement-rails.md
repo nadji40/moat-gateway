@@ -78,6 +78,24 @@ expressed and makes the rail visible in the record. Tagging first, and
 changing behaviour second, is what keeps the card path provably unmoved while
 the rest is built.
 
+## Addendum, September 2026: the bank rail is implemented
+
+The first two follow-ons below are done. Assets carry their own exponent and
+amounts are `u128` minor units; destinations are typed, canonical and matched
+exactly (ADR 0001 addendum). On top of those, the arena runs the whole
+scenario corpus against a mock bank: the tool is `transfer`, the arguments are
+a beneficiary name and an IBAN, and the policy is its own document. Nothing in
+the card path moved, which the cell-by-cell comparison against the published
+run is there to keep true.
+
+Two things this addendum does not claim. The bank rail is still evaluated with
+card settlement semantics: an ambiguous provider result releases the
+reservation, and a transfer the bank has accepted but not settled is treated
+as finished. The mock records acceptance and settlement separately so the core
+can start reading the difference, but the core does not read it yet. That is
+the third follow-on, and until it lands the bank rail measures authorization,
+not settlement.
+
 The immediate follow-ons, each needing its own ADR: an asset and amount model
 that can represent six- and eighteen-decimal tokens rather than two-exponent
 fiat minor units; a typed destination with canonical comparison and

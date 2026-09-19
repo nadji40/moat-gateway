@@ -1,6 +1,9 @@
 packages:
+  - mock-bank
+  - mock-ledger
   - mock-stripe
   - mock-web
+  - rails
   - runner
   - stripe-sandbox
 allowBuilds:

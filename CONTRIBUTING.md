@@ -86,12 +86,29 @@ payment rail already offers.
 
 A rail is how the money leaves: `card`, `bank`, `crypto`. It is declared per
 upstream in the gateway config and never taken from a call argument — a
-payment must not be able to select the rail whose checks it prefers. Adding a
-rail means a new entry in `arena/runner/src/rails.ts` plus a mock package, not
-edits spread through the runner; if you find yourself special-casing a rail
-outside its `RailSpec`, the registry is missing a field. Card is the only
-implemented rail today, and every change must leave its published numbers
-untouched — `--rails card` is the regression.
+payment must not be able to select the rail whose checks it prefers.
+
+Adding a rail is a new entry in `arena/runner/src/rails.ts`, a block of
+fixtures in `arena/rails/fixtures.json`, a mock package and a set of policies.
+It is not edits spread through the runner: if you find yourself special-casing
+a rail outside its `RailSpec`, the registry is missing a field.
+
+Write a scenario once. Anything that is a property of the rail rather than of
+the attack — the asset, the currency symbol, an account — is a `{{rail.*}}`
+placeholder, and the arguments are the canonical ones (`payee`,
+`recipient_account_id`), which expansion renames to whatever that rail's tool
+takes. Two corpora would drift within a month, and the moment they did the
+comparison between rails would stop meaning anything.
+
+A rail's baseline arms are that rail's own controls, not a copy of the card
+ones. Giving a rail a weaker baseline than the one it ships in production
+inflates Moat's result, and an inflated number is the first thing a reviewer
+takes apart. Where a baseline differs between rails, say so in
+`arena/analysis/README.md`.
+
+The card numbers are the regression: `--rails card` across all four arms must
+reproduce the published run cell for cell. Compare against the committed
+baseline in `arena/analysis/data/` before opening a pull request.
 
 ## Policy changes
 

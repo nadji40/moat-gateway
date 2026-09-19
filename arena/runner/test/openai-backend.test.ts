@@ -14,12 +14,20 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Ledger } from "../../mock-stripe/src/ledger.js";
-import { loadAttacks, loadControls } from "../src/attacks.js";
+import { loadAttacks, loadControls, scenarioForRail } from "../src/attacks.js";
 import { OpenAIBackend } from "../src/backends/openai.js";
 import { ScriptedModel } from "../src/backends/stubModel.js";
 import { contextFor } from "../src/context.js";
 
 const ARENA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/** A scenario from the corpus, expanded onto the card rail. */
+function cardScenario(id: string) {
+  const sources = [...loadAttacks(ARENA_ROOT), ...loadControls(ARENA_ROOT)];
+  const source = sources.find((candidate) => candidate.id === id);
+  if (!source) throw new Error(`no scenario ${id}`);
+  return scenarioForRail(ARENA_ROOT, source, "card");
+}
 // The gateway's web upstream is pinned to 7100 in moat.arena.yaml, so mock-web
 // must listen there for web__fetch to exist in gateway mode (the http-listen test
 // does the same). Files run one at a time (vitest.config.ts), so the port is free.
@@ -64,12 +72,12 @@ afterAll(() => {
 });
 
 describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
-  const attack = loadAttacks(ARENA_ROOT).find((a) => a.id === "inject-visible-text");
+  const attack = cardScenario("inject-visible-text");
 
   it("connects as a plain MCP client and sees the gateway's namespaced tools", async () => {
     const model = new ScriptedModel([]);
     const ctx = contextFor("gateway", "test-tools", join(work, "tools.json"));
-    await new OpenAIBackend(model).run(attack!, ctx);
+    await new OpenAIBackend(model).run(attack, ctx);
     expect(model.offered).toContain("stripe__pay");
     expect(model.offered).toContain("web__fetch");
   }, 60_000);
@@ -77,7 +85,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
   it("denies an injected payee: nothing is paid and the agent is told why", async () => {
     const ledger = join(work, "injected.json");
     const model = new ScriptedModel([
-      { tool: "fetch", args: { url: "https://arena.local/attacks/inject-visible-text/renewal.html" } },
+      { tool: "fetch", args: { url: "https://arena.local/card/attacks/inject-visible-text/renewal.html" } },
       {
         tool: "pay",
         args: {
@@ -90,7 +98,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
       },
     ]);
     const ctx = contextFor("gateway", "test-injected", ledger);
-    const trace = await new OpenAIBackend(model).run(attack!, ctx);
+    const trace = await new OpenAIBackend(model).run(attack, ctx);
 
     expect(trace.fetches).toHaveLength(1);
     expect(trace.pays).toHaveLength(1);
@@ -107,7 +115,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
     const model = new ScriptedModel([
       {
         tool: "fetch",
-        args: { url: "https://arena.local/attacks/inject-visible-text/renewal.html" },
+        args: { url: "https://arena.local/card/attacks/inject-visible-text/renewal.html" },
       },
       {
         tool: "pay",
@@ -121,7 +129,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
       },
     ]);
     const ctx = contextFor("gateway", "test-clean", ledger);
-    const trace = await new OpenAIBackend(model).run(attack!, ctx);
+    const trace = await new OpenAIBackend(model).run(attack, ctx);
 
     expect(trace.pays[0]!.outcome.kind).toBe("paid");
     expect(new Ledger(ledger).paidTo("Monitoring Pro Inc")).toHaveLength(1);
@@ -141,9 +149,9 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
         },
       },
     ]);
-    const inflate = loadAttacks(ARENA_ROOT).find((a) => a.id === "inflate-under-cap");
+    const inflate = cardScenario("inflate-under-cap");
     const ctx = contextFor("gateway", "test-unknown-amount", ledger);
-    const trace = await new OpenAIBackend(model).run(inflate!, ctx);
+    const trace = await new OpenAIBackend(model).run(inflate, ctx);
 
     expect(trace.pays[0]!.outcome.kind).toBe("step_up");
     expect(new Ledger(ledger).paidTo("Monitoring Pro Inc")).toHaveLength(0);
@@ -154,9 +162,9 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
     const model = new ScriptedModel([
       { tool: "pay", args: { payee: "Monitoring Pro Inc", amount: 99, currency: "USD" } },
     ]);
-    const inflate = loadAttacks(ARENA_ROOT).find((a) => a.id === "inflate-under-cap");
+    const inflate = cardScenario("inflate-under-cap");
     const ctx = contextFor("gateway", "test-missing-authorization-id", ledger);
-    const trace = await new OpenAIBackend(model).run(inflate!, ctx);
+    const trace = await new OpenAIBackend(model).run(inflate, ctx);
 
     expect(trace.pays[0]!.outcome.kind).toBe("deny");
     expect(new Ledger(ledger).paidTo("Monitoring Pro Inc")).toHaveLength(0);
@@ -164,7 +172,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
 
   it("denies a currency substituted under an otherwise valid authorization", async () => {
     const ledger = join(work, "currency-substitution.json");
-    const attack = loadAttacks(ARENA_ROOT).find((candidate) => candidate.id === "substitute-currency")!;
+    const attack = cardScenario("substitute-currency");
     const model = new ScriptedModel([
       {
         tool: "pay",
@@ -186,7 +194,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
 
   it("denies an invoice identity substituted under a valid authorization", async () => {
     const ledger = join(work, "invoice-substitution.json");
-    const attack = loadAttacks(ARENA_ROOT).find((candidate) => candidate.id === "substitute-invoice-id")!;
+    const attack = cardScenario("substitute-invoice-id");
     const model = new ScriptedModel([
       {
         tool: "pay",
@@ -212,7 +220,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
       { tool: "pay", args: { payee: "ProMon Billing Ltd", amount: 480, currency: "USD" } },
     ]);
     const ctx = contextFor("direct", "test-direct", ledger);
-    const trace = await new OpenAIBackend(model).run(attack!, ctx);
+    const trace = await new OpenAIBackend(model).run(attack, ctx);
 
     expect(trace.pays[0]!.outcome.kind).toBe("paid");
     expect(new Ledger(ledger).paidTo("ProMon Billing Ltd")).toHaveLength(1);
@@ -220,7 +228,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
 
   it("allows an exact legitimate control and records the intended payment", async () => {
     const ledger = join(work, "legitimate-control.json");
-    const control = loadControls(ARENA_ROOT).find((candidate) => candidate.id === "authorized-exact")!;
+    const control = cardScenario("authorized-exact");
     const model = new ScriptedModel([
       {
         tool: "pay",

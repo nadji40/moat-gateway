@@ -28,12 +28,19 @@ server.registerTool(
   },
   async ({ payee, amount, currency, authorization_id, invoice_id, recipient_account_id, invoice_fingerprint }) => {
     const entry = ledger.append({
+      rail: "card",
       payee,
-      amount,
+      amount: String(amount),
       currency,
+      // A card authorization is the whole story: there is no later moment
+      // at which the money arrives, and it can be reversed afterwards.
+      status: "succeeded",
+      settlement: "not_applicable",
       ...(authorization_id ? { authorization_id } : {}),
       ...(invoice_id ? { invoice_id } : {}),
-      ...(recipient_account_id ? { recipient_account_id } : {}),
+      ...(recipient_account_id
+        ? { destination: recipient_account_id, destination_key: `opaque:${recipient_account_id}` }
+        : {}),
       ...(invoice_fingerprint ? { invoice_fingerprint: invoice_fingerprint.toLowerCase() } : {}),
     });
     return {

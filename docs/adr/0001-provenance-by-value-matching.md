@@ -87,3 +87,41 @@ between the two paths would be a silent bypass.
 trustworthy span-level provenance, it can register values through the intent API
 as `User` or `Allowlist` and Moat will prefer them, without the matching path
 changing. Option 3 is the floor, not the ceiling.
+
+## Addendum, September 2026: destinations are matched exactly
+
+Value matching as described above is text matching, and it is the wrong tool
+for an identifier. Two of its properties are actively dangerous applied to an
+account number or an address.
+
+Substring matching would accept a fragment. A page that prints a truncated
+address, or an account number that happens to contain four characters of
+another, would lend its provenance to a different account. That is how
+address poisoning works, and there is nothing to gain from it: an identifier
+either is the one that was approved or is not.
+
+The numeric path would launder trust. `normalize_number` drops leading zeros,
+so the account `0012345` and the number `12345` are the same value. A user
+who mentioned invoice 12345 in their own request would, without meaning to,
+have granted `Source::User` to an attacker's account.
+
+So a field the policy declares as `kind: destination` resolves through a
+separate mode. Each kind of identifier gets a canonical form of its own --
+an IBAN compacted and uppercased after its mod-97 check digits pass, an EVM
+address lowercased after EIP-55 holds, a Solana address re-encoded from its
+32 bytes, anything else the trimmed text it arrived as -- and destinations
+are compared on that form and nothing else. The key is prefixed with the
+kind, so two kinds can never collide on one string.
+
+The scanner that finds destinations in page text reads an IBAN written in
+groups as well as compacted, because that is how an invoice prints one and
+how a person types one. Reading only the compact form would mean the account
+a user named in their own request resolved to `Unknown`, and the legitimate
+payment would be refused for looking exactly like the fraud. Every span whose
+check digits pass is recorded rather than one chosen by a tie-break rule: a
+span that validates and is not the printed IBAN can only ever matter if it is
+canonically equal to the destination being resolved, which makes it the same
+account.
+
+This is the "revisitable per field" clause above being used, not an exception
+to it. Everything that is a name still matches as text.

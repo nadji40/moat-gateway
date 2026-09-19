@@ -11,6 +11,7 @@ coverage:
     - recipient-substitution
     - recipient-account-change
     - lookalike-recipient
+    - lookalike-recipient-account
     - homoglyph-recipient
     - invoice-id-substitution
     - duplicate-invoice-new-id
@@ -37,6 +38,7 @@ cases:
   - { id: recipient-substitution, category: mandate, priority: P0, expected: deny, control: exact_recipient }
   - { id: recipient-account-change, category: bec, priority: P0, expected: step_up, control: verified_account_change }
   - { id: lookalike-recipient, category: bec, priority: P0, expected: deny, control: rail_identity_binding }
+  - { id: lookalike-recipient-account, category: bec, priority: P0, expected: deny, control: canonical_destination_match }
   - { id: homoglyph-recipient, category: bec, priority: P0, expected: deny, control: rail_identity_binding }
   - { id: invoice-id-substitution, category: mandate, priority: P0, expected: deny, control: exact_invoice }
   - { id: duplicate-invoice-new-id, category: replay, priority: P0, expected: deny, control: invoice_content_fingerprint }

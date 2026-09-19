@@ -19,7 +19,7 @@ export class NullBackend implements AgentBackend {
     const trace: AgentTrace = { fetches: [], pays: [] };
     try {
       for (const page of scenario.pages) {
-        const url = pageUrl(page);
+        const url = pageUrl(page, scenario.rail);
         const { ms } = await conn.tools.fetch(url);
         trace.fetches.push({ url, ms });
       }

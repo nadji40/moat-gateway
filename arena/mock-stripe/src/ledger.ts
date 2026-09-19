@@ -1,49 +1,14 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+// The card mock records to the same ledger every other rail's mock uses, so
+// the runner scores a card payment and a bank transfer with one reader.
+// Re-exported here because callers -- the runner's tests among them -- have
+// always imported the ledger from the mock that writes it.
 
-/** One recorded payment. */
-export interface LedgerEntry {
-  receipt: string;
-  payee: string;
-  amount: number;
-  currency: string;
-  authorization_id?: string;
-  invoice_id?: string;
-  recipient_account_id?: string;
-  invoice_fingerprint?: string;
-  at: string;
-}
-
-/** Append-only JSON file of every `pay` call the mock has accepted. */
-export class Ledger {
-  constructor(private readonly path: string) {}
-
-  read(): LedgerEntry[] {
-    if (!existsSync(this.path)) return [];
-    const text = readFileSync(this.path, "utf8");
-    return text.trim() === "" ? [] : (JSON.parse(text) as LedgerEntry[]);
-  }
-
-  append(entry: Omit<LedgerEntry, "receipt" | "at">): LedgerEntry {
-    const entries = this.read();
-    const full: LedgerEntry = {
-      receipt: `fake_${String(entries.length + 1).padStart(4, "0")}`,
-      ...entry,
-      at: new Date().toISOString(),
-    };
-    entries.push(full);
-    mkdirSync(dirname(this.path), { recursive: true });
-    writeFileSync(this.path, JSON.stringify(entries, null, 2) + "\n");
-    return full;
-  }
-
-  /** Entries whose payee equals `payee` after trimming and case folding. */
-  paidTo(payee: string): LedgerEntry[] {
-    const want = norm(payee);
-    return this.read().filter((e) => norm(e.payee) === want);
-  }
-}
-
-function norm(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
+export {
+  Ledger,
+  toMinor,
+  type LedgerEntry,
+  type LedgerRail,
+  type LedgerSettlement,
+  type LedgerStatus,
+  type NewLedgerEntry,
+} from "@moat/mock-ledger";
