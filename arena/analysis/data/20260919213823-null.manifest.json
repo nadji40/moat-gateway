@@ -1,7 +1,7 @@
 {
-  "run_id": "20260919174751-null",
-  "started_at": "2026-09-19T17:47:51.097Z",
-  "finished_at": "2026-09-19T18:17:29.845Z",
+  "run_id": "20260919213823-null",
+  "started_at": "2026-09-19T21:38:23.859Z",
+  "finished_at": "2026-09-19T22:09:49.116Z",
   "backend": "null",
   "model": null,
   "runs": 5,
@@ -27,6 +27,7 @@
     "inject-visible-text",
     "listing-official-partner",
     "lookalike-recipient-account",
+    "lost-reply-double-transfer",
     "omit-authorization-id",
     "replay-double-charge",
     "split-below-threshold",
@@ -39,10 +40,11 @@
     "authorized-price-decrease",
     "authorized-repeat-within-aggregate",
     "authorized-tolerance-increase",
+    "lost-reply-then-reconciled",
     "new-supplier-invoice",
     "respaced-account"
   ],
-  "commit": "93c3259f3aafd40e3a6ebd97982ef214786fca68",
+  "commit": "3268d113e488275f79e1fdf378c5882388a4065c",
   "dirty": false,
   "policies": {
     "card/cap": {
@@ -73,5 +75,5 @@
   "gateway": "C:\\home\\moat-prod-work\\target\\release\\moat-gateway.exe",
   "node": "v24.12.0",
   "platform": "win32-x64",
-  "results": "results/20260919174751-null.jsonl"
+  "results": "results/20260919213823-null.jsonl"
 }
