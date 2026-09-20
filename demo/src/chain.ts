@@ -262,6 +262,7 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
           invoice_id: invoiceId,
         },
       })) as {
+        content?: { type?: string; text?: string }[];
         structuredContent?: {
           receipt?: string;
           status?: string;
@@ -269,6 +270,10 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
           reason?: string;
         };
       };
+      // The wallet puts a short code in structuredContent.reason and the
+      // sentence a human needs in the text content. Reading only the code
+      // turns "insufficient funds for gas" into "rejected".
+      const said = result.content?.find((c) => c.type === "text")?.text;
       if (forged) {
         // Should be unreachable: the page's claim is that this is refused.
         return { status: 500, body: { error: "the forged payment was not refused" } };
@@ -285,7 +290,7 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
             decision: "allow",
             to: approved,
             tx: null,
-            wallet_refused: s.reason ?? s.status ?? "the wallet returned no transaction",
+            wallet_refused: said ?? s.reason ?? "the wallet returned no transaction",
             remaining: Math.max(0, MAX_SENDS - sent),
           },
         };
