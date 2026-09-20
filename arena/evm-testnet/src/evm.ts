@@ -54,6 +54,14 @@ import { baseSepolia } from "viem/chains";
 export const CHAIN = baseSepolia;
 export const NETWORK = `eip155:${CHAIN.id}`;
 
+/**
+ * Circle's testnet USDC on Base Sepolia. Six decimals; read back from the
+ * contract before it was written here. Circle's faucet sends 20 to any
+ * address every two hours, so nothing needs deploying to have a real
+ * six-decimal token to move.
+ */
+export const USDC_BASE_SEPOLIA: Address = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+
 // viem's client types carry the chain and the account in their generics, so
 // the concrete clients are typed from the calls that make them rather than
 // from the bare interfaces, which would not match.

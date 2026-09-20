@@ -8,12 +8,13 @@ transactions are real and permanent.
 
 ## What it shows
 
-Four transactions go out and two are refused before the wallet hears of
+Five transactions go out and two are refused before the wallet hears of
 them, all under one policy and one signed evidence chain:
 
 | Step | What happens | Who stops it |
 |---|---|---|
 | Approved invoice | Sent, mined, hash recorded against the authorization | nobody, correctly |
+| Approved invoice in USDC | The same through the real six-decimal contract, when the wallet holds any | nobody, correctly |
 | Forged invoice | Right supplier name, attacker's address | Moat: `destination-provenance` |
 | Right address, wrong chain | `eip155:1` against an authorization for `eip155:84532` | Moat: `authorization-network` |
 | Lost reply | Broadcast, then the reply is dropped | Moat holds and quarantines it |
@@ -40,10 +41,24 @@ file.
 cd arena && pnpm --filter @moat/evm-testnet keygen
 ```
 
-Fund the first address with Base Sepolia ether. A few thousandths is plenty;
-each run costs about four times `0.0001` plus gas. Faucets change; at the
-time of writing the ones that work without a mainnet balance generally want
-an account login, which is the one step nobody can do for you.
+Fund the first address twice.
+
+**Ether**, for gas and the native-asset payments. A few thousandths is
+plenty; each run costs about four times `0.0001` plus gas. Faucets change;
+at the time of writing the [Coinbase Developer Platform
+faucet](https://portal.cdp.coinbase.com/) gives 0.1 per day behind a free
+account, [Alchemy's](https://www.alchemy.com/faucets/base-sepolia) wants a
+small mainnet balance, and the [Superchain
+faucet](https://docs.base.org/base-chain/network-information/network-faucets)
+wants an onchain identity. All of them want a human, which is the one step
+nobody can do for you.
+
+**USDC**, for the six-decimal token payment. [Circle's
+faucet](https://faucet.circle.com/) is permissionless: paste the address,
+pick Base Sepolia, and it sends 20 USDC, once per two hours. The contract it
+funds is `0x036CbD53842c5426634e7929541eC2318f3dCF7e`, which `keygen` has
+already written into the file, and whose symbol and six decimals were read
+back from the chain before they were written here. Nothing needs deploying.
 
 Check the wallet sees the chain and the funds:
 
@@ -84,7 +99,7 @@ Read from `.env.evm-testnet`. `keygen` writes all of it with comments.
 | `MOAT_EVM_PRIVATE_KEY` | The sender. Testnet only, and still never committed. |
 | `MOAT_EVM_AUTHORIZED_ADDRESS` / `_PAYEE` | The approved supplier. `keygen` gives you this key too. |
 | `MOAT_EVM_UNAUTHORIZED_ADDRESS` / `_PAYEE` | The address on the forged invoice. Nobody holds it. |
-| `MOAT_EVM_TOKEN_ADDRESS` / `_SYMBOL` / `_DECIMALS` | Optional. A test ERC-20 once one is deployed; ether needs nothing. |
+| `MOAT_EVM_TOKEN_ADDRESS` / `_SYMBOL` / `_DECIMALS` | The ERC-20 the wallet can move. `keygen` sets Circle's Base Sepolia USDC. Remove to run ether-only. |
 | `MOAT_EVM_MAX_SEND` | Largest single send in ether. A guard on faucet funds, not a policy. Default `0.001`. |
 | `MOAT_EVM_CONFIRMATIONS` | Blocks to wait before reporting `confirmed`. Default `1`. |
 | `MOAT_EVM_FINALITY` | Confirmations after which `get_transaction` reports `finalized`. Default `12`. |
@@ -108,7 +123,8 @@ require Moat's signature — a Safe transaction guard, an ERC-7579 validator —
 is the co-signer design, and it is not built. This adapter makes the
 demonstration real; it does not make the enforcement real.
 
-No token is deployed here. Native ether exercises every path the core has:
-destination, network, amount at eighteen decimals, idempotency, the hold. A
-six-decimal token adds realism and the `approve` surface, and needs a
-contract deployed, which needs the same faucet.
+There is no `approve` here. The mock wallet has one because the
+standing-allowance attack needs it; this wallet moves value and grants
+nothing, which is all the demonstration calls for. The token payment goes
+through the real USDC contract's `transfer`, so the six-decimal path is
+exercised end to end without deploying anything.

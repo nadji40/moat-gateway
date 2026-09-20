@@ -915,14 +915,18 @@ cd arena && pnpm --filter @moat/evm-testnet keygen
 ```
 
 writes `.env.evm-testnet` at the repository root (ignored by Git) and prints
-the address to fund from a Base Sepolia faucet. Then:
+the address to fund: ether from a Base Sepolia faucet, and USDC from
+[Circle's faucet](https://faucet.circle.com/), which is permissionless and
+funds the real six-decimal testnet USDC contract, so no token is deployed.
+Then:
 
 ```bash
 cd arena && MOAT_EVM_SMOKE_CONFIRM=YES pnpm --filter @moat/evm-testnet smoke
 ```
 
-Four transactions go out and two are refused before the wallet hears of them:
-the approved invoice is mined; the forged invoice's address is refused by
+Four transactions go out — five once the wallet holds USDC — and two are
+refused before the wallet hears of them: the approved invoice is mined, in
+ether and through the real USDC contract; the forged invoice's address is refused by
 `destination-provenance`; the right address on the wrong chain is refused by
 `authorization-network`; a lost reply after broadcast is held and
 quarantined, the retry refused, the hash confirmed on chain and reconciled,

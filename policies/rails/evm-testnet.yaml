@@ -10,7 +10,9 @@ version: 1
 # the strength of a file, which is a weaker thing to show than a payment
 # going through on the strength of what the user agreed to.
 #
-# The cap is in ether, because that is what a wallet with no token holds.
+# The cap is a bare number and applies to whatever unit is sent -- ether
+# or USDC alike -- because a per-asset cap is not built. It is set for
+# ether, and the token payment in the smoke script is sized under it.
 
 payment_tools:
   - server: "*"

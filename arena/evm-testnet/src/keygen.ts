@@ -13,7 +13,7 @@ import { chmodSync, existsSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { CHAIN } from "./evm.js";
+import { CHAIN, USDC_BASE_SEPOLIA } from "./evm.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = resolve(here, "../../..");
@@ -49,10 +49,11 @@ const lines = [
   "MOAT_EVM_UNAUTHORIZED_PAYEE=ProMon Billing Ltd",
   `MOAT_EVM_UNAUTHORIZED_ADDRESS=${attackerAddress}`,
   "",
-  "# Optional. A six-decimal test token, once one is deployed; ether needs nothing.",
-  "# MOAT_EVM_TOKEN_ADDRESS=0x...",
-  "# MOAT_EVM_TOKEN_SYMBOL=USDC",
-  "# MOAT_EVM_TOKEN_DECIMALS=6",
+  "# Circle's testnet USDC on Base Sepolia: six decimals, verified on chain.",
+  "# Fund the sender from https://faucet.circle.com (20 USDC per 2 hours, any address).",
+  `MOAT_EVM_TOKEN_ADDRESS=${USDC_BASE_SEPOLIA}`,
+  "MOAT_EVM_TOKEN_SYMBOL=USDC",
+  "MOAT_EVM_TOKEN_DECIMALS=6",
   "",
   "# Guards on faucet funds and on how long to wait. Not policy.",
   "MOAT_EVM_MAX_SEND=0.001",
@@ -72,7 +73,8 @@ process.stdout.write(
   [
     `wrote ${target}`,
     "",
-    `fund this address with ${CHAIN.name} ether (a few thousandths is plenty):`,
+    `fund this address with ${CHAIN.name} ether (a few thousandths is plenty),`,
+    `and with testnet USDC from https://faucet.circle.com:`,
     `  ${senderAddress}`,
     "",
     `the approved supplier's address, which will receive the allowed payments:`,

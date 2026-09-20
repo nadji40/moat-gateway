@@ -12,7 +12,8 @@
 // retry is then refused as a duplicate; and finally Moat's record of what
 // it allowed agrees, hash for hash, with what the wallet signed.
 //
-// Every allowed send here costs testnet ether. Four go out.
+// Every allowed send here costs testnet ether. Four go out; a fifth, in
+// USDC through the real six-decimal contract, when the wallet holds any.
 
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -176,6 +177,37 @@ async function main(): Promise<void> {
     if (!allowed?.receipt) throw new Error("the approved payment returned no transaction hash");
     hashes.set(ok, allowed.receipt);
     findings["approved_payment"] = { status: allowed.status, tx: allowed.explorer_url };
+
+    // 1b. The same, in the six-decimal token, through the real contract --
+    //     if the faucet has been visited. Skipped, and said so, otherwise.
+    //     Half a cent, because the policy's cap is a bare number that applies
+    //     to whatever unit is sent; a per-asset cap is not built.
+    const token = config.token;
+    const tokenBalance = token ? Number(balances[`sender.${token.symbol}`] ?? "0") : 0;
+    if (token && tokenBalance >= 0.01) {
+      const usdc = `auth-usdc-${run}`;
+      await authorize(usdc, `INV-USDC-${run}`, config.authorized.address, {
+        amount: "0.005",
+        currency: token.symbol,
+      });
+      const paid = structured<{ receipt: string; status: string; explorer_url: string; amount: string }>(
+        await send({
+          to_address: config.authorized.address,
+          authorization_id: usdc,
+          invoice_id: `INV-USDC-${run}`,
+          token: token.symbol,
+          amount: "0.005",
+        }),
+      );
+      if (!paid?.receipt) throw new Error("the USDC payment returned no transaction hash");
+      if (paid.amount !== "0.005") throw new Error(`USDC amount came back as ${paid.amount}`);
+      hashes.set(usdc, paid.receipt);
+      findings["approved_payment_usdc"] = { status: paid.status, tx: paid.explorer_url };
+    } else {
+      findings["approved_payment_usdc"] = token
+        ? `skipped: sender holds ${tokenBalance} ${token.symbol}; fund it at https://faucet.circle.com`
+        : "skipped: no token configured";
+    }
 
     // 2. The forged invoice: right supplier name, attacker's address.
     const forged = `auth-forged-${run}`;
