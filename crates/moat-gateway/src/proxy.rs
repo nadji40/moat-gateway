@@ -903,6 +903,100 @@ impl Gateway {
 
     /// Evaluate a payment call. Returns its evidence context if it may be forwarded; on
     /// `step_up` or `deny` the error has already been sent to the client.
+    /// Release a reservation from the session and from the tenant ledger.
+    ///
+    /// Both, always. A reservation released in only one of the two leaves
+    /// the mandate holding value against a payment that is not happening --
+    /// in the session it blocks this agent, and in the ledger it blocks
+    /// every other session under the tenant, which is worse and harder to
+    /// see.
+    async fn release_reservation_everywhere(
+        &self,
+        session: &std::sync::Arc<std::sync::Mutex<moat_core::session::Session>>,
+        fingerprint: &str,
+    ) {
+        moat_core::session::lock(session).release_payment_reservation(fingerprint);
+        if let Some(storage) = self.shared.storage() {
+            if let Err(error) = storage
+                .release_reservation(&self.tenant_id, fingerprint)
+                .await
+            {
+                tracing::error!(
+                    %error, tenant = %self.tenant_id, fingerprint,
+                    "could not release the ledger reservation; it will hold against                      the mandate until it is cleared"
+                );
+            }
+        }
+    }
+
+    /// Whether the tenant's ledger has room for this payment, taking the
+    /// reservation if it does.
+    ///
+    /// Returns the refusal to record when it does not. The limit is
+    /// computed the way `policy.rs` computes it -- the declared aggregate
+    /// limit, or the maximum single payment times the permitted count --
+    /// so the two agree about what the mandate is worth.
+    ///
+    /// Without durable storage there is nothing to contend over and this
+    /// is a no-op: a single process with one document in memory is already
+    /// serialised by the session lock.
+    async fn refuse_beyond_tenant_aggregate(
+        &self,
+        session: &std::sync::Arc<std::sync::Mutex<moat_core::session::Session>>,
+        eval: &moat_core::policy::Evaluation,
+        fingerprint: &str,
+        amount: moat_core::money::Minor,
+    ) -> Option<String> {
+        let storage = self.shared.storage()?;
+        let authorization_id = eval
+            .call
+            .args
+            .get("authorization_id")
+            .and_then(Value::as_str)?
+            .to_owned();
+        let limit = {
+            let s = moat_core::session::lock(session);
+            let authorization = s.payment_authorization(&authorization_id)?;
+            authorization.aggregate_limit_minor.unwrap_or_else(|| {
+                authorization
+                    .amount_minor
+                    .saturating_add(authorization.tolerance_minor)
+                    .saturating_mul(u128::from(authorization.max_payments))
+            })
+        };
+        match storage
+            .reserve_if_within(
+                &self.tenant_id,
+                &authorization_id,
+                fingerprint,
+                &self.session_id,
+                amount,
+                limit,
+            )
+            .await
+        {
+            Ok(Some(_before)) => None,
+            Ok(None) => Some(format!(
+                concat!(
+                    "this tenant's committed and in-flight payments under {} already ",
+                    "reach the mandate's limit of {}; another session may hold what ",
+                    "this one is asking for"
+                ),
+                authorization_id, limit.0
+            )),
+            Err(error) => {
+                // Fail closed. The ledger is the only thing that can see
+                // what other sessions are doing, and an allow issued
+                // without it is an allow issued without the check.
+                tracing::error!(
+                    %error, tenant = %self.tenant_id, authorization_id,
+                    "could not reserve against the payment ledger; denying"
+                );
+                Some("the payment ledger could not be reached to check the mandate".to_owned())
+            }
+        }
+    }
+
     async fn authorize(
         &self,
         id: &RequestId,
@@ -924,6 +1018,16 @@ impl Gateway {
             args,
         };
         let session = self.shared.store.get_or_create(&self.session_id);
+        // A mandate registered in an earlier session lives in the ledger,
+        // not in this session's document. Fetch it before evaluating, or
+        // this call is judged against an authorization Moat has simply not
+        // looked for -- which fails closed, but fails closed on a mandate
+        // the user really did grant.
+        if let Some(authorization_id) = call.args.get("authorization_id").and_then(Value::as_str) {
+            self.shared
+                .hydrate_authorization(&self.tenant_id, &session, authorization_id)
+                .await;
+        }
         let now = now_unix_ms();
 
         let (eval, reservation_fingerprint, proposed_minor) =
@@ -1006,11 +1110,46 @@ impl Gateway {
                 }
             };
 
+        // The same reservation again, this time against the tenant's ledger
+        // rather than this session's document.
+        //
+        // The in-session reservation above stops one session sending the
+        // same payment twice. It cannot stop two sessions each spending the
+        // whole allowance, because each reads its own document and both see
+        // it unspent. This does, by computing the aggregate and taking the
+        // reservation inside one row lock on the authorization.
+        //
+        // Only reached on an allow that already reserved locally, so the
+        // common path costs one statement and the contended path is the one
+        // that pays for the lock.
+        let mut eval = eval;
+        let mut reservation_fingerprint = reservation_fingerprint;
+        if let (Some(fingerprint), Some(amount)) = (&reservation_fingerprint, proposed_minor) {
+            if let Some(refusal) = self
+                .refuse_beyond_tenant_aggregate(&session, &eval, fingerprint, amount)
+                .await
+            {
+                self.release_reservation_everywhere(&session, fingerprint)
+                    .await;
+                reservation_fingerprint = None;
+                eval.verdict.decision = Decision::Deny;
+                eval.verdict.reasons.push(moat_core::verdict::RuleOutcome {
+                    id: "authorization-tenant-aggregate".to_owned(),
+                    field: None,
+                    passed: false,
+                    source: None,
+                    on_fail: Decision::Deny,
+                    message: refusal,
+                });
+            }
+        }
+
         let record = match self.shared.record(&session, &eval) {
             Ok(r) => r,
             Err(e) => {
                 if let Some(fingerprint) = &reservation_fingerprint {
-                    moat_core::session::lock(&session).release_payment_reservation(fingerprint);
+                    self.release_reservation_everywhere(&session, fingerprint)
+                        .await;
                 }
                 // No verdict without evidence: if evidence cannot be written,
                 // the payment does not happen.
@@ -1038,7 +1177,8 @@ impl Gateway {
         if let Err(error) = durable_result {
             if let Some(fingerprint) = &reservation_fingerprint {
                 {
-                    moat_core::session::lock(&session).release_payment_reservation(fingerprint);
+                    self.release_reservation_everywhere(&session, fingerprint)
+                        .await;
                 }
                 let _ = self
                     .shared

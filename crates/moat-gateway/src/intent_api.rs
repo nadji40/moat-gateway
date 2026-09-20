@@ -765,6 +765,68 @@ fn address_arg(text: &str, field: &str) -> Result<[u8; 20], (StatusCode, Json<Er
         .map_err(|why| err(StatusCode::BAD_REQUEST, format!("{field}: {why}")))
 }
 
+/// Every open payment across the tenant, not just this session.
+///
+/// The per-session `/outcomes` answers "what is outstanding in this
+/// conversation". This answers "what is outstanding at all", which is the
+/// question an operator actually has: a quarantined payment blocks its
+/// mandate whether or not anyone still has the session that made it open,
+/// and before the payment ledger there was no way to ask.
+async fn get_tenant_outcomes(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> ApiResult {
+    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let Some(storage) = shared.storage() else {
+        return Err(err(
+            StatusCode::NOT_IMPLEMENTED,
+            "this gateway has no durable storage, so it has no ledger to read;              open outcomes are per-session at /v1/session/{id}/outcomes",
+        ));
+    };
+    let open = storage
+        .open_outcomes(&tenant_id, 200)
+        .await
+        .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    Ok(Json(json!({ "tenant": tenant_id, "open": open })))
+}
+
+/// One mandate and what it has spent, across every session.
+async fn get_tenant_authorization(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let Some(storage) = shared.storage() else {
+        return Err(err(
+            StatusCode::NOT_IMPLEMENTED,
+            "this gateway has no durable storage, so a mandate cannot outlive its session",
+        ));
+    };
+    let authorization = storage
+        .payment_authorization(&tenant_id, &id)
+        .await
+        .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    let Some(authorization) = authorization else {
+        return Err(err(
+            StatusCode::NOT_FOUND,
+            "no authorization with that id in this tenant's ledger",
+        ));
+    };
+    let aggregate = storage
+        .aggregate_for(&tenant_id, &id)
+        .await
+        .map_err(|error| err(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    Ok(Json(json!({
+        "tenant": tenant_id,
+        "authorization": authorization,
+        "aggregate": {
+            // Strings, because these are u128 and a JSON number is not.
+            "committed_minor": aggregate.committed.0.to_string(),
+            "reserved_minor": aggregate.reserved.0.to_string(),
+            "total_minor": aggregate.total().0.to_string(),
+            "committed_payments": aggregate.payments,
+        },
+    })))
+}
+
 async fn get_workflow(
     State(shared): State<Arc<Shared>>,
     headers: HeaderMap,
@@ -865,6 +927,8 @@ pub fn router(shared: Arc<Shared>) -> Router {
         .route("/v1/session/{id}/cosign", post(cosign_verdict))
         .route("/v1/session/{id}/workflow", get(get_workflow))
         .route("/v1/session/{id}/evidence", get(get_evidence))
+        .route("/v1/outcomes", get(get_tenant_outcomes))
+        .route("/v1/authorizations/{id}", get(get_tenant_authorization))
         .route("/v1/cosigner", get(cosigner))
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))

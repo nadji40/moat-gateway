@@ -246,6 +246,11 @@ impl Shared {
         self.cosign.as_ref()
     }
 
+    /// The durable store, when this deployment has one.
+    pub fn storage(&self) -> Option<&DurableStore> {
+        self.storage.as_ref()
+    }
+
     /// Whether HTTP callers must present a database-backed bearer key.
     pub fn auth_required(&self) -> bool {
         self.auth_required
@@ -374,7 +379,35 @@ impl Shared {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(id.to_owned(), version);
+        self.mirror_payment_ledger(storage, tenant_id, &snapshot)
+            .await;
         Ok(())
+    }
+
+    /// Mirror the session's mandates into the payment ledger.
+    ///
+    /// A mirror, not the source: the gateway still evaluates from the
+    /// session document, and this keeps the tenant-scoped tables in step so
+    /// a later session can find a mandate and an operator can see every
+    /// open outcome. Deliberately non-fatal -- the session snapshot is
+    /// already committed by the time this runs, and failing the caller's
+    /// request over a bookkeeping write would turn a reporting problem into
+    /// a payment outage. It is logged loudly instead.
+    async fn mirror_payment_ledger(
+        &self,
+        storage: &DurableStore,
+        tenant_id: &str,
+        snapshot: &Session,
+    ) {
+        if snapshot.payment_authorizations().is_empty() {
+            return;
+        }
+        if let Err(error) = storage.save_payment_ledger(tenant_id, snapshot).await {
+            tracing::error!(
+                %error, tenant = %tenant_id, session = %snapshot.id,
+                "payment ledger mirror failed; the session is saved and the                  tenant-scoped tables are now behind"
+            );
+        }
     }
 
     /// Apply a control-plane mutation and its durable snapshot as one logical
@@ -433,6 +466,7 @@ impl Shared {
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
                         .insert(id.to_owned(), version);
+                    self.mirror_payment_ledger(storage, tenant_id, &after).await;
                 }
                 Err(error) => {
                     *lock(&session) = before;
@@ -441,6 +475,57 @@ impl Shared {
             }
         }
         Ok(Ok(value))
+    }
+
+    /// Bring an authorization from the ledger into this session, if this
+    /// session does not have it and the ledger does.
+    ///
+    /// This is what makes a mandate outlive the conversation that created
+    /// it. The session document is still what the policy evaluates, so the
+    /// row is copied in rather than read through; that keeps evaluation
+    /// synchronous and keeps one code path deciding, whether the mandate
+    /// was granted a minute ago or last week.
+    ///
+    /// Silent when there is no storage, when the session already has it, or
+    /// when the ledger does not. A miss here is not an error: most calls
+    /// carry an authorization the session registered itself.
+    pub async fn hydrate_authorization(
+        &self,
+        tenant_id: &str,
+        session: &std::sync::Arc<std::sync::Mutex<Session>>,
+        authorization_id: &str,
+    ) {
+        let Some(storage) = &self.storage else { return };
+        {
+            let session = lock(session);
+            if session.payment_authorization(authorization_id).is_some() {
+                return;
+            }
+        }
+        match storage
+            .payment_authorization(tenant_id, authorization_id)
+            .await
+        {
+            Ok(Some(authorization)) => {
+                let mut session = lock(session);
+                if let Err(error) = session.register_payment_authorization(authorization) {
+                    tracing::warn!(
+                        %error, tenant = %tenant_id, authorization_id,
+                        "an authorization from the ledger was refused by this session"
+                    );
+                } else {
+                    tracing::info!(
+                        tenant = %tenant_id, authorization_id,
+                        "authorization loaded from the payment ledger; it outlived                          the session that registered it"
+                    );
+                }
+            }
+            Ok(None) => {}
+            Err(error) => tracing::warn!(
+                %error, tenant = %tenant_id, authorization_id,
+                "could not read the payment ledger; evaluating on this session alone"
+            ),
+        }
     }
 
     /// Persist signed evidence in PostgreSQL as well as the append-only file.

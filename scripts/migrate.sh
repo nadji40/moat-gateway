@@ -20,7 +20,7 @@ if [[ "$database" != "moat_gateway" || "$role" != "moat_migrator" ]]; then
   exit 1
 fi
 
-for version in 1 2; do
+for version in 1 2 3; do
   applied="$(psql "$MOAT_MIGRATOR_DATABASE_URL" -XAtqc \
     "select to_regclass('moat.schema_migrations') is not null and exists (select 1 from moat.schema_migrations where version = ${version})" 2>/dev/null || true)"
   if [[ "$applied" == "t" ]]; then
