@@ -1,76 +1,108 @@
 # demo
 
-The public try-it page. One page, a live gateway behind it, and one button
-that moves real value on a public test network.
+The public sandbox. A gateway anyone can point a payment at, with a page
+for composing attacks by hand and an HTTP API for driving it from code.
 
-## What a visitor gets
+## What it is
 
-Five scenarios drawn from the measured corpus, not invented for the page.
-Each one registers the user's own words as an intent, registers the
-approver's mandate where the scenario has one, and then has an agent
-attempt a payment that either matches or does not. The page shows what the
-user asked, what the agent read, what it tried, what Moat decided, the
-rule that decided it, and whether the provider was actually paid.
+Not a tour. A visitor writes what the user asked for, writes what an
+approver signed off, and then attempts whatever payment they like. Moat
+compares the two and decides, and the page shows the verdict, the rule
+that produced it, whether the mock provider was actually paid, and the
+signed evidence id.
 
-Then the same decision in front of a real Base Sepolia wallet: the
-approved payment produces a transaction you can open in a block explorer,
-and the forged one produces nothing, because Moat refuses before the
-wallet is asked.
+There is also one path that moves real value on Base Sepolia, so the
+asymmetry is visible: the approved payment leaves a transaction anyone
+can open in a block explorer, and the refused one leaves nothing at all,
+because Moat refuses before the wallet is asked.
 
-## Why it is safe to expose
+## The API
 
-**Every run is its own gateway process, with its own session, killed
-afterwards.** One visitor cannot see or affect another's state. That costs
-about two seconds a run; a shared session on a public endpoint would be a
-different demonstration entirely.
+No key, no account. Sandboxes expire after ten idle minutes.
 
-**The scenario buttons talk to a mock provider.** Nothing moves anywhere.
+```bash
+B=https://<host>
+S=$(curl -s -XPOST $B/v1/sandbox | jq -r .id)
 
-**The chain button uses a wallet funded on purpose with almost nothing**,
-separate from the one the smoke scripts use, so the worst case is that
-this page stops working. On top of that:
+curl -s -XPOST $B/v1/sandbox/$S/intent -H 'content-type: application/json'   -d '{"text":"Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD."}'
 
-- a hard cap on how many real payments the page will ever make, counted in
-  memory, so a restart is the only way to raise it;
-- a floor on the balance, so the wallet stops while it can still pay gas
-  rather than stranding every later visitor on an error;
-- two payments per caller, because the third proves nothing;
-- a per-address run limit;
-- and `MOAT_EVM_MAX_SEND` set two orders of magnitude below anything the
-  page asks for, so a bug here cannot become a large payment.
+curl -s -XPOST $B/v1/sandbox/$S/authorization -H 'content-type: application/json'   -d '{"payee":"Acme Cloud Ltd","amount":"480","currency":"USD"}'
 
-The refusal path costs nothing at all, which is the point.
+curl -s -XPOST $B/v1/sandbox/$S/pay -H 'content-type: application/json'   -d '{"payee":"Nordwind Handels GmbH","amount":480,"currency":"USD"}'
 
-**There is no database, no account and no persistence.** The only mutable
-state is a spend counter in memory.
+curl -s $B/v1/sandbox/$S/evidence
+curl -s -XDELETE $B/v1/sandbox/$S
+```
+
+`GET /v1/limits` reports the pool and the limits below.
+
+## Why each sandbox is its own everything
+
+Running two at once is what proved this necessary, and every item here is
+a bug that existed before it was.
+
+**Its own port.** Each sandbox is a real gateway process, and they all
+read one config, so they all bound one intent-API port. Only the first
+won -- and every later sandbox's intent and mandate were registered
+against the *first* sandbox's session. One visitor's words conferring
+authority inside another visitor's sandbox is the worst failure a public
+demonstration of an authorization layer could have.
+
+**Its own evidence file.** The chain is hash-linked. Several processes
+appending to one file produce a chain that verifies against nothing.
+
+**Its own signing key.** The arena's key is readable only by whoever made
+it, so a service running as another user dies at startup -- and the
+caller sees an MCP connection closing with no reason attached. A key per
+sandbox is more correct anyway: the chain is the sandbox's own and dies
+with it.
+
+**Its own config**, generated rather than committed, because the right
+key directory and evidence path differ between a laptop and a hardened
+service, and a committed file has to guess.
+
+## Limits
+
+Twelve live sandboxes; past that a request is refused rather than queued,
+because a clear "try again shortly" beats a page that hangs. Ten idle
+minutes, thirty absolute, forty payments each. Ninety requests a minute
+per address, hashed rather than stored. A 64 KiB body cap.
+
+The chain path has its own: a wallet funded on purpose with a few
+thousandths of an ether and separate from the smoke scripts', a hard cap
+on total payments, a balance floor so it stops while it can still pay
+gas, two payments per caller, and a wallet-level maximum two orders of
+magnitude below what the page asks. The worst case is that the page stops
+working.
 
 ## Running it
 
 ```bash
 cargo build -p moat-gateway --release
-cd demo && pnpm install && pnpm start          # 127.0.0.1:8787
-cloudflared tunnel --url http://127.0.0.1:8787 # prints a random URL
+cd demo && pnpm install && pnpm start
 ```
 
-The tunnel is a quick tunnel: a random `trycloudflare.com` hostname, no
-DNS record, no account, nothing attached to a domain. Stop it and the URL
-is gone.
+Under systemd on the pilot host, `moat-demo.service` runs the page and
+`moat-demo-tunnel.service` runs a Cloudflare quick tunnel. The tunnel is
+deliberately **not** bound to the page: a quick tunnel mints a new
+hostname every time it starts, so binding them would change the public
+URL on every deploy. `moat-demo-url` prints the current one.
 
 | Variable | Meaning |
 |---|---|
-| `MOAT_DEMO_PORT` | Listen port. Default 8787, bound to loopback only. |
-| `MOAT_DEMO_MAX_SENDS` | Real payments before the page refuses. Default 40. |
-| `MOAT_DEMO_CONFIG` | Gateway config for the mock scenarios. |
-| `MOAT_DEMO_WALLET_ADDRESS` | The chain demo's wallet; absent disables that section. |
+| `MOAT_DEMO_PORT` | Listen port, loopback only. Default 8787. |
+| `MOAT_DEMO_KEYS` | Writable directory for per-sandbox signing keys. |
+| `MOAT_DEMO_MAX_SANDBOXES` | Live ceiling. Default 12. |
+| `MOAT_DEMO_MAX_SENDS` | Real chain payments before refusing. Default 40. |
+| `MOAT_EVM_STATE_DIR` | Where the chain wallet records signed transactions. Must be writable. |
 
-`.env.evm-demo` holds the demo wallet's key, is mode 0600 and is ignored
-by Git. It is a testnet key holding a few thousandths of an ether and it
-should still never be committed.
+The wallet secret lives in `/etc/moat/moat-demo.env`, read by systemd as
+root and injected; the service user never needs access to it. Host paths
+do not belong in that file -- one left there overrode the unit and sent
+the wallet writing to a read-only directory.
 
-## What this page is not
+## What this is not
 
-It is not the product. There is no approval console here — when Moat steps
-up, a real deployment needs a human surface for that, and building one is
-separate work. And the page demonstrates; the arena measures. The numbers
-in the header come from the published run, not from anything a visitor
-clicks.
+It is not the product, and there is no approval console: when Moat steps
+up, a real deployment needs a human surface for that and this has none.
+The page demonstrates; the arena measures.
