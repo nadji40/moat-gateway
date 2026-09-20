@@ -331,6 +331,22 @@ export class Wallet {
       return { record: existing, view: await this.view(existing.signature, false), replayed: true };
     }
 
+    // Solana will not leave an account below the rent-exempt minimum, so a
+    // transfer that would create one with dust fails in simulation with a
+    // message about account index 2. There is no equivalent on an EVM
+    // chain, where an address costs nothing to exist, and it is the first
+    // thing anyone plugging in Solana hits. Say it plainly and early.
+    const rentExempt = BigInt(await this.connection.getMinimumBalanceForRentExemption(0));
+    const held = await this.balanceLamports(input.to);
+    if (held + lamports < rentExempt) {
+      throw new Error(
+        `${input.amount} SOL would leave ${input.to} below the rent-exempt minimum of ` +
+          `${fromBaseUnits(rentExempt, SOL_DECIMALS)} SOL; it holds ` +
+          `${fromBaseUnits(held, SOL_DECIMALS)}. Send at least ` +
+          `${fromBaseUnits(rentExempt - held, SOL_DECIMALS)} SOL, or fund the account first.`,
+      );
+    }
+
     const { account, nonce } = await this.nonce();
     const transaction = new Transaction();
     // The nonce advance must be the first instruction; that is what makes

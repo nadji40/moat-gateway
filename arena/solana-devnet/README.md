@@ -33,6 +33,27 @@ same signed bytes the way the EVM adapter does.
 Without this the adapter would look correct and be wrong in the one case it
 was written for.
 
+## The other thing that bites
+
+**You cannot create an account with dust.** Solana refuses to leave an
+account below the rent-exempt minimum, currently about 0.00089 SOL, so a
+transfer of 0.0001 to an address that does not exist yet fails in
+simulation with a message about "account (2)". There is no equivalent on
+an EVM chain, where an address costs nothing to exist. The wallet checks
+for this before signing and says so in those words; the smoke sends 0.002
+for the same reason.
+
+**A signed transaction that failed to broadcast stays on the ledger.** The
+adapter writes the signed bytes before it broadcasts, so if the broadcast
+throws, the record remains with `broadcast: false` and a retry rebroadcasts
+those same bytes rather than signing new ones. That is deliberate and it is
+fail-closed: a broadcast that throws may still have landed -- a timeout
+after the node accepted it looks identical to a refusal -- and on an
+irreversible rail the one thing you must not do is sign a second
+transaction. The cost is that a transfer which definitively failed stays
+stuck until an operator clears the record. Paying twice is worse than
+stopping.
+
 ## Setup
 
 Node 22 on `PATH` and the gateway built:

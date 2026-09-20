@@ -38,8 +38,12 @@ const gatewayCandidates = [
   resolve(repo, "target/debug/moat-gateway.exe"),
   resolve(repo, "target/debug/moat-gateway"),
 ];
-/** Small enough that one airdrop covers many runs. */
-const AMOUNT = "0.0001";
+/**
+ * Above the rent-exempt minimum, which is the floor for creating an
+ * account at all on this chain, and small enough that one airdrop covers
+ * many runs.
+ */
+const AMOUNT = "0.002";
 
 interface Outcome {
   authorization_id: string;

@@ -123,8 +123,15 @@ async function main(): Promise<void> {
 
   // Appended rather than rewritten: the file holds a private key and the
   // less this touches it the better.
+  // An uncommented assignment, specifically. keygen leaves a commented
+  // placeholder in the file, and matching that told the first run to set
+  // the value by hand while the account it had just paid rent for went
+  // unrecorded.
   const existing = readFileSync(ENV_PATH, "utf8");
-  if (existing.includes("MOAT_SOLANA_NONCE_ACCOUNT=")) {
+  const alreadySet = existing
+    .split(NEWLINE)
+    .some((line) => line.trimStart().startsWith("MOAT_SOLANA_NONCE_ACCOUNT="));
+  if (alreadySet) {
     process.stderr.write(
       `set MOAT_SOLANA_NONCE_ACCOUNT=${nonceAccount.publicKey.toBase58()} by hand${NEWLINE}`,
     );
