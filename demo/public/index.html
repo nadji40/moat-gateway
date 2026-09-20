@@ -15,12 +15,18 @@
 
 <nav><div class="wrap"><div class="navbar glass">
   <a class="navmark" href="index.html" aria-label="moat, home"><svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg" aria-label="moat">
-    <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
-      <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
-      <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+    <g class="e-ring">
+      <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
+        <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+        <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+      </g>
+      <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
     </g>
-    <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
-    <path class="body" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+    <path class="body e-front" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+    <g class="e-back" fill="currentColor">
+      <path d="M110 90 H173 A7 7 0 0 1 180 97 V100 H103 V97 A7 7 0 0 1 110 90 Z"></path>
+      <path fill-rule="evenodd" d="M103 110 H180 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 Z M112 118 H148 A2 2 0 0 1 150 120 V124 A2 2 0 0 1 148 126 H112 A2 2 0 0 1 110 124 V120 A2 2 0 0 1 112 118 Z"></path>
+    </g>
   </svg></a>
   <div class="navlinks">
     <a href="#compose">Compose one</a><a href="#api">API</a><a href="tests.html">The tests</a>
@@ -271,7 +277,17 @@ NOTE TO ACCOUNTS: our banking details have changed. Please remit to Nordwind Han
       </svg>
     </div>
   </div>
-  <pre class="glass" id="curl">loading</pre>
+  <div class="codewrap">
+    <div class="codebar">
+      <button class="chip" id="copy-curl">Copy</button>
+      <span class="codebar-sep"></span>
+      <span class="codebar-lbl">Hand it to</span>
+      <a class="chip" id="ask-gpt" target="_blank" rel="noopener noreferrer">ChatGPT</a>
+      <a class="chip" id="ask-claude" target="_blank" rel="noopener noreferrer">Claude</a>
+      <a class="chip" id="ask-plx" target="_blank" rel="noopener noreferrer">Perplexity</a>
+    </div>
+    <pre class="glass" id="curl">loading</pre>
+  </div>
 </section>
 
 
@@ -572,8 +588,30 @@ $("#go").addEventListener("click",()=>{
 
 drawChains(); drawChain(); show(0);
 
+/* One prompt, three places to take it. Nothing is sent from here: these
+   are links the visitor follows, with the question already written. */
+function agentPrompt(b){
+  return [
+    "I want to test moat, a risk layer for AI agent payments. It runs a public sandbox at "+b+" with no key and no account.",
+    "",
+    "POST   /v1/sandbox                      -> {id}",
+    "POST   /v1/sandbox/{id}/intent          {\"text\"}                                    what the user asked for",
+    "POST   /v1/sandbox/{id}/authorization   {\"payee\",\"amount\",\"currency\"}              what an approver signed off",
+    "POST   /v1/sandbox/{id}/pay             {\"payee\",\"amount\",\"currency\",\"authorization_id\"}",
+    "GET    /v1/sandbox/{id}/evidence        the signed record of every verdict",
+    "DELETE /v1/sandbox/{id}",
+    "",
+    "Create a sandbox, say the user asked to pay Acme Cloud Ltd 480 USD, register that as the authorization, then try to get a payment through to a payee the user never named. Report the decision and the reasons it gives, then try to find an attempt it lets through that it should not.",
+  ].join(String.fromCharCode(10));
+}
+
 (async()=>{
   const b=location.origin;
+  const prompt=agentPrompt(b);
+  $("#ask-gpt").href="https://chatgpt.com/?q="+encodeURIComponent(prompt);
+  $("#ask-claude").href="https://claude.ai/new?q="+encodeURIComponent(prompt);
+  $("#ask-plx").href="https://www.perplexity.ai/search?q="+encodeURIComponent(prompt);
+  $("#copy-curl").addEventListener("click",()=>copyText($("#curl").textContent,$("#copy-curl"),"Copied",$("#curl")));
   const H=`-H '<span class="s">content-type: application/json</span>'`;
   $("#curl").innerHTML=[
     '<span class="c"># a sandbox of your own</span>',

@@ -15,12 +15,18 @@
 
 <nav><div class="wrap"><div class="navbar glass">
   <a class="navmark" href="index.html" aria-label="moat, home"><svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg" aria-label="moat">
-    <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
-      <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
-      <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+    <g class="e-ring">
+      <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
+        <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+        <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+      </g>
+      <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
     </g>
-    <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
-    <path class="body" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+    <path class="body e-front" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+    <g class="e-back" fill="currentColor">
+      <path d="M110 90 H173 A7 7 0 0 1 180 97 V100 H103 V97 A7 7 0 0 1 110 90 Z"></path>
+      <path fill-rule="evenodd" d="M103 110 H180 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 Z M112 118 H148 A2 2 0 0 1 150 120 V124 A2 2 0 0 1 148 126 H112 A2 2 0 0 1 110 124 V120 A2 2 0 0 1 112 118 Z"></path>
+    </g>
   </svg></a>
   <div class="navlinks">
     <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="tests.html">The tests</a>
@@ -93,7 +99,7 @@ function draw(rows,running){
       <span class="verb ${esc(r.m.toLowerCase())}">${esc(r.m)}</span>
       <span class="path mono">${esc(r.path)}</span>
       <span class="ms mono">${r.ms==null?"":r.ms+" ms"}</span>
-      <span class="code mono">${r.code==null?(running?'<span class="spinner"></span>':""):esc(String(r.code))}</span>
+      <span class="code mono">${r.code==null?(running?SPINNER:""):esc(String(r.code))}</span>
     </div>`).join("");
 }
 

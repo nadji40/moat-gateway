@@ -64,14 +64,27 @@ nav{position:sticky;top:0;z-index:20;padding-top:14px}
 .statusbtn b{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
 .statusbtn.on b{background:var(--green-l)}
 .statusbtn.bad b{background:var(--red-l)}
-@media(max-width:760px){.navlinks{display:none}}
+@media(max-width:760px){.navlinks{display:none}.navbar{justify-content:center;gap:14px}}
+
+/* the mark turns over when you point at it. The load-in uses fill mode
+   'both' rather than a base opacity of 0, so that replacing the animation
+   on hover cannot make the card vanish. */
+.navmark:hover .e-ring,.navmark:focus-visible .e-ring{animation:e-ring 4s cubic-bezier(.7,0,.3,1) infinite}
+.navmark:hover .e-front,.navmark:focus-visible .e-front{animation:e-front 4s infinite}
+.navmark:hover .e-back,.navmark:focus-visible .e-back{animation:e-back 4s infinite}
+.mark .e-ring{transform-box:view-box;transform-origin:141px 115px}
+.mark .e-front{transform-box:view-box;transform-origin:141.5px 115px}
+.mark .e-back{transform-box:view-box;transform-origin:141.5px 115px;transform:scale(0,1)}
+@keyframes e-front{0%,20%{transform:scale(1,1);animation-timing-function:cubic-bezier(.55,0,1,.45)}32%{transform:scale(0,1.08)}82%{transform:scale(0,1.08);animation-timing-function:cubic-bezier(0,.55,.45,1)}94%,100%{transform:scale(1,1)}}
+@keyframes e-back{0%,32%{transform:scale(0,1.08);animation-timing-function:cubic-bezier(0,.55,.45,1)}44%{transform:scale(1,1)}70%{transform:scale(1,1);animation-timing-function:cubic-bezier(.55,0,1,.45)}82%,100%{transform:scale(0,1.08)}}
+@keyframes e-ring{0%,20%{transform:rotate(0deg)}44%,70%{transform:rotate(90deg)}94%,100%{transform:rotate(0deg)}}
 
 /* logo motion */
 .mark .arc{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.3s var(--ease) forwards}
 .mark .arc.two{animation-delay:.18s}
 .mark .dot{opacity:0;animation:pop .5s var(--ease) 1.05s forwards}
 .mark .dot.two{animation-delay:1.2s}
-.mark .body{opacity:0;animation:fade .6s var(--ease) .5s forwards}
+.mark .body{animation:fade .6s var(--ease) .5s both}
 @keyframes draw{to{stroke-dashoffset:0}}
 @keyframes pop{from{opacity:0;r:2}to{opacity:1;r:11}}
 @keyframes fade{to{opacity:1}}
@@ -104,7 +117,7 @@ h1 .g{color:var(--orange)}
 .btn[aria-busy="true"]{opacity:1;cursor:progress;transform:none;
   box-shadow:0 6px 0 var(--edge),0 12px 22px -8px rgba(0,0,0,.9),
     inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 7px -3px rgba(0,0,0,.4)}
-.btn .spinner{width:.85em;height:.85em;border-width:2px}
+.btn .spin-mark{width:1.15em;height:1.15em}
 .btn.ghost{background:rgba(255,255,255,.08);color:var(--ink);border:1px solid var(--line-2);--edge:rgba(255,255,255,.09);
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
   box-shadow:0 6px 0 var(--edge),0 12px 22px -10px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.2)}
@@ -164,7 +177,7 @@ section.tight{padding-block:clamp(48px,7vw,80px)}
 .test .link[disabled]{opacity:.4;cursor:default}
 .test .link[aria-busy="true"]{opacity:1;cursor:progress;color:var(--ink);border-color:var(--c);
   display:inline-flex;align-items:center;gap:7px}
-.test .link .spinner{width:.8em;height:.8em;border-width:2px}
+.test .link .spin-mark{width:1.05em;height:1.05em}
 details.sc{font-size:.82rem;color:var(--ink-2)}
 details.sc summary{cursor:pointer;list-style:none;font-weight:700;color:var(--ink-3);display:flex;align-items:center;justify-content:center;gap:8px}
 details.sc summary::-webkit-details-marker{display:none}
@@ -311,7 +324,21 @@ footer.foot p{max-width:64ch;margin:0 auto}
   border:1px solid var(--line);background:rgba(255,255,255,.05);
   box-shadow:0 3px 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.13)}
 .rail svg{width:18px;height:18px;flex:none;color:var(--c,var(--ink-2))}
-.spinner{display:inline-block;width:.8em;height:.8em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:turn .7s linear infinite;vertical-align:-1px}
+/* work in progress, drawn as the mark: arcs spinning and breathing, dots
+   going the other way, the card holding still */
+.spin-mark{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.15em}
+.spin-mark .s-arcs{transform-box:view-box;transform-origin:141px 115px;animation:d-spin 1.6s linear infinite}
+.spin-mark .s-arc{animation:d-breathe 1.6s ease-in-out infinite}
+.spin-mark .s-dots{transform-box:view-box;transform-origin:141px 115px;animation:d-spin 3.2s linear infinite reverse}
+@keyframes d-spin{to{transform:rotate(360deg)}}
+@keyframes d-breathe{0%{stroke-dasharray:6 94;stroke-dashoffset:0}50%{stroke-dasharray:70 30;stroke-dashoffset:-20}100%{stroke-dasharray:6 94;stroke-dashoffset:-100}}
+
+/* the bar above the curl block */
+.codewrap{display:grid;gap:12px}
+.codebar{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.codebar .chip{text-decoration:none}
+.codebar-lbl{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.codebar-sep{width:1px;height:18px;background:var(--line)}
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
   .test,.test.enter,.mark .dot,.mark .body{opacity:1}
