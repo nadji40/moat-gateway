@@ -1,0 +1,23 @@
+{
+  "name": "@moat/solana-devnet",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A real wallet on Solana devnet, with Moat in front of it. The chain counterpart of evm-testnet for the second chain family.",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=../../.env.solana-devnet --import tsx src/server.ts",
+    "keygen": "tsx src/keygen.ts",
+    "fund": "node --env-file=../../.env.solana-devnet --import tsx src/fund.ts",
+    "smoke": "node --env-file=../../.env.solana-devnet --import tsx src/smoke.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@solana/web3.js": "^1.98.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}

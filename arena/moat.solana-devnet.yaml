@@ -1,0 +1,15 @@
+# Real Solana devnet upstream for a narrow Moat demonstration: genuine
+# transactions on a public cluster, Moat in front of the wallet.
+# Run from arena/ with Node 22 on PATH. The key lives in
+# ../.env.solana-devnet, which is ignored by Git. See solana-devnet/README.md.
+listen: { transport: stdio }
+upstreams:
+  - name: wallet
+    rail: crypto
+    transport: stdio
+    command:
+      ["node", "--env-file=../.env.solana-devnet", "--import", "tsx", "solana-devnet/src/server.ts"]
+policy: ../policies/rails/solana-devnet.yaml
+evidence: ./results/solana-devnet-evidence.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7078" }

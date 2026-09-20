@@ -1,0 +1,59 @@
+version: 1
+
+# The policy in front of the real Solana devnet wallet.
+#
+# rails/solana.yaml with the address book taken out, and the same shape as
+# rails/evm-testnet.yaml: nothing is approved in advance, so every payment
+# has to be authorized through the intent API with a payee, an address, an
+# amount, an asset and a cluster. A base58 address is compared on its
+# canonical form and matched exactly, which is what makes an address that
+# shares its first and last characters with the approved one fail.
+#
+# The cap is a bare number in whole SOL. It is a guard on airdropped
+# funds, not a statement about anyone's limits.
+
+payment_tools:
+  - server: "*"
+    tool: "send"
+
+fields:
+  payee:       { args: ["counterparty"] }
+  amount:      { args: ["amount"] }
+  currency:    { args: ["token"] }
+  destination: { kind: destination, args: ["to_address"] }
+  network:     { args: ["network"] }
+
+allowlist:
+  payees: []
+  accounts: []
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User]
+    on_fail: step_up
+    message: "counterparty label did not come from the user"
+
+  - id: destination-provenance
+    when: field == destination
+    require_source: [User]
+    on_fail: deny
+    message: "destination address did not come from the user"
+
+  - id: amount-cap
+    when: field == amount
+    max: 0.01
+    on_fail: deny
+    message: "amount exceeds the devnet cap"
+
+  - id: amount-provenance
+    when: field == amount
+    require_source: [User, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 20
+  max_calls_per_minute: 10
+  on_exceed: deny
+
+no_human_available: deny
