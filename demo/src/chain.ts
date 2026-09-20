@@ -261,14 +261,37 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
           authorization_id: authorizationId,
           invoice_id: invoiceId,
         },
-      })) as { structuredContent?: { receipt?: string; status?: string; explorer_url?: string } };
+      })) as {
+        structuredContent?: {
+          receipt?: string;
+          status?: string;
+          explorer_url?: string;
+          reason?: string;
+        };
+      };
       if (forged) {
         // Should be unreachable: the page's claim is that this is refused.
         return { status: 500, body: { error: "the forged payment was not refused" } };
       }
+      const s = result.structuredContent ?? {};
+      // Moat allowing and the wallet succeeding are two different things,
+      // and a page that reports only the first is lying by omission. If
+      // the wallet refused, say so and say why.
+      if (!s.receipt) {
+        return {
+          status: 200,
+          body: {
+            mode: "approved",
+            decision: "allow",
+            to: approved,
+            tx: null,
+            wallet_refused: s.reason ?? s.status ?? "the wallet returned no transaction",
+            remaining: Math.max(0, MAX_SENDS - sent),
+          },
+        };
+      }
       sent += 1;
       byCaller.set(who, (byCaller.get(who) ?? 0) + 1);
-      const s = result.structuredContent ?? {};
       return {
         status: 200,
         body: {
