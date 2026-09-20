@@ -1,197 +1,92 @@
-// The public try-it service.
+// The public sandbox: a gateway anyone can point a payment at.
 //
-// It serves one page and runs real verdicts behind it. Each run spawns its
-// own gateway process with its own session and kills it afterwards, so one
-// visitor can never see or affect another's state. That costs about two
-// seconds a run and is worth it: the alternative is a shared session on a
-// public endpoint, which is a different demonstration entirely.
+// Two surfaces over the same thing. A page where you compose the attack
+// yourself -- what the user asked for, what the approver signed, what the
+// agent then tries -- and an HTTP API with the same four calls, so the
+// interesting version is driving it from your own agent rather than from
+// a form.
 //
-// What is deliberately not here: no accounts, no database, no persistence.
-// The only mutable state is a spend counter, and it is in memory, so a
-// restart is also a reset.
-//
-// Safety, because this is public and one path spends real value:
-//
-//   The gateway it drives talks to the arena's mock payment server, so the
-//   scenario buttons move nothing anywhere.
-//
-//   The one button that does move value uses a wallet funded on purpose
-//   with almost nothing, separate from the wallets the smoke scripts use.
-//   It is rate limited per address and capped in total, and the cap is
-//   enforced here rather than by hoping the balance lasts.
+// The API is deliberately not a copy of Moat's own. This exposes the four
+// verbs a visitor needs and nothing else: no tenants, no keys, no
+// reconciliation, no cancellation. A public sandbox that exposed the
+// control plane would be demonstrating the wrong thing.
 
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, type ServerResponse } from "node:http";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { McpError } from "@modelcontextprotocol/sdk/types.js";
-import { SCENARIOS, scenario } from "./scenarios.js";
 import { chainDemo, chainState } from "./chain.js";
+import {
+  authorize,
+  create,
+  destroy,
+  evidence,
+  intent,
+  LIMITS,
+  pay,
+  SandboxError,
+  stats,
+  type SandboxConfig,
+} from "./sandbox.js";
 
 const HERE = dirname(dirname(fileURLToPath(import.meta.url)));
-const REPO = resolve(HERE, "..");
 const PUBLIC = join(HERE, "public");
+const CFG: SandboxConfig = {
+  repo: resolve(HERE, ".."),
+  config: process.env["MOAT_DEMO_CONFIG"] ?? join(resolve(HERE, ".."), "arena", "moat.demo.yaml"),
+  api: process.env["MOAT_DEMO_INTENT_API"] ?? "http://127.0.0.1:7090",
+};
 const PORT = Number(process.env["MOAT_DEMO_PORT"] ?? "8787");
-const CONFIG = process.env["MOAT_DEMO_CONFIG"] ?? join(REPO, "arena", "moat.demo.yaml");
-const DENY = -31051;
-const STEP_UP = -31050;
 
-const GATEWAY = [
-  join(REPO, "target", "release", "moat-gateway.exe"),
-  join(REPO, "target", "release", "moat-gateway"),
-].find(existsSync);
+/** Requests per address per minute, so one script cannot hold the page. */
+const WINDOW_MS = 60_000;
+const PER_WINDOW = 90;
+const seen = new Map<string, { n: number; from: number }>();
 
-/** A crude per-address budget, so one visitor cannot hold the whole page. */
-const RUNS = new Map<string, { count: number; first: number }>();
-const RUN_WINDOW_MS = 60_000;
-const RUNS_PER_WINDOW = 20;
-
-function allowed(who: string): boolean {
-  const now = Date.now();
-  const seen = RUNS.get(who);
-  if (!seen || now - seen.first > RUN_WINDOW_MS) {
-    RUNS.set(who, { count: 1, first: now });
-    return true;
-  }
-  seen.count += 1;
-  return seen.count <= RUNS_PER_WINDOW;
-}
-
-/** The caller, as well as a tunnel lets us know it. */
-function caller(headers: Record<string, string | string[] | undefined>): string {
-  const forwarded = headers["cf-connecting-ip"] ?? headers["x-forwarded-for"];
-  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+function caller(h: Record<string, string | string[] | undefined>): string {
+  const fwd = h["cf-connecting-ip"] ?? h["x-forwarded-for"];
+  const raw = Array.isArray(fwd) ? fwd[0] : fwd;
   const ip = (raw ?? "local").split(",")[0]!.trim();
-  // Hashed: the page has no reason to hold anyone's address, and the
-  // counter works just as well on a digest.
+  // Hashed: a counter works as well on a digest, and the page has no
+  // business holding anyone's address.
   return createHash("sha256").update(ip).digest("hex").slice(0, 16);
 }
 
-interface Verdict {
-  decision: "allow" | "deny" | "step_up";
-  reasons: { id: string; passed: boolean; message: string }[];
-  evidenceId?: string;
+function overLimit(who: string): boolean {
+  const now = Date.now();
+  const s = seen.get(who);
+  if (!s || now - s.from > WINDOW_MS) {
+    seen.set(who, { n: 1, from: now });
+    return false;
+  }
+  s.n += 1;
+  return s.n > PER_WINDOW;
 }
 
-/**
- * Run one scenario through a real gateway and report what it decided.
- *
- * The session is thrown away afterwards. The intent is registered as the
- * user's own words, which is what gives those words provenance; everything
- * the agent then tries is measured against them.
- */
-async function run(id: string): Promise<{ verdict: Verdict; ledger: boolean }> {
-  const s = scenario(id);
-  if (!s) throw new Error(`no scenario ${id}`);
-  if (!GATEWAY) throw new Error("the gateway binary is not built");
+function json(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store",
+    "access-control-allow-origin": "*",
+  });
+  res.end(JSON.stringify(body, null, 2));
+}
 
-  const session = `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const api = process.env["MOAT_DEMO_INTENT_API"] ?? "http://127.0.0.1:7090";
-  const client = new Client({ name: "moat-demo", version: "0.1.0" });
-  const ledgerPath = join(
-    process.env["TMPDIR"] ?? process.env["TEMP"] ?? "/tmp",
-    `moat-demo-${session}.json`,
-  );
-
-  await client.connect(
-    new StdioClientTransport({
-      command: GATEWAY,
-      args: ["--config", CONFIG, "--session-id", session],
-      cwd: join(REPO, "arena"),
-      env: { ...process.env, MOCK_STRIPE_LEDGER: ledgerPath } as Record<string, string>,
-      stderr: "ignore",
-    }),
-  );
-
+async function readJson(req: import("node:http").IncomingMessage): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const c of req) {
+    size += (c as Buffer).length;
+    // A public endpoint should not accept an arbitrarily large body.
+    if (size > 64 * 1024) throw new SandboxError(413, "body too large");
+    chunks.push(c as Buffer);
+  }
+  if (chunks.length === 0) return {};
   try {
-    for (let i = 0; i < 60; i += 1) {
-      try {
-        const probe = await fetch(`${api}/v1/session/${encodeURIComponent(session)}/evidence`);
-        if (probe.ok) break;
-      } catch {
-        /* not up yet */
-      }
-      await new Promise((r) => setTimeout(r, 100));
-    }
-
-    // The user's own words. This is the only channel that confers authority.
-    await fetch(`${api}/v1/session/${encodeURIComponent(session)}/intent`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: s.task }),
-    });
-
-    const args: Record<string, unknown> = { ...s.call };
-    if (s.authorization) {
-      const authorizationId = `auth-${session}`;
-      const invoiceId = `INV-${session}`;
-      await fetch(`${api}/v1/session/${encodeURIComponent(session)}/authorizations`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          authorization_id: authorizationId,
-          invoice_id: invoiceId,
-          payee: s.authorization.payee,
-          amount: s.authorization.amount,
-          tolerance: 0,
-          currency: s.authorization.currency,
-          expires_at: new Date(Date.now() + 3_600_000).toISOString(),
-          repeat_payments: false,
-          max_payments: 1,
-        }),
-      });
-      args["authorization_id"] = authorizationId;
-      args["invoice_id"] = invoiceId;
-    }
-
-    let verdict: Verdict;
-    try {
-      await client.callTool({ name: "stripe__pay", arguments: args });
-      verdict = { decision: "allow", reasons: [] };
-    } catch (error) {
-      if (!(error instanceof McpError) || (error.code !== DENY && error.code !== STEP_UP)) {
-        throw error;
-      }
-      const data = error.data as {
-        moat?: { reasons?: { id: string; passed: boolean; message: string }[]; evidence_id?: string };
-      };
-      verdict = {
-        decision: error.code === DENY ? "deny" : "step_up",
-        reasons: (data.moat?.reasons ?? []).filter((r) => !r.passed),
-        ...(data.moat?.evidence_id ? { evidenceId: data.moat.evidence_id } : {}),
-      };
-    }
-
-    // The evidence record, so the page can show that the verdict was
-    // written down and signed rather than merely returned.
-    let evidenceId = verdict.evidenceId;
-    if (!evidenceId) {
-      try {
-        const res = await fetch(`${api}/v1/session/${encodeURIComponent(session)}/evidence`);
-        const body = (await res.json()) as { evidence?: { id: string }[] };
-        evidenceId = body.evidence?.at(-1)?.id;
-      } catch {
-        /* the page copes without it */
-      }
-    }
-
-    // Did the mock provider actually take money? The only honest way to
-    // answer "was the attacker paid".
-    let ledger = false;
-    try {
-      const entries = JSON.parse(readFileSync(ledgerPath, "utf8")) as unknown[];
-      ledger = Array.isArray(entries) && entries.length > 0;
-    } catch {
-      /* no ledger written means nothing was paid */
-    }
-
-    return { verdict: { ...verdict, ...(evidenceId ? { evidenceId } : {}) }, ledger };
-  } finally {
-    await client.close().catch(() => {});
+    return JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<string, unknown>;
+  } catch {
+    throw new SandboxError(400, "body is not valid JSON");
   }
 }
 
@@ -202,50 +97,71 @@ const TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-function json(res: import("node:http").ServerResponse, status: number, body: unknown): void {
-  const text = JSON.stringify(body);
-  res.writeHead(status, {
-    "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
-  });
-  res.end(text);
-}
-
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
-  const who = caller(req.headers);
-
-  // Nothing here is worth framing, embedding or sniffing.
+  const path = url.pathname;
+  const method = req.method ?? "GET";
   res.setHeader("x-content-type-options", "nosniff");
-  res.setHeader("x-frame-options", "DENY");
   res.setHeader("referrer-policy", "no-referrer");
 
+  if (method === "OPTIONS") {
+    res.writeHead(204, {
+      "access-control-allow-origin": "*",
+      "access-control-allow-headers": "content-type",
+      "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+    });
+    return res.end();
+  }
+
   try {
-    if (url.pathname === "/api/scenarios") {
-      return json(res, 200, { scenarios: SCENARIOS, chain: chainState() });
+    if (path.startsWith("/v1/")) {
+      if (overLimit(caller(req.headers))) {
+        return json(res, 429, { error: "too many requests from here; wait a minute" });
+      }
     }
 
-    if (url.pathname === "/api/run" && req.method === "POST") {
-      if (!allowed(who)) {
-        return json(res, 429, { error: "too many runs from here; wait a minute" });
-      }
-      const id = url.searchParams.get("scenario") ?? "";
-      if (!scenario(id)) return json(res, 400, { error: "unknown scenario" });
-      const started = Date.now();
-      const { verdict, ledger } = await run(id);
-      return json(res, 200, { verdict, paid: ledger, ms: Date.now() - started });
+    if (path === "/v1/limits") {
+      return json(res, 200, { ...stats(), ...LIMITS, chain: chainState() });
     }
 
-    if (url.pathname === "/api/chain" && req.method === "POST") {
-      if (!allowed(who)) {
-        return json(res, 429, { error: "too many runs from here; wait a minute" });
+    if (path === "/v1/sandbox" && method === "POST") {
+      return json(res, 201, await create(CFG));
+    }
+
+    const m = /^\/v1\/sandbox\/([A-Za-z0-9_-]{1,32})(\/[a-z]+)?$/.exec(path);
+    if (m) {
+      const id = m[1]!;
+      const leaf = m[2] ?? "";
+      if (leaf === "/intent" && method === "POST") {
+        const body = await readJson(req);
+        const text = String(body["text"] ?? "").slice(0, 4000);
+        if (!text.trim()) return json(res, 400, { error: "intent text is required" });
+        await intent(CFG, id, text);
+        return json(res, 200, { ok: true });
       }
-      const outcome = await chainDemo(who, url.searchParams.get("mode") ?? "approved");
+      if (leaf === "/authorization" && method === "POST") {
+        return json(res, 200, await authorize(CFG, id, await readJson(req)));
+      }
+      if (leaf === "/pay" && method === "POST") {
+        return json(res, 200, await pay(CFG, id, await readJson(req)));
+      }
+      if (leaf === "/evidence" && method === "GET") {
+        return json(res, 200, await evidence(CFG, id));
+      }
+      if (leaf === "" && method === "DELETE") {
+        await destroy(id);
+        return json(res, 200, { ok: true });
+      }
+    }
+
+    if (path === "/v1/chain" && method === "POST") {
+      const outcome = await chainDemo(caller(req.headers), url.searchParams.get("mode") ?? "approved");
       return json(res, outcome.status, outcome.body);
     }
 
-    // Static files, from one directory, resolved and then checked.
-    const wanted = url.pathname === "/" ? "/index.html" : url.pathname;
+    if (path.startsWith("/v1/")) return json(res, 404, { error: "no such endpoint" });
+
+    const wanted = path === "/" ? "/index.html" : path;
     const file = resolve(PUBLIC, `.${wanted}`);
     if (!file.startsWith(PUBLIC) || !existsSync(file)) {
       res.writeHead(404, { "content-type": "text/plain" });
@@ -257,14 +173,12 @@ const server = createServer(async (req, res) => {
     });
     return res.end(readFileSync(file));
   } catch (error) {
-    // Never leak an internal error to a public page.
+    if (error instanceof SandboxError) return json(res, error.status, { error: error.message });
     process.stderr.write(`demo: ${String(error)}\n`);
-    return json(res, 500, { error: "the demo could not complete that run" });
+    return json(res, 500, { error: "the sandbox could not complete that" });
   }
 });
 
 server.listen(PORT, "127.0.0.1", () => {
-  process.stderr.write(
-    `moat demo on http://127.0.0.1:${PORT} (gateway ${GATEWAY ?? "NOT BUILT"})\n`,
-  );
+  process.stderr.write(`moat sandbox on http://127.0.0.1:${PORT}\n`);
 });
