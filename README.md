@@ -818,6 +818,58 @@ The run and its manifest are committed under
 [`arena/analysis/`](arena/analysis/README.md) regenerates every number above
 from them rather than anyone typing one in.
 
+### Four rails, one control (2026-09-20)
+
+The same corpus, the same four arms and the same scoring, run on card, bank
+transfer and two chains. A rail changes what the money is -- a card account,
+an IBAN, an EVM address, a Solana address -- and what the provider's tool
+calls its arguments. It does not change a single check. Null backend, five
+iterations per scenario per arm, 2,060 runs, no errors, Wilson 95% intervals:
+
+| rail | `none` | `cap` | `allowlist` | `moat` | 95% CI on `moat` | legitimate through `moat` |
+|---|---:|---:|---:|---:|---|---:|
+| card | 85/85 | 85/85 | 45/85 | **0/85** | [0.000, 0.043] | 25/25 |
+| bank | 90/90 | 90/90 | 40/90 | **0/90** | [0.000, 0.041] | 35/35 |
+| evm | 105/105 | 100/105 | 55/105 | **0/105** | [0.000, 0.035] | 40/40 |
+| solana | 100/100 | 95/100 | 50/100 | **0/100** | [0.000, 0.037] | 35/35 |
+
+Three things in this table are worth more than the zeros.
+
+**The baselines fail differently on different rails, and Moat does not.** A
+cap stops nothing on card or bank, and on the chains it stops exactly one
+scenario of the twenty-odd: the base-unit confusion, which states the
+amount in base units and so asks for a number large enough to breach the
+cap by accident rather than by being understood. An
+allowlist stops between 44% and 53% depending on the rail, and what it
+stops is the wrong *name*: the wrong account, a substituted asset, a
+duplicate invoice and an inflated price to the right payee go through it
+everywhere. Which half of the corpus a list happens to catch is a property
+of the corpus, not of the list.
+
+**The allowlist's cost moves with the rail too.** It blocks 20% of
+legitimate card payments, 12.5% of legitimate EVM ones -- a supplier who is
+not on the list is refused whatever the user asked for. Moat completed
+every legitimate task on every rail: 135 of 135.
+
+**Nothing was added to the core to make the chains work.** `Rail::Crypto`
+is irreversible, and one method saying so is what gives the chains the
+hold-and-quarantine behaviour the bank rail already had. The two checks
+that are genuinely new -- the bound network, and the asset contract added
+since this run -- exist because an address is not an account without a
+chain and a ticker is not an asset without a contract, not because crypto
+needed its own engine.
+
+Added `pay` latency at p50, measured only on calls that reached the
+provider: +1.6 ms card, +1.4 ms bank, +1.9 ms EVM, +1.7 ms Solana.
+
+This run is two runs joined. The first was stopped with 1,285 of 2,060 rows
+on disk; the second ran only the scenario and rail cells it had never
+reached, whole, and the join is refused unless it is exactly the planned
+set -- every cell once, none missing, none from both halves. Its manifest
+records both commits and the one code difference between them. Against the
+previously published card-and-bank baseline, all 188 shared cells agree
+exactly.
+
 ### First results against a real model (2026-09-16)
 
 OpenAI Agents SDK, `policies/default.yaml`, one run per attack per mode. The
