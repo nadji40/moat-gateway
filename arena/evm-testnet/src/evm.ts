@@ -33,7 +33,8 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createPublicClient,
   createWalletClient,
@@ -153,11 +154,42 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): WalletConfi
     authorized,
     unauthorized,
     ...(token ? { token } : {}),
-    stateDir: env["MOAT_EVM_STATE_DIR"]?.trim() || join(process.cwd(), "state"),
+    stateDir: env["MOAT_EVM_STATE_DIR"]?.trim() || defaultStateDir(),
     confirmations: Number.isInteger(confirmations) && confirmations >= 0 ? confirmations : 1,
     finality: Number.isInteger(finality) && finality >= 1 ? finality : 12,
     maxSendEther,
   };
+}
+
+/**
+ * Where signed transactions are kept when nothing says otherwise.
+ *
+ * Anchored to this package, not to the working directory. The wallet runs as
+ * a child of the gateway and inherits its directory, while the smoke script
+ * that audits the same ledger runs from here; a cwd-relative default gives
+ * the two of them different files and the audit reads an empty one.
+ */
+export function defaultStateDir(): string {
+  return join(dirname(dirname(fileURLToPath(import.meta.url))), "state");
+}
+
+/**
+ * Retry a read that asks for a specific block.
+ *
+ * One endpoint is many nodes, and the one that answers may not have the
+ * block the one before it just told us about. Waiting for the head is not
+ * enough on its own, because the next request can land on a different
+ * replica; asking again is what gets a node that has it.
+ */
+async function retrying<T>(read: () => Promise<T>, tries = 10): Promise<T> {
+  for (let i = 0; ; i += 1) {
+    try {
+      return await read();
+    } catch (error) {
+      if (i >= tries - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
 }
 
 /** The assets this wallet can move: ether always, the test token if configured. */
@@ -309,27 +341,49 @@ export class Wallet {
     );
   }
 
-  async balances(): Promise<Record<string, string>> {
+  /**
+   * What each party holds, read at one block.
+   *
+   * `at` pins the block, and a caller that has just watched transactions
+   * mine should pass the last block it saw. A public endpoint is several
+   * nodes behind one address, and an unpinned read can land on one that is
+   * a block behind the receipt it was handed a moment ago -- which prints a
+   * total that does not account for a transfer listed in the same report.
+   */
+  async balances(at?: bigint): Promise<Record<string, string>> {
     const out: Record<string, string> = {};
+    const block = at === undefined ? {} : { blockNumber: at };
+    if (at !== undefined) await this.waitForHead(at);
     const parties: [string, Address][] = [
       ["sender", this.address],
       ["authorized", this.config.authorized.address],
       ["unauthorized", this.config.unauthorized.address],
     ];
     for (const [label, who] of parties) {
-      const wei = await this.publicClient.getBalance({ address: who });
+      const wei = await retrying(() => this.publicClient.getBalance({ address: who, ...block }));
       out[`${label}.ETH`] = formatUnits(wei, 18);
       if (this.config.token) {
-        const units = await this.publicClient.readContract({
-          address: this.config.token.address,
-          abi: erc20Abi,
-          functionName: "balanceOf",
-          args: [who],
-        });
+        const units = await retrying(() =>
+          this.publicClient.readContract({
+            address: this.config.token!.address,
+            abi: erc20Abi,
+            functionName: "balanceOf",
+            args: [who],
+            ...block,
+          }),
+        );
         out[`${label}.${this.config.token.symbol}`] = formatUnits(units, this.config.token.decimals);
       }
     }
     return out;
+  }
+
+  /** Wait until the node has the block we are about to read at. */
+  private async waitForHead(block: bigint, tries = 30): Promise<void> {
+    for (let i = 0; i < tries; i += 1) {
+      if ((await this.publicClient.getBlockNumber({ cacheTime: 0 })) >= block) return;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
   }
 
   /**

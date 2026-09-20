@@ -104,7 +104,7 @@ Read from `.env.evm-testnet`. `keygen` writes all of it with comments.
 | `MOAT_EVM_CONFIRMATIONS` | Blocks to wait before reporting `confirmed`. Default `1`. |
 | `MOAT_EVM_FINALITY` | Confirmations after which `get_transaction` reports `finalized`. Default `12`. |
 | `MOAT_EVM_RPC_URL` | Defaults to the public Base Sepolia endpoint. |
-| `MOAT_EVM_STATE_DIR` | Where signed transactions are kept. Default `./state`, ignored by Git. |
+| `MOAT_EVM_STATE_DIR` | Where signed transactions are kept. Defaults to `state/` inside this package -- not the working directory, because the wallet runs as a child of the gateway and the smoke script audits the same file from elsewhere. Ignored by Git. |
 
 ## How a retry stays a retry
 

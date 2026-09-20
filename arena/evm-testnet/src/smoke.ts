@@ -297,6 +297,22 @@ async function main(): Promise<void> {
       }
     }
 
+    // Report the balances at the block that carried the last of these
+    // transactions, so the figures account for every transaction listed
+    // above them. Read against the head instead and a public endpoint can
+    // answer from a node that has not seen the last block yet.
+    // Taken from the wallet's own records, which the loop above has just
+    // checked hash-for-hash against Moat's, so these are the same
+    // transactions the report lists.
+    const signedHashes = [...hashes.keys()].flatMap((id) =>
+      new SentLedger(config.stateDir).forAuthorization(id).map((r) => r.hash),
+    );
+    const blocks = await Promise.all(signedHashes.map(async (h) => (await wallet.view(h, true)).block));
+    const lastBlock = blocks.reduce<bigint | undefined>(
+      (max, b) => (b === null ? max : max === undefined || BigInt(b) > max ? BigInt(b) : max),
+      undefined,
+    );
+
     process.stdout.write(
       JSON.stringify(
         {
@@ -311,7 +327,7 @@ async function main(): Promise<void> {
             transactions_on_chain: hashes.size,
             refused_before_signing: 2,
           },
-          balances_after: await wallet.balances(),
+          balances_after: await wallet.balances(lastBlock),
         },
         null,
         2,
