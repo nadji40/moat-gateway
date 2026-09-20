@@ -19,8 +19,21 @@
   --max:1240px; --pad:clamp(20px,5vw,64px); --sec:clamp(72px,10vw,120px);
   --font:"Manrope","Helvetica Neue",Helvetica,Arial,sans-serif;
   --ease:cubic-bezier(.2,.7,.2,1);
+  --water:
+    inset 8px 8px 12px -9px rgba(255,255,255,.85),
+    inset 16px 18px 28px -18px rgba(0,0,0,.95),
+    inset -7px -16px 22px -11px rgba(255,255,255,.5),
+    inset 0 1px 0 rgba(255,255,255,.14),
+    0 24px 46px -28px rgba(0,0,0,1);
+  --water-lift:
+    inset 9px 9px 13px -10px rgba(255,255,255,.9),
+    inset 15px 16px 26px -19px rgba(0,0,0,.95),
+    inset -7px -18px 24px -14px rgba(255,255,255,.58),
+    inset 0 1px 0 rgba(255,255,255,.2),
+    0 30px 54px -28px rgba(0,0,0,1);
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html{scroll-behavior:smooth}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden}
@@ -35,8 +48,8 @@ p{margin:0}
 ::selection{background:rgba(255,95,0,.35)}
 
 .glass{background:var(--glass);border:1px solid var(--line);
-  -webkit-backdrop-filter:blur(22px) saturate(150%);backdrop-filter:blur(22px) saturate(150%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 50px -20px rgba(0,0,0,.7)}
+  -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+  box-shadow:var(--water)}
 
 /* nav */
 nav{position:sticky;top:0;z-index:20;padding-top:14px}
@@ -71,7 +84,7 @@ header.hero{padding-block:clamp(48px,8vw,96px) clamp(36px,6vw,64px)}
 h1 .g{color:var(--orange)}
 .hero .lede{color:var(--ink-2);max-width:48ch;margin-top:22px;font-size:1.0625rem}
 .hero .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:32px}
-.btn{display:inline-flex;align-items:center;gap:10px;color:#000;border:0;border-radius:999px;padding:14px 26px;
+.btn{display:inline-flex;align-items:center;gap:10px;color:#000;border:0;border-radius:999px;padding:14px 26px;text-decoration:none;
   font:700 .9375rem var(--font);cursor:pointer;letter-spacing:-.01em;background:var(--orange);
   transition:transform .2s var(--ease),background .2s}
 .btn:hover{transform:translateY(-1px);background:#FF7A2B}
@@ -99,14 +112,14 @@ section.tight{padding-block:clamp(48px,7vw,80px)}
 /* tests */
 .tests{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(19.5rem,1fr))}
 .test{border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;position:relative;
-  opacity:0;animation:rise .55s var(--ease) forwards;animation-delay:calc(var(--i,0)*55ms);
-  transition:transform .25s var(--ease),border-color .25s,box-shadow .25s}
-.test:hover{transform:translateY(-2px);border-color:var(--line-2)}
+  transition:transform .25s var(--ease),border-color .25s,box-shadow .35s var(--ease)}
+.test.enter{opacity:0;animation:rise .55s var(--ease) forwards;animation-delay:calc(var(--i,0)*55ms)}
+.test:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:var(--water-lift)}
 .test.running{border-color:var(--c)}
 .test.running:before{content:"";position:absolute;inset:-1px;border-radius:19px;border:1px solid var(--c);
   animation:pulse 1.2s ease-in-out infinite;pointer-events:none}
 @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
-.test.done{border-color:color-mix(in srgb,var(--v) 45%,transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 50px -24px color-mix(in srgb,var(--v) 55%,transparent)}
+.test.done{border-color:color-mix(in srgb,var(--v) 45%,transparent);box-shadow:var(--water),0 22px 46px -26px color-mix(in srgb,var(--v) 40%,transparent)}
 .test .icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
   background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);
   transition:transform .3s var(--ease)}
@@ -163,8 +176,9 @@ details.sc .note{margin-top:10px;padding-top:8px;border-top:1px dashed var(--lin
 .panel .pb{padding:18px;display:grid;gap:14px}
 label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:7px}
 input,textarea{width:100%;padding:11px 13px;font:600 .9375rem var(--font);color:var(--ink);
-  background:rgba(0,0,0,.45);border:1px solid var(--line-2);border-radius:11px;transition:border-color .2s,box-shadow .2s}
-input:focus,textarea:focus{outline:0;border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,95,0,.18)}
+  background:rgba(0,0,0,.45);border:1px solid var(--line-2);border-radius:11px;transition:border-color .2s,box-shadow .2s;
+  box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95),inset 0 -1px 0 rgba(255,255,255,.1)}
+input:focus,textarea:focus{outline:0;border-color:var(--orange);box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95),0 0 0 3px rgba(255,95,0,.18)}
 textarea{resize:vertical;min-height:88px;line-height:1.5;font-weight:500}
 .three{display:grid;grid-template-columns:1fr 6.5rem 5.5rem;gap:10px}
 @media(max-width:520px){.three{grid-template-columns:1fr}}
@@ -190,7 +204,7 @@ footer.foot p{max-width:64ch}
 .spinner{display:inline-block;width:.8em;height:.8em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:turn .7s linear infinite;vertical-align:-1px}
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-  .test,.mark .dot,.mark .body{opacity:1}
+  .test,.test.enter,.mark .dot,.mark .body{opacity:1}
   .mark .arc{stroke-dashoffset:0}
 }
 </style>
@@ -357,7 +371,7 @@ const ICONS={
 };
 const FAM={provenance:"red",mandate:"yellow",replay:"orange",control:"green"};
 const icon=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.none}</svg>`;
-let TESTS=[],results={},busy=new Set();
+let TESTS=[],results={},busy=new Set(),firstDraw=true;
 
 async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
 
@@ -398,7 +412,7 @@ function testCard(t,i){
     else body="refused";
   }
   const why=body?`<div class="why">${body}</div>`:"";
-  const cls=["test","glass","f-"+(FAM[t.family]||"orange"),run?"running":"",r&&!run?"done v-"+r.decision:""].join(" ");
+  const cls=["test","glass",firstDraw?"enter":"","f-"+(FAM[t.family]||"orange"),run?"running":"",r&&!run?"done v-"+r.decision:""].join(" ");
   return `<article class="${cls}" style="--i:${i}" data-id="${esc(t.id)}">
     <div class="top">
       <div class="icon">${icon(t.icon)}</div>
@@ -416,6 +430,7 @@ const openState=()=>new Set([...document.querySelectorAll("details.sc[open]")].m
 function draw(){
   const open=openState();
   $("#tests").innerHTML=TESTS.map(testCard).join("");
+  firstDraw=false;
   for(const d of document.querySelectorAll("[data-id]")) if(open.has(d.dataset.id)) d.querySelector("details").open=true;
   for(const b of document.querySelectorAll("[data-run]")) b.addEventListener("click",()=>runTests([b.dataset.run]));
   const done=Object.values(results);
