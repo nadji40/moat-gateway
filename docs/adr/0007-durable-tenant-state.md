@@ -160,3 +160,40 @@ table and does not grant it is only half a migration**, and the half that
 is missing fails later, in production, under load, rather than at the
 point of change.
 
+### Verified, 20 September 2026
+
+The ledger now has tests and they have run against PostgreSQL 16, not
+just compiled. Seven of them, gated on `MOAT_TEST_DATABASE_URL` so
+`cargo test` stays green without a database:
+
+```bash
+docker run -d --rm --name moatpg -e POSTGRES_PASSWORD=test   -p 55432:5432 docker.io/library/postgres:16
+export U="postgres://postgres:test@127.0.0.1:55432/postgres"
+psql "$U" -q -c "CREATE ROLE moat_owner NOLOGIN"   -c "GRANT moat_owner TO postgres"   -c "CREATE SCHEMA moat AUTHORIZATION moat_owner"
+for f in migrations/000*.sql; do psql "$U" -v ON_ERROR_STOP=1 -q -f "$f"; done
+MOAT_TEST_DATABASE_URL="$U" cargo test -p moat-gateway ledger_tests
+```
+
+The one that matters is `two_sessions_cannot_both_spend_the_same_allowance`:
+two tasks racing one mandate through `SELECT ... FOR UPDATE`, where
+exactly one must be granted it. A row lock cannot be verified any other
+way, and it is the specific bug the tables were built to close.
+
+**Running them found that `save_payment_ledger` had never worked.** A
+bare `$n::numeric` makes Postgres infer the parameter as numeric, and
+tokio-postgres will not send a String for it; the cast has to be
+`$n::text::numeric`. Every ledger write failed on its first parameter.
+
+The way it failed is the part worth remembering. The mirror is
+deliberately non-fatal -- a bookkeeping write should not fail a
+customer's payment -- so in production it would have logged an error and
+carried on. The tables would have stayed empty, `aggregate_for` would
+have read zero, and `authorization-tenant-aggregate` would have allowed
+everything while appearing to work. A cross-session limit that silently
+enforces nothing is worse than no limit, because somebody believes in it.
+
+The schema was applied to the pilot and confirmed correct hours before
+this was found. **Applying a migration proves the DDL; only running the
+code proves the code.** Non-fatal error handling needs a test more than
+fatal handling does, precisely because nothing shouts when it is wrong.
+

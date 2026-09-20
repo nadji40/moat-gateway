@@ -26,6 +26,25 @@ deliberate: running with the tenant-wide aggregate unenforced is worse than
 not running. It is also why the deploy below migrates before it installs --
 keep that order.
 
+## Checking the payment ledger before a deploy
+
+The ledger's behaviour -- the cross-session aggregate and its row lock --
+is covered by tests that need a database and are skipped without one.
+Never point them at the pilot database: they create a tenant, write rows
+and delete them. A throwaway container is enough, and touches nothing.
+
+```bash
+docker run -d --rm --name moatpg -e POSTGRES_PASSWORD=test   -p 55432:5432 docker.io/library/postgres:16
+export U="postgres://postgres:test@127.0.0.1:55432/postgres"
+psql "$U" -q -c "CREATE ROLE moat_owner NOLOGIN"   -c "GRANT moat_owner TO postgres"   -c "CREATE SCHEMA moat AUTHORIZATION moat_owner"
+for f in migrations/000*.sql; do psql "$U" -v ON_ERROR_STOP=1 -q -f "$f"; done
+MOAT_TEST_DATABASE_URL="$U" cargo test -p moat-gateway ledger_tests
+docker stop moatpg
+```
+
+Migration 4 will say `moat_app does not exist` and skip its grants there.
+That is correct on a scratch database and not a failure.
+
 ## Deploy or update
 
 ```bash
