@@ -29,7 +29,7 @@
 import { createServer } from "node:net";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -88,6 +88,25 @@ async function freePort(): Promise<number> {
       probe.close(() => (port ? resolve(port) : reject(new Error("no free port"))));
     });
   });
+}
+
+/**
+ * The environment a gateway child needs.
+ *
+ * The gateway spawns `node` from PATH to run the mock provider, so it has
+ * to be the same Node that is running this service -- under systemd the
+ * binary may be installed under another name entirely, and a PATH without
+ * a plain `node` on it makes the gateway exit the moment it tries. The
+ * arena learned this first; the symptom here is an MCP connection that
+ * closes immediately and says nothing about why.
+ */
+function childEnv(extra: Record<string, string>): Record<string, string> {
+  const key = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  return {
+    ...(process.env as Record<string, string>),
+    [key]: `${dirname(process.execPath)}${delimiter}${process.env[key] ?? ""}`,
+    ...extra,
+  };
 }
 
 const live = new Map<string, Live>();
@@ -193,7 +212,7 @@ export async function create(cfg: SandboxConfig): Promise<{ id: string; expires_
       command: gatewayBinary(cfg.repo),
       args: ["--config", configPath, "--session-id", session],
       cwd: join(cfg.repo, "arena"),
-      env: { ...process.env, MOCK_STRIPE_LEDGER: ledger } as Record<string, string>,
+      env: childEnv({ MOCK_STRIPE_LEDGER: ledger }),
       stderr: "ignore",
     }),
   );

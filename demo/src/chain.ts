@@ -24,7 +24,7 @@
 // ever asked, which is the point being demonstrated.
 
 import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -48,6 +48,25 @@ const PER_CALLER = 2;
 
 let sent = 0;
 const byCaller = new Map<string, number>();
+
+/**
+ * The environment a gateway child needs.
+ *
+ * The gateway spawns `node` from PATH to run the mock provider, so it has
+ * to be the same Node that is running this service -- under systemd the
+ * binary may be installed under another name entirely, and a PATH without
+ * a plain `node` on it makes the gateway exit the moment it tries. The
+ * arena learned this first; the symptom here is an MCP connection that
+ * closes immediately and says nothing about why.
+ */
+function childEnv(extra: Record<string, string>): Record<string, string> {
+  const key = Object.keys(process.env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  return {
+    ...(process.env as Record<string, string>),
+    [key]: `${dirname(process.execPath)}${delimiter}${process.env[key] ?? ""}`,
+    ...extra,
+  };
+}
 
 const chain = createPublicClient({ chain: baseSepolia, transport: http() });
 
@@ -134,7 +153,7 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
       command: gateway,
       args: ["--config", CONFIG, "--session-id", session],
       cwd: join(REPO, "arena"),
-      env: process.env as Record<string, string>,
+      env: childEnv({}),
       stderr: "ignore",
     }),
   );
