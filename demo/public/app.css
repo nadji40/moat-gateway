@@ -17,7 +17,11 @@
 [hidden]{display:none!important}
 html{scroll-behavior:smooth}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden;text-align:center}
+body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden;text-align:center;-webkit-user-select:none;user-select:none}
+/* the page reads as an app, not a document. Two exceptions: a field you
+   cannot select text in is a field you cannot edit, and the curl block
+   exists to be copied. */
+input,textarea,pre{-webkit-user-select:text;user-select:text}
 .wrap{max-width:var(--max);margin:0 auto;padding-inline:var(--pad)}
 a{color:inherit}
 h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.03em;line-height:1.02;text-wrap:balance}
