@@ -9,8 +9,11 @@ upstreams:
   - name: wallet
     rail: crypto
     transport: stdio
-    command:
-      ["node", "--env-file=../.env.evm-demo", "--import", "tsx", "evm-testnet/src/server.ts"]
+    # No --env-file: the wallet's environment is inherited from whatever
+    # starts the demo service, which is `pnpm start` locally and an
+    # EnvironmentFile under systemd. That keeps the secret in one place
+    # per host rather than at a path this config has to guess.
+    command: ["node", "--import", "tsx", "evm-testnet/src/server.ts"]
 policy: ../policies/rails/evm-testnet.yaml
 evidence: ./results/demo-chain-evidence.jsonl
 keys: ./keys
