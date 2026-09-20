@@ -1,0 +1,110 @@
+{
+  "run_id": "20260920164859-null",
+  "started_at": "2026-09-20T16:48:59.832Z",
+  "finished_at": "2026-09-20T17:56:27.542Z",
+  "backend": "null",
+  "model": null,
+  "runs": 5,
+  "suite": "all",
+  "arms": [
+    "none",
+    "cap",
+    "allowlist",
+    "moat"
+  ],
+  "rails": [
+    "card",
+    "bank",
+    "evm",
+    "solana"
+  ],
+  "scenarios": [
+    "chain-approval-grant",
+    "chain-base-unit-confusion",
+    "chain-network-substitution",
+    "change-recipient-account",
+    "duplicate-invoice-new-id",
+    "inflate-under-cap",
+    "inject-alt-attribute",
+    "inject-hidden-css",
+    "inject-html-comment",
+    "inject-spoiler-block",
+    "inject-visible-text",
+    "listing-official-partner",
+    "lookalike-recipient-account",
+    "lost-reply-double-transfer",
+    "omit-authorization-id",
+    "replay-double-charge",
+    "split-below-threshold",
+    "spoof-homoglyph",
+    "spoof-lookalike-name",
+    "substitute-currency",
+    "substitute-invoice-id",
+    "authorized-eur-invoice",
+    "authorized-exact",
+    "authorized-price-decrease",
+    "authorized-repeat-within-aggregate",
+    "authorized-tolerance-increase",
+    "chain-native-asset-invoice",
+    "lost-reply-then-reconciled",
+    "new-supplier-invoice",
+    "respaced-account"
+  ],
+  "commit": "aa39edf1270c649ccedb23a784e5fe139ecdbc9d",
+  "dirty": true,
+  "policies": {
+    "card/cap": {
+      "file": "../policies/arm-cap.yaml",
+      "sha256": "f0bbb11289539b1105375a2083f6da68bbbe3b88c64018aee966ba468e66e46c"
+    },
+    "card/allowlist": {
+      "file": "../policies/arm-allowlist.yaml",
+      "sha256": "c03eff18b97316d45f471534d4cef8cdfe5ffea4db9c329cb07c3ecf452aeed8"
+    },
+    "card/moat": {
+      "file": "../policies/default.yaml",
+      "sha256": "c2c8e133ccc8de8ae8b2160e426d42e6cd986243334e25a4c88c9096a888a1f6"
+    },
+    "bank/cap": {
+      "file": "../policies/rails/arm-cap-bank.yaml",
+      "sha256": "e702d8192fe8a2110318d826792bf4a4b065448b71249ed885a058ed13da9a23"
+    },
+    "bank/allowlist": {
+      "file": "../policies/rails/arm-allowlist-bank.yaml",
+      "sha256": "a976e124952122d6634cfd9bff726d6e80ac83d166e7057ac8618a9480f65752"
+    },
+    "bank/moat": {
+      "file": "../policies/rails/bank.yaml",
+      "sha256": "5948bcbd000d7cafffc13b172742b3faeaac54c5deeaab8435caa9cc11c991fc"
+    },
+    "evm/cap": {
+      "file": "../policies/rails/arm-cap-crypto.yaml",
+      "sha256": "97678f8d8787164ab22d307fcaa4e0eb59b5d8a78766df69b57a7dd4af676cce"
+    },
+    "evm/allowlist": {
+      "file": "../policies/rails/arm-allowlist-evm.yaml",
+      "sha256": "ea914e75ea7c183c71ceb996db8ec0871150cf9047b3766f508569f7fc0794ba"
+    },
+    "evm/moat": {
+      "file": "../policies/rails/evm.yaml",
+      "sha256": "7117301108a188bde9aa2e885623ad59a1710695645e0e62a0ecdf60a0026732"
+    },
+    "solana/cap": {
+      "file": "../policies/rails/arm-cap-crypto.yaml",
+      "sha256": "97678f8d8787164ab22d307fcaa4e0eb59b5d8a78766df69b57a7dd4af676cce"
+    },
+    "solana/allowlist": {
+      "file": "../policies/rails/arm-allowlist-solana.yaml",
+      "sha256": "603260d71fdcf69a0a15309adc4cb3cecd43e9e672c1afbda67e3f9e20e6df91"
+    },
+    "solana/moat": {
+      "file": "../policies/rails/solana.yaml",
+      "sha256": "f30a0426f41b7a339567a67ed3dea9d5e59e2ec122b809041bf68dde288e62c5"
+    }
+  },
+  "gateway": "C:\\home\\moat-prod-work\\target\\release\\moat-gateway.exe",
+  "node": "v24.12.0",
+  "platform": "win32-x64",
+  "results": "results/20260920164859-null.jsonl",
+  "dirty_note": "Produced from a working tree that carried the four control-scenario changes now committed as 1c9e910. The captured commit aa39edf is that commit's parent, and `dirty` is true for exactly that reason: the run was started before the fix was committed so the fix and the table it produces could be committed together. The diff between aa39edf and 1c9e910 is the whole of the difference between the recorded commit and the tree that ran. Recorded rather than corrected, because editing the captured commit would make the manifest say something untrue."
+}

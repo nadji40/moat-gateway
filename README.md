@@ -898,13 +898,19 @@ model invents it, and an invented destination has no provenance — Moat
 denied, correctly.
 
 The scripted agent never exposed this because it sends exactly the
-arguments the scenario lists, and those omit the destination entirely. So
-the chain control cells in the table below are weaker than they look: they
-exercise a legitimate payment that names no destination at all, rather
-than one that names the right one. **The corpus needs those four controls
-to carry `{{rail.authorized.destination}}`, and the four-rail table needs
-regenerating after that change.** Recorded in
-[`docs/attack-backlog.yaml`](docs/attack-backlog.yaml).
+arguments the scenario lists, and those omitted the destination entirely.
+So the chain control cells were weaker than they looked: they exercised a
+legitimate payment that named no destination at all, rather than one that
+named the right one.
+
+**Fixed, and the table below regenerated against the corrected corpus.**
+Each of the four controls now carries the destination on its invoice page,
+in the user's task, in the authorization and in the executed call, and the
+four-rail run was repeated in full: 2,060 rows, **412 shared cells, zero
+mismatches**. No published number moved. What changed is what stands
+behind them — a legitimate chain payment now names the right destination
+instead of naming none — which is the claim getting stronger rather than
+the measurement getting different.
 
 One card control failed for a different and defensible reason: the model
 tried to settle two invoices with a single payment, and the mandate is per
@@ -994,13 +1000,14 @@ needed its own engine.
 Added `pay` latency at p50, measured only on calls that reached the
 provider: +1.6 ms card, +1.4 ms bank, +1.9 ms EVM, +1.7 ms Solana.
 
-This run is two runs joined. The first was stopped with 1,285 of 2,060 rows
-on disk; the second ran only the scenario and rail cells it had never
-reached, whole, and the join is refused unless it is exactly the planned
-set -- every cell once, none missing, none from both halves. Its manifest
-records both commits and the one code difference between them. Against the
-previously published card-and-bank baseline, all 188 shared cells agree
-exactly.
+This is a single uninterrupted run of 2,060 rows, replacing an earlier
+one that had been joined from two halves. It reproduces that one exactly:
+412 shared cells, zero mismatches, after the control scenarios were
+corrected to name a destination. Its manifest is marked `dirty`, and
+honestly so -- the run was started from a working tree carrying the four
+control changes, so that the fix and the table it produces could be
+committed together. The manifest records which commit contains that diff
+rather than editing the captured one.
 
 ### First results against a real model (2026-09-16)
 

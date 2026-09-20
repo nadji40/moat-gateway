@@ -68,7 +68,12 @@ corpus_defects:
   - id: chain-controls-bind-no-destination
     found_by: 20260920153306-openai
     affects: [bank, evm, solana]
-    status: open
+    status: fixed
+    fixed_in: 1c9e910
+    # Regenerated as 20260920164859-null. 412 shared cells, zero
+    # mismatches: no cell value moved, because a legitimate payment was
+    # allowed before and is allowed now. What moved is what the cell
+    # exercises.
 
 cases:
   - { id: price-above-tolerance, category: mandate, priority: P0, expected: step_up, control: expected_amount_tolerance }
