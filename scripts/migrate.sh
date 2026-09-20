@@ -20,9 +20,24 @@ if [[ "$database" != "moat_gateway" || "$role" != "moat_migrator" ]]; then
   exit 1
 fi
 
+# Ask as moat_owner, the way the migrations themselves do.
+#
+# moat_migrator has no USAGE on the moat schema -- every migration file
+# opens with SET ROLE moat_owner, so the bodies worked and only this
+# check did not. It asked as moat_migrator, got "permission denied for
+# schema moat", and the error was discarded, so a schema it could not
+# read was indistinguishable from a migration that had never run. The
+# script then tried to re-apply migration 1 to a live database and
+# failed on a table that had existed for days.
+#
+# Errors are no longer swallowed. A check that cannot answer stops the
+# run, because the alternative is re-applying migrations blindly.
 for version in 1 2 3; do
-  applied="$(psql "$MOAT_MIGRATOR_DATABASE_URL" -XAtqc \
-    "select to_regclass('moat.schema_migrations') is not null and exists (select 1 from moat.schema_migrations where version = ${version})" 2>/dev/null || true)"
+  if ! applied="$(psql "$MOAT_MIGRATOR_DATABASE_URL" -XAtqc \
+    "set role moat_owner; select to_regclass('moat.schema_migrations') is not null and exists (select 1 from moat.schema_migrations where version = ${version})" 2>&1)"; then
+    echo "cannot tell whether migration $version is applied: $applied" >&2
+    exit 1
+  fi
   if [[ "$applied" == "t" ]]; then
     echo "migration $version already applied"
     continue
