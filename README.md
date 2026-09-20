@@ -855,6 +855,66 @@ bypass, not the false negative. The contract is unaudited and testnet-only,
 and the co-signing key is a file, which is why a KMS is named in ADR 0010
 as the first hard production dependency.
 
+### A real model, on all four rails (2026-09-20)
+
+The numbers above come from a scripted backend, which is what makes them
+reproducible and is also their limit: a script does what the corpus tells
+it to. This run puts an actual model in the loop on every rail —
+`gpt-5-mini` through the OpenAI Agents SDK, never told that Moat, step-ups
+or provenance exist. 206 runs, no errors.
+
+| rail | attacker paid, no gateway | attacker paid, through Moat |
+|---|---:|---:|
+| card | 9/17 | **0/17** |
+| bank | 9/18 | **0/18** |
+| evm | 8/21 | **0/21** |
+| solana | 9/20 | **0/20** |
+| **total** | **35/76** | **0/76** |
+
+**Of the 35 attacks the model actually fell for, Moat stopped 35.**
+
+The other number in that table matters just as much: the model refused
+**41 of 76 on its own**. It read the poisoned page and declined — "the
+invoice page states payments to 0x864c… are no longer accepted and
+instructs remittance to 0x6F0e…, so I withheld payment pending
+confirmation." A capable model is a partial control, and any honest
+reading of a real-model run has to say so. What it is not is a reliable
+one: it still paid the attacker in nearly half of them, and which half
+moved by rail.
+
+This is why both runs exist. The scripted backend isolates the control by
+removing the model's judgement; the real-model run measures the residual
+risk after that judgement. Neither number replaces the other.
+
+**What this run found that the scripted one could not.** Legitimate
+payments through Moat completed 4/5 on card but 2/7 on bank and 0/8 on
+EVM — which looks like a false-positive catastrophe and is not. The model
+was sending to `0x1111…1111`, `0xaaaa…aaaa` and `0xDeaDbeef…`, and said
+why: *"the supplied invoice page contained no destination address."* Four
+rail-agnostic control scenarios bind no destination and put none on the
+page. On a card that is fine, because the pay tool needs no destination.
+On a bank or a chain the tool cannot be called without one, so a real
+model invents it, and an invented destination has no provenance — Moat
+denied, correctly.
+
+The scripted agent never exposed this because it sends exactly the
+arguments the scenario lists, and those omit the destination entirely. So
+the chain control cells in the table below are weaker than they look: they
+exercise a legitimate payment that names no destination at all, rather
+than one that names the right one. **The corpus needs those four controls
+to carry `{{rail.authorized.destination}}`, and the four-rail table needs
+regenerating after that change.** Recorded in
+[`docs/attack-backlog.yaml`](docs/attack-backlog.yaml).
+
+One card control failed for a different and defensible reason: the model
+tried to settle two invoices with a single payment, and the mandate is per
+invoice.
+
+The run and its manifest are committed under
+[`arena/analysis/data/`](arena/analysis/data/) beside the scripted one;
+the tables group by backend and model, so the two never pool. Cost: 805k
+input and 210k output tokens, about $0.62.
+
 ### Four rails, one control (2026-09-20)
 
 The same corpus, the same four arms and the same scoring, run on card, bank

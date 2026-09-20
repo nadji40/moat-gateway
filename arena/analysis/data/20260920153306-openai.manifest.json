@@ -1,0 +1,75 @@
+{
+  "run_id": "20260920153306-openai",
+  "started_at": "2026-09-20T15:33:06.922Z",
+  "finished_at": "2026-09-20T16:22:25.349Z",
+  "backend": "openai",
+  "model": "gpt-5-mini",
+  "runs": 1,
+  "suite": "all",
+  "arms": [
+    "none",
+    "moat"
+  ],
+  "rails": [
+    "card",
+    "bank",
+    "evm",
+    "solana"
+  ],
+  "scenarios": [
+    "chain-approval-grant",
+    "chain-base-unit-confusion",
+    "chain-network-substitution",
+    "change-recipient-account",
+    "duplicate-invoice-new-id",
+    "inflate-under-cap",
+    "inject-alt-attribute",
+    "inject-hidden-css",
+    "inject-html-comment",
+    "inject-spoiler-block",
+    "inject-visible-text",
+    "listing-official-partner",
+    "lookalike-recipient-account",
+    "lost-reply-double-transfer",
+    "omit-authorization-id",
+    "replay-double-charge",
+    "split-below-threshold",
+    "spoof-homoglyph",
+    "spoof-lookalike-name",
+    "substitute-currency",
+    "substitute-invoice-id",
+    "authorized-eur-invoice",
+    "authorized-exact",
+    "authorized-price-decrease",
+    "authorized-repeat-within-aggregate",
+    "authorized-tolerance-increase",
+    "chain-native-asset-invoice",
+    "lost-reply-then-reconciled",
+    "new-supplier-invoice",
+    "respaced-account"
+  ],
+  "commit": "8adf1836550257a12ccf12680f5be1e2f8730162",
+  "dirty": false,
+  "policies": {
+    "card/moat": {
+      "file": "../policies/default.yaml",
+      "sha256": "c2c8e133ccc8de8ae8b2160e426d42e6cd986243334e25a4c88c9096a888a1f6"
+    },
+    "bank/moat": {
+      "file": "../policies/rails/bank.yaml",
+      "sha256": "5948bcbd000d7cafffc13b172742b3faeaac54c5deeaab8435caa9cc11c991fc"
+    },
+    "evm/moat": {
+      "file": "../policies/rails/evm.yaml",
+      "sha256": "7117301108a188bde9aa2e885623ad59a1710695645e0e62a0ecdf60a0026732"
+    },
+    "solana/moat": {
+      "file": "../policies/rails/solana.yaml",
+      "sha256": "f30a0426f41b7a339567a67ed3dea9d5e59e2ec122b809041bf68dde288e62c5"
+    }
+  },
+  "gateway": "C:\\home\\moat-prod-work\\target\\release\\moat-gateway.exe",
+  "node": "v24.12.0",
+  "platform": "win32-x64",
+  "results": "results/20260920153306-openai.jsonl"
+}

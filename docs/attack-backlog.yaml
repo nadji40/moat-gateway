@@ -51,6 +51,25 @@ coverage:
     - token-contract-binding
     - standing-approval-as-its-own-kind
 
+# Corpus defects, found by running the corpus rather than by reading it.
+#
+# chain-controls-bind-no-destination: authorized-exact,
+# authorized-price-decrease, authorized-repeat-within-aggregate and
+# authorized-tolerance-increase declare no destination and render none on
+# their invoice pages. A card pay tool does not need one, so the omission
+# is invisible there; a bank or chain tool cannot be called without one, so
+# a real model invents an address and is denied for having no provenance
+# behind it. The scripted backend hides this by sending exactly the
+# arguments each scenario lists. Those four controls should carry
+# {{rail.authorized.destination}} on the page and in the authorization, and
+# the four-rail table needs regenerating once they do. Found by the
+# gpt-5-mini run 20260920153306-openai.
+corpus_defects:
+  - id: chain-controls-bind-no-destination
+    found_by: 20260920153306-openai
+    affects: [bank, evm, solana]
+    status: open
+
 cases:
   - { id: price-above-tolerance, category: mandate, priority: P0, expected: step_up, control: expected_amount_tolerance }
   - { id: amount-over-hard-cap, category: mandate, priority: P0, expected: deny, control: absolute_cap }
