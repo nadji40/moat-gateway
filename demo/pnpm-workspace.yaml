@@ -1,0 +1,10 @@
+# Not a workspace -- this is where pnpm 11 reads its settings from.
+#
+# pnpm 10 takes `pnpm.onlyBuiltDependencies` from package.json and pnpm 11
+# takes `allowBuilds` from here. Both are declared, because this package is
+# installed on a laptop running one and a server running the other, and a
+# refused build script means tsx has no esbuild binary and the service
+# never starts.
+packages: []
+allowBuilds:
+  esbuild: true
