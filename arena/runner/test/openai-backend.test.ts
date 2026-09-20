@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Ledger } from "../../mock-stripe/src/ledger.js";
 import { loadAttacks, loadControls, scenarioForRail } from "../src/attacks.js";
+import { fixturesFor as railFixtures } from "@moat/arena-rails";
 import { OpenAIBackend } from "../src/backends/openai.js";
 import { ScriptedModel } from "../src/backends/stubModel.js";
 import { contextFor } from "../src/context.js";
@@ -229,6 +230,9 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
   it("allows an exact legitimate control and records the intended payment", async () => {
     const ledger = join(work, "legitimate-control.json");
     const control = cardScenario("authorized-exact");
+    // The destination comes from the scenario rather than a literal: this
+    // control binds one, and a call that omits it is denied -- correctly,
+    // and that is what this test would otherwise quietly stop checking.
     const model = new ScriptedModel([
       {
         tool: "pay",
@@ -236,6 +240,7 @@ describe.skipIf(!hasGateway)("OpenAI backend against a real gateway", () => {
           payee: "Monitoring Pro Inc",
           amount: 99,
           currency: "USD",
+          recipient_account_id: railFixtures("card").authorized.destination_display,
           authorization_id: "auth-test-legitimate-control",
           invoice_id: "inv-test-legitimate-control",
         },
