@@ -8,8 +8,7 @@ cannot. This page is the discipline.
 
 - **Sign your commits off (DCO).** Every commit needs a `Signed-off-by:` line
   with your real name and email, which `git commit -s` adds for you. It says you
-  wrote the change or have the right to submit it under the project licence
-  (Apache-2.0, see `LICENSE`). We do not use a CLA.
+  wrote the change or have the right to submit it. We do not use a CLA.
 - **No secrets, ever.** Not in code, tests, fixtures, docs or commit messages.
   Provider keys come from the environment; `.env*`, `keys/` and evidence logs
   are ignored by git for a reason. A pull request that adds one is closed and
