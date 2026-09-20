@@ -130,7 +130,7 @@ function testCard(t,i){
   </article>`;
 }
 
-function busy(btn,label){
+function working(btn,label){
   if(btn.dataset.idle===undefined) btn.dataset.idle=btn.innerHTML;
   btn.innerHTML='<span class="spinner"></span>'+label;
   btn.disabled=true; btn.setAttribute("aria-busy","true");
@@ -163,7 +163,7 @@ function draw(){
 /* three at a time, each its own call, so cards fill in as they finish */
 async function runTests(ids){
   ids=ids.filter(id=>!busy.has(id)); if(!ids.length)return;
-  const btn=$("#run-all"); busy(btn,"Running");
+  const btn=$("#run-all"); working(btn,"Running");
   for(const id of ids){busy.add(id);delete results[id];}
   draw();
   const queue=[...ids];
