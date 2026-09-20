@@ -16,6 +16,8 @@ arena/keys/
 !arena/attacks/**/*.jsonl
 !crates/moat-core/tests/golden/*.jsonl
 # Finished evaluation runs the analysts publish, copied from arena/results/
+# Adapter state: idempotency maps for real providers, never shared
+arena/**/state/
 !arena/analysis/data/*.jsonl
 moat_ed25519
 moat_ed25519.pub

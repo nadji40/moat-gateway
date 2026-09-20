@@ -1,0 +1,15 @@
+# Real Base Sepolia upstream for a narrow Moat demonstration: genuine
+# transactions on a public testnet, Moat in front of the wallet.
+# Run from arena/ with Node 22 on PATH. The key lives in ../.env.evm-testnet,
+# which is ignored by Git. See evm-testnet/README.md.
+listen: { transport: stdio }
+upstreams:
+  - name: wallet
+    rail: crypto
+    transport: stdio
+    command:
+      ["node", "--env-file=../.env.evm-testnet", "--import", "tsx", "evm-testnet/src/server.ts"]
+policy: ../policies/rails/evm-testnet.yaml
+evidence: ./results/evm-testnet-evidence.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7075" }

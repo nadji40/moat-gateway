@@ -328,7 +328,6 @@ describe("allowances on evm", () => {
     });
     expect(result.isError).toBeFalsy();
     expect(result.structuredContent?.["kind"]).toBe("approval");
-    expect(result.structuredContent?.["unlimited"]).toBe(false);
     const [written] = ledger();
     // The scorer reads a ledger and does not care which tool wrote the
     // row: 450 granted is 450 at risk.
@@ -336,24 +335,5 @@ describe("allowances on evm", () => {
     expect(written?.detail?.["kind"]).toBe("approval");
     // And a reader should be told plainly what was agreed to.
     expect(result.content?.[0]?.text).toContain("at any time, without asking again");
-  });
-
-  it("writes an unlimited allowance out as the number it really is", async () => {
-    const result = await approve({
-      counterparty: "Monitoring Pro Inc",
-      spender: AUTHORIZED,
-      token: "USDC",
-      amount: "unlimited",
-      network: "eip155:84532",
-    });
-    expect(result.structuredContent?.["unlimited"]).toBe(true);
-    // 2^256 - 1 base units, in whole units of a six-decimal token. A
-    // control layer that compares numbers should have to see this one
-    // rather than the word.
-    expect(result.structuredContent?.["amount"]).toBe(
-      "115792089237316195423570985008687907853269984665640564039457" +
-        "584007913129" +
-        ".639935",
-    );
   });
 });

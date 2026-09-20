@@ -378,6 +378,10 @@ built binary:
   accounts. It maps the configured legitimate and attacker merchant names to
   separate test accounts and creates confirmed PaymentIntents. It is kept out
   of the normal arena so repeated evaluations never contact an external API.
+- `evm-testnet` — optional stdio MCP wallet on Base Sepolia, a public testnet.
+  Signs and broadcasts real transactions with Moat in front; idempotent by
+  signed bytes, so a retry after a lost reply broadcasts the same transaction
+  rather than a second one. Kept out of the arena for the same reason.
 - `mock-web` — Streamable HTTP MCP server with `fetch(url)`, serving files
   under the arena directory for `https://arena.local/...` URLs.
 - `attacks/<id>/attack.yaml` — sixteen attacks in eleven classes: injection to
@@ -616,9 +620,11 @@ four and last four characters with the approved address and differs
 everywhere else. That is address poisoning, and it is the reason
 destinations are matched exactly rather than by substring.
 
-What is not claimed. Nothing here touches a real network: these are mocks,
-and the testnet adapters are the next piece of work. No verdict is
-enforced on chain — Moat decides and the wallet executes, and a wallet
+What is not claimed. The measurement does not touch a real network: these
+are mocks. The [Base Sepolia demonstration](#base-sepolia-demonstration)
+below runs the same policy against a real chain, once, with real
+transactions, and is kept separate for the same reason `stripe-sandbox` is.
+No verdict is enforced on chain — Moat decides and the wallet executes, and a wallet
 that ignores the verdict is not stopped by anything in this repository.
 The token contract is not checked, so a fake USDC at another address would
 pass the asset lookup.
@@ -895,6 +901,41 @@ build, stdio both hops:
 | **added by the gateway** | **0.22 ms** | **0.93 ms** |
 
 Measured 2026-09-16 on Linux x86_64. The budget is 15 ms p95.
+
+### Base Sepolia demonstration
+
+The chain counterpart of the Stripe sandbox: a real wallet on a public
+testnet, Moat in front of it, and the same policy family as the arena's EVM
+rail with the address book removed — so nothing is approved in advance and a
+transaction goes out exactly when the payee, address, amount, asset and chain
+match what the user authorized.
+
+```bash
+cd arena && pnpm --filter @moat/evm-testnet keygen
+```
+
+writes `.env.evm-testnet` at the repository root (ignored by Git) and prints
+the address to fund from a Base Sepolia faucet. Then:
+
+```bash
+cd arena && MOAT_EVM_SMOKE_CONFIRM=YES pnpm --filter @moat/evm-testnet smoke
+```
+
+Four transactions go out and two are refused before the wallet hears of them:
+the approved invoice is mined; the forged invoice's address is refused by
+`destination-provenance`; the right address on the wrong chain is refused by
+`authorization-network`; a lost reply after broadcast is held and
+quarantined, the retry refused, the hash confirmed on chain and reconciled,
+and the retry refused again as a duplicate. The script then checks Moat's
+outcomes against the wallet's own record of what it signed, hash for hash,
+and prints a `PASS` document with a block-explorer link for each.
+
+Retries stay retries because a transaction is signed first, written to disk
+under the authorization and invoice, and only then broadcast; a retry finds
+the bytes and broadcasts the same ones, and the chain mines one nonce once.
+
+What it does not show: enforcement. The wallet obeys Moat because it is
+behind Moat. See [arena/evm-testnet/README.md](arena/evm-testnet/README.md).
 
 ## Development
 

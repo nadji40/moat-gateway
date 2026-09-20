@@ -43,7 +43,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { Ledger, type LedgerRail, type LedgerSettlement } from "@moat/mock-ledger";
 import { z } from "zod";
-import { assetOf, chainFromEnv, checkAmount, unlimitedAllowance } from "./chain.js";
+import { assetOf, chainFromEnv, checkAmount } from "./chain.js";
 
 const chain = chainFromEnv(process.env["MOCK_CHAIN"]);
 const ledgerPath = process.env["MOCK_CHAIN_LEDGER"] ?? `./${chain.family}-ledger.json`;
@@ -288,9 +288,7 @@ if (chain.hasApprovals) {
         counterparty: z.string().describe("Who the spender is believed to be. A label only"),
         spender: z.string().describe("Address being granted the allowance"),
         token: z.string().describe("Token symbol"),
-        amount: z
-          .union([z.string().min(1), z.number().positive()])
-          .describe('Allowance in whole units, or "unlimited"'),
+        amount: Amount.describe("Allowance in whole units"),
         network: z.string().optional().describe(`CAIP-2 network id; defaults to ${defaultNetwork}`),
         authorization_id: z.string().min(1).optional().describe("Payment authorization id"),
         invoice_id: z.string().min(1).optional().describe("Supplier invoice id"),
@@ -301,12 +299,7 @@ if (chain.hasApprovals) {
       if (asset === undefined) {
         return refuse(`This wallet does not hold ${args.token}.`, "unknown_asset");
       }
-      const requested = String(args.amount).trim();
-      const unlimited = requested.toLowerCase() === "unlimited" || requested.toLowerCase() === "max";
-      // An unlimited approval is recorded at its true size rather than as a
-      // word. What an allowance puts at risk is a number, and a control
-      // layer that compares numbers should have to see this one.
-      const amount = unlimited ? unlimitedAllowance(asset) : requested;
+      const amount = String(args.amount).trim();
       const checked = prepare({
         to: args.spender,
         token: args.token,
@@ -334,20 +327,15 @@ if (chain.hasApprovals) {
         network: checked.network,
         ...(args.authorization_id ? { authorization_id: args.authorization_id } : {}),
         ...(args.invoice_id ? { invoice_id: args.invoice_id } : {}),
-        detail: {
-          kind: "approval",
-          allowance: unlimited ? "unlimited" : "fixed",
-          counterparty_checked: "no",
-        },
+        detail: { kind: "approval", counterparty_checked: "no" },
       });
       return {
         content: [
           {
             type: "text",
             text:
-              `Approved: ${checked.display} may now move up to ` +
-              `${unlimited ? "an unlimited amount of" : amount} ${entry.currency} out of this ` +
-              `wallet, at any time, without asking again. Receipt ${txId}.`,
+              `Approved: ${checked.display} may now move up to ${amount} ${entry.currency} ` +
+              `out of this wallet, at any time, without asking again. Receipt ${txId}.`,
           },
         ],
         structuredContent: {
@@ -359,7 +347,6 @@ if (chain.hasApprovals) {
           destination: checked.canonical,
           destination_display: checked.display,
           spender: checked.canonical,
-          unlimited,
           amount,
           currency: entry.currency,
         },

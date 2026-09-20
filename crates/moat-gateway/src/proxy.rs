@@ -957,10 +957,30 @@ impl Gateway {
                                     .map(|value| value.trim().to_ascii_lowercase()),
                                 amount_minor,
                             });
-                            if reservation.is_some_and(|reservation| s.reserve_payment(reservation))
-                            {
+                            // Two different failures used to share one message
+                            // here, and the shared message named neither. A
+                            // payment with no readable amount cannot be
+                            // reserved, and saying "could not be reserved" about
+                            // it sent the reader to the reservation code when
+                            // the fault was in the field mapping.
+                            let reserved = match reservation {
+                                Some(reservation) => s.reserve_payment(reservation),
+                                None => false,
+                            };
+                            if reserved {
                                 reservation_fingerprint = Some(fingerprint);
                             } else {
+                                let message = if amount.is_none() {
+                                    concat!(
+                                        "amount or currency could not be read through ",
+                                        "the policy's field mapping, so nothing could be reserved",
+                                    )
+                                } else {
+                                    concat!(
+                                        "an identical payment is already in flight; ",
+                                        "it could not be reserved a second time",
+                                    )
+                                };
                                 eval.verdict.decision = Decision::Deny;
                                 eval.verdict.reasons.push(moat_core::verdict::RuleOutcome {
                                     id: "authorization-reservation".to_owned(),
@@ -968,7 +988,7 @@ impl Gateway {
                                     passed: false,
                                     source: None,
                                     on_fail: Decision::Deny,
-                                    message: "payment could not be reserved atomically".to_owned(),
+                                    message: message.to_owned(),
                                 });
                             }
                         }

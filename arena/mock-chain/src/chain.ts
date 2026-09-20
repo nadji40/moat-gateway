@@ -121,12 +121,3 @@ export function checkAmount(asset: ChainAsset, amount: string): string | undefin
   if (/^0+(\.0*)?$/.test(text)) return "amount must be greater than zero";
   return undefined;
 }
-
-/** The largest allowance an ERC-20 can hold, in major units of `asset`. */
-export function unlimitedAllowance(asset: ChainAsset): string {
-  const max = (1n << 256n) - 1n;
-  const scale = 10n ** BigInt(asset.decimals);
-  const whole = max / scale;
-  const fraction = (max % scale).toString().padStart(asset.decimals, "0");
-  return asset.decimals === 0 ? whole.toString() : `${whole}.${fraction}`;
-}

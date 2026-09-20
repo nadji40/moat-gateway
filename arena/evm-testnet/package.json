@@ -1,0 +1,19 @@
+{
+  "name": "@moat/evm-testnet",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Real on-chain MCP wallet on Base Sepolia for Moat demonstrations. Testnet only; no funds at risk.",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=../../.env.evm-testnet --import tsx src/server.ts",
+    "keygen": "tsx src/keygen.ts",
+    "smoke": "node --env-file=../../.env.evm-testnet --import tsx src/smoke.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "viem": "^2.56.8",
+    "zod": "^4.6.5"
+  }
+}

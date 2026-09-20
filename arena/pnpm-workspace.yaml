@@ -1,4 +1,5 @@
 packages:
+  - evm-testnet
   - mock-bank
   - mock-chain
   - mock-ledger
