@@ -777,7 +777,10 @@ async fn get_tenant_outcomes(State(shared): State<Arc<Shared>>, headers: HeaderM
     let Some(storage) = shared.storage() else {
         return Err(err(
             StatusCode::NOT_IMPLEMENTED,
-            "this gateway has no durable storage, so it has no ledger to read;              open outcomes are per-session at /v1/session/{id}/outcomes",
+            concat!(
+                "this gateway has no durable storage, so it has no ledger to read; ",
+                "open outcomes are per-session at /v1/session/{id}/outcomes",
+            ),
         ));
     };
     let open = storage

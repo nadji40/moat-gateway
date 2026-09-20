@@ -923,7 +923,10 @@ impl Gateway {
             {
                 tracing::error!(
                     %error, tenant = %self.tenant_id, fingerprint,
-                    "could not release the ledger reservation; it will hold against                      the mandate until it is cleared"
+                    concat!(
+                        "could not release the ledger reservation; it will ",
+                        "hold against the mandate until it is cleared",
+                    )
                 );
             }
         }

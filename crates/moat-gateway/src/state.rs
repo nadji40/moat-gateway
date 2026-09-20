@@ -405,7 +405,10 @@ impl Shared {
         if let Err(error) = storage.save_payment_ledger(tenant_id, snapshot).await {
             tracing::error!(
                 %error, tenant = %tenant_id, session = %snapshot.id,
-                "payment ledger mirror failed; the session is saved and the                  tenant-scoped tables are now behind"
+                concat!(
+                    "payment ledger mirror failed; the session is saved ",
+                    "and the tenant-scoped tables are now behind",
+                )
             );
         }
     }
@@ -516,7 +519,10 @@ impl Shared {
                 } else {
                     tracing::info!(
                         tenant = %tenant_id, authorization_id,
-                        "authorization loaded from the payment ledger; it outlived                          the session that registered it"
+                        concat!(
+                            "authorization loaded from the payment ledger; ",
+                            "it outlived the session that registered it",
+                        )
                     );
                 }
             }
