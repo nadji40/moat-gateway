@@ -1,4 +1,5 @@
 packages:
+  - bank-adapter
   - evm-testnet
   - mock-bank
   - mock-chain

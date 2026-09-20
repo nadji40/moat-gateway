@@ -1,0 +1,14 @@
+# The reference bank adapter behind Moat: an asynchronous rail with
+# settlement, returns and Confirmation of Payee, and no network.
+#
+# Run from arena/ with Node 22 on PATH. See bank-adapter/README.md.
+listen: { transport: stdio }
+upstreams:
+  - name: bank
+    rail: bank
+    transport: stdio
+    command: ["node", "--import", "tsx", "bank-adapter/src/server.ts"]
+policy: ../policies/rails/bank-adapter.yaml
+evidence: ./results/bank-adapter-evidence.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7077" }

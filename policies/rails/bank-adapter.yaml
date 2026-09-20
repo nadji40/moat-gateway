@@ -1,0 +1,60 @@
+version: 1
+
+# The policy in front of the reference bank adapter.
+#
+# rails/bank.yaml with the address book taken out and the argument name the
+# adapter actually uses. Nothing is approved in advance: every transfer has
+# to be authorized through the intent API, with a beneficiary, an account,
+# an amount and a currency, and the demonstration is that a transfer goes
+# out exactly when all four match and never otherwise. An allowlist would
+# let a payment through on the strength of a file, which is a weaker thing
+# to show than a payment going through on the strength of what the user
+# agreed to.
+#
+# The cap is set for the synthetic invoices in the smoke script, not for
+# any real institution's limits.
+
+payment_tools:
+  - server: "*"
+    tool: "transfer"
+
+fields:
+  payee:       { args: ["beneficiary_name"] }
+  amount:      { args: ["amount"] }
+  currency:    { args: ["currency"] }
+  destination: { kind: destination, args: ["iban"] }
+
+allowlist:
+  payees: []
+  accounts: []
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User]
+    on_fail: step_up
+    message: "beneficiary name did not come from the user"
+
+  - id: destination-provenance
+    when: field == destination
+    require_source: [User]
+    on_fail: deny
+    message: "beneficiary account did not come from the user"
+
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds the adapter cap"
+
+  - id: amount-provenance
+    when: field == amount
+    require_source: [User, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 20
+  max_calls_per_minute: 10
+  on_exceed: deny
+
+no_human_available: deny

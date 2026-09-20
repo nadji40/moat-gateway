@@ -1,0 +1,21 @@
+{
+  "name": "@moat/bank-adapter",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A provider-agnostic bank-transfer adapter with a reference implementation, so SEPA, SARIE or ACH is a plug-in rather than a fork.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "smoke": "tsx src/smoke.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@moat/mock-ledger": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.7"
+  }
+}
