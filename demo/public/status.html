@@ -101,7 +101,8 @@ function draw(rows,running){
 function summarise(rows){
   const done=rows.filter(r=>r.code!=null);
   if(!done.length) return;
-  const ok=done.filter(r=>r.state==="up").length;
+  // a slow endpoint still answered; only a non-2xx has not
+  const ok=done.filter(r=>r.state==="up"||r.state==="slow").length;
   const times=done.map(r=>r.ms).filter(n=>n!=null).sort((a,b)=>a-b);
   const median=times.length?times[Math.floor(times.length/2)]:0;
   const slowest=times.length?times[times.length-1]:0;
@@ -133,7 +134,7 @@ async function run(){
       const res=await fetch(path,f.init(state));
       const ms=Math.round(performance.now()-t0);
       rows[i].ms=ms; rows[i].code=res.status;
-      rows[i].state=!res.ok?"down":(ms>1500?"slow":"up");
+      rows[i].state=!res.ok?"down":(ms>2500?"slow":"up");
       const j=await res.json().catch(()=>({}));
       if(f.keep&&res.ok) state={...state,...f.keep(j)};
     }catch(e){
