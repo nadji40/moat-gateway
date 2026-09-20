@@ -218,7 +218,7 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
       await new Promise((r) => setTimeout(r, 100));
     }
 
-    const payee = process.env["MOAT_EVM_AUTHORIZED_PAYEE"] ?? "Monitoring Pro Inc";
+    const payee = process.env["MOAT_EVM_AUTHORIZED_PAYEE"] ?? "Aseer Cloud Co";
     const approved = process.env["MOAT_EVM_AUTHORIZED_ADDRESS"]!;
     const attacker = process.env["MOAT_EVM_UNAUTHORIZED_ADDRESS"]!;
     const authorizationId = `auth-${session}`;

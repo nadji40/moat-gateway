@@ -25,7 +25,7 @@ input,textarea,pre{-webkit-user-select:text;user-select:text}
 .wrap{max-width:var(--max);margin:0 auto;padding-inline:var(--pad)}
 a{color:inherit}
 h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.03em;line-height:1.02;text-wrap:balance}
-h1{font-size:clamp(2.4rem,6.4vw,4rem)}
+h1{font-size:clamp(1.9rem,7vw,4rem)}
 h2{font-size:clamp(1.6rem,3.6vw,2.4rem)}
 h3{font-size:1.0625rem;letter-spacing:-.015em;line-height:1.25}
 p{margin:0}

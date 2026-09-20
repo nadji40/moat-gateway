@@ -80,9 +80,9 @@ const FLOW=[
   {m:"GET",    p:()=>"/v1/limits",                     init:()=>({})},
   {m:"GET",    p:()=>"/v1/tests",                      init:()=>({})},
   {m:"POST",   p:()=>"/v1/sandbox",                    init:()=>({method:"POST"}), keep:j=>({id:j.id})},
-  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/intent`,      init:()=>body({text:"Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD."})},
-  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/authorization`,init:()=>body({payee:"Acme Cloud Ltd",amount:"480",currency:"USD"}), keep:j=>({auth:j.authorization_id})},
-  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/pay`,         init:s=>body({payee:"Acme Cloud Ltd",amount:480,currency:"USD",authorization_id:s.auth})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/intent`,      init:()=>body({text:"Pay the Aseer Cloud Co invoice INV-4471 for 480 USD."})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/authorization`,init:()=>body({payee:"Aseer Cloud Co",amount:"480",currency:"USD"}), keep:j=>({auth:j.authorization_id})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/pay`,         init:s=>body({payee:"Aseer Cloud Co",amount:480,currency:"USD",authorization_id:s.auth})},
   {m:"GET",    p:s=>`/v1/sandbox/${s.id}/evidence`,    init:()=>({})},
   {m:"DELETE", p:s=>`/v1/sandbox/${s.id}`,             init:()=>({method:"DELETE"})},
 ];
