@@ -270,6 +270,15 @@ impl DurableStore {
 // every write casts from it. Going through i64 would silently lose an
 // eighteen-decimal token above about 9.2 units, and going through f64 in a
 // ledger would be indefensible.
+//
+// The write cast is `$n::text::numeric`, not `$n::numeric`, and the
+// difference is the whole thing working. A bare `$n::numeric` makes
+// Postgres infer the parameter's type as numeric, and tokio-postgres then
+// refuses to send a String for it. Naming `text` first fixes the inferred
+// type at the one thing we can serialize, and the second cast converts it
+// server-side. Written the obvious way, every ledger write failed -- and
+// because the mirror is deliberately non-fatal, it failed by logging and
+// carrying on, leaving the tables empty and the aggregate reading zero.
 
 /// A `Minor` from a `numeric` column returned as text.
 fn minor_from_text(text: &str) -> Result<Minor> {
@@ -328,8 +337,8 @@ impl DurableStore {
                      require_invoice_fingerprint, repeat_payments, max_payments,
                      expires_unix_ms, cancelled, body
                  ) VALUES (
-                     $1, $2, $3, $4, $5, $6, $7, $8, $9::numeric, $10::numeric,
-                     $11::numeric, $12, $13, $14, $15, $16, $17, $18, $19
+                     $1, $2, $3, $4, $5, $6, $7, $8, $9::text::numeric, $10::text::numeric,
+                     $11::text::numeric, $12, $13, $14, $15, $16, $17, $18, $19
                  )
                  ON CONFLICT (tenant_id, id) DO UPDATE SET
                      cancelled = moat.payment_authorizations.cancelled OR EXCLUDED.cancelled,
@@ -371,7 +380,7 @@ impl DurableStore {
                      invoice_id, status, status_kind, committed, terminal, quarantined,
                      amount_minor, receipt, body
                  ) VALUES (
-                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::numeric, $14, $15
+                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::text::numeric, $14, $15
                  )
                  ON CONFLICT (tenant_id, evidence_id) DO UPDATE SET
                      status = EXCLUDED.status,
@@ -416,7 +425,7 @@ impl DurableStore {
             tx.execute(
                 "INSERT INTO moat.payment_reservations (
                      tenant_id, fingerprint, authorization_id, session_id, amount_minor
-                 ) VALUES ($1, $2, $3, $4, $5::numeric)
+                 ) VALUES ($1, $2, $3, $4, $5::text::numeric)
                  ON CONFLICT (tenant_id, fingerprint) DO NOTHING",
                 &[
                     &tenant_id,
@@ -582,7 +591,7 @@ impl DurableStore {
             .execute(
                 "INSERT INTO moat.payment_reservations (
                      tenant_id, fingerprint, authorization_id, session_id, amount_minor
-                 ) VALUES ($1, $2, $3, $4, $5::numeric)
+                 ) VALUES ($1, $2, $3, $4, $5::text::numeric)
                  ON CONFLICT (tenant_id, fingerprint) DO NOTHING",
                 &[
                     &tenant_id,
