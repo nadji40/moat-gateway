@@ -115,13 +115,60 @@ finds the bytes and broadcasts the same ones. The chain has one nonce for
 them and mines them once. Re-signing on retry would mint a second nonce and a
 second payment, which is the failure the whole exercise is about.
 
-## What this does not show
+## The guarded wallet: enforcement, not advice
 
-The wallet obeys Moat because the wallet is behind Moat. An agent holding the
-key can bypass the proxy and the chain will not stop it. Making the chain
-require Moat's signature — a Safe transaction guard, an ERC-7579 validator —
-is the co-signer design, and it is not built. This adapter makes the
-demonstration real; it does not make the enforcement real.
+Everything above has one hole in it, and it is the hole every wallet policy
+product has: the wallet obeys Moat because the wallet is behind Moat. An
+agent holding the key can skip the proxy and the chain will not care.
+
+`contracts/MoatGuardedWallet.sol` closes it. The funds sit in a contract
+that executes a payment only against an EIP-712 signature from Moat's
+co-signing key over that exact payment. The owner is the agent; it keeps
+its key and is still the only party that can propose a payment, and it
+cannot move a wei alone. Moat holds no funds and cannot move anything
+either. ADR 0010 has the design and the threat model.
+
+```bash
+cd arena && MOAT_EVM_GUARD_CONFIRM=YES pnpm --filter @moat/evm-testnet guard
+```
+
+That compiles the contract from source, deploys it around whatever
+co-signing address the gateway reports at `GET /v1/cosigner`, funds it, and
+proves five things against Base Sepolia:
+
+| Step | What happens | Who stops it |
+|---|---|---|
+| Owner alone | The only keyholder presents a signature it invented | The chain: reverted |
+| Approved payment | Proposed, allowed, co-signed, executed | nobody, correctly |
+| Same verdict again | The identical signature, replayed | The chain: reverted |
+| Denied payment | Moat refuses to co-sign a deny | Moat: no signature exists |
+| Stretched verdict | A signature asked for ten times the allowed amount | Moat: the request is checked against the evidence |
+
+The first row is the one that matters. Every other measurement in this
+repository is about what Moat decides; that row is about what an agent can
+do anyway.
+
+A proposal is recorded as a **pending** payment rather than as nothing,
+because Moat's last chance to refuse is at co-signing time: once the
+signature exists the owner may execute whenever it likes and Moat cannot
+recall it. The mandate is consumed at that moment, the same way a broadcast
+transfer is (ADR 0009), and the transaction hash is reconciled afterwards.
+
+## What this still does not show
+
+The contract enforces Moat's verdict on funds the contract holds, and
+nothing about funds held anywhere else. An agent with its own wallet and
+its own money is outside the system.
+
+The contract is unaudited, testnet-only, and deliberately has no escape
+hatch — no timelock letting the owner act alone after a delay. A real
+deployment needs one, because a Moat that is down must not freeze funds
+forever, and adding one here would weaken the very property being
+demonstrated. The co-signing key is a mode-0600 file, which is fine for
+testnet ether and is not fine for anything else; a key that gates real
+money belongs in a KMS.
+
+Solana has no equivalent yet. The design is in ADR 0010.
 
 There is no `approve` here. The mock wallet has one because the
 standing-allowance attack needs it; this wallet moves value and grants

@@ -25,6 +25,15 @@ pub struct Config {
     /// Directory holding (or receiving) the ed25519 signing key.
     #[serde(default = "default_keys")]
     pub keys: PathBuf,
+    /// Directory holding (or receiving) the secp256k1 co-signing key a
+    /// guarded wallet requires before it will move money (ADR 0010).
+    ///
+    /// Absent by default, and absent means no co-signing: a deployment
+    /// that has not asked for this capability should not silently acquire
+    /// a key that can cause payments to execute. Deliberately a separate
+    /// directory from `keys`, because the two have different blast radii.
+    #[serde(default)]
+    pub cosign_keys: Option<PathBuf>,
     /// The intent API listener. Read from step 7 on.
     #[serde(default)]
     #[allow(dead_code)]

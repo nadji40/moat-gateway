@@ -36,8 +36,16 @@ coverage:
     - cross-tenant-isolation
     - behavioural-baseline-and-graph-risk
     - sanctions-and-debarment-screening
-    # Measured on mocks only. Nothing in the arena touches a real network
-    # or a real bank, and no verdict is enforced on chain.
+    # Measured on mocks. The EVM adapter does move real value on Base
+    # Sepolia -- signed, broadcast and reconciled against the chain -- but
+    # that is a demonstration beside the corpus, not a measurement of it.
+    # Nothing has touched a real bank.
+    #
+    # on-chain-enforcement is no longer "not built": MoatGuardedWallet on
+    # Base Sepolia executes only against a co-signature over the exact
+    # payment, and the owner's own key moves nothing (ADR 0010). It stays
+    # unclaimed because it is demonstrated rather than measured, is EVM
+    # only, and covers only funds the contract holds.
     - on-chain-enforcement
     - token-contract-binding
     - standing-approval-as-its-own-kind

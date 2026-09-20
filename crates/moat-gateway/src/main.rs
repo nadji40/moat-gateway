@@ -171,6 +171,21 @@ async fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
         keys = %cfg.keys.display(), public = %keys.public_hex(), created,
         "evidence signing key ready"
     );
+    let cosign = match &cfg.cosign_keys {
+        Some(dir) => {
+            let (key, created) = moat_core::cosign::CosignKey::load_or_create(dir)
+                .with_context(|| format!("co-signing key in {}", dir.display()))?;
+            tracing::info!(
+                keys = %dir.display(), address = %key.address_hex(), created,
+                concat!(
+                    "co-signing key ready; a guarded wallet constructed with ",
+                    "this address will execute only payments this gateway allows",
+                )
+            );
+            Some(key)
+        }
+        None => None,
+    };
     let storage = match &cfg.storage {
         Some(storage) => {
             let database_url = std::env::var(&storage.database_url_env).with_context(|| {
@@ -190,13 +205,16 @@ async fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
         }
         None => None,
     };
-    Ok(Arc::new(state::Shared::new(
-        policies,
-        keys,
-        cfg.evidence.clone(),
-        storage,
-        cfg.auth.required,
-    )?))
+    Ok(Arc::new(
+        state::Shared::new(
+            policies,
+            keys,
+            cfg.evidence.clone(),
+            storage,
+            cfg.auth.required,
+        )?
+        .with_cosign(cosign),
+    ))
 }
 
 fn start_intent_api(cfg: &config::Config, shared: &Arc<state::Shared>) {

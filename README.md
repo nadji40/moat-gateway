@@ -818,6 +818,43 @@ The run and its manifest are committed under
 [`arena/analysis/`](arena/analysis/README.md) regenerates every number above
 from them rather than anyone typing one in.
 
+### Going around Moat does not help (2026-09-20)
+
+Every number in this file assumes the agent calls Moat. That assumption was
+not enforced by anything: Moat is a proxy, and an agent holding the
+provider's credential could skip it. On a chain that means signing a
+transaction and broadcasting it to any node in the world.
+
+`MoatGuardedWallet` on Base Sepolia removes the assumption. The funds live
+in a contract that executes a payment only against an EIP-712 signature
+from Moat's co-signing key over that exact payment — recipient, token,
+amount, evidence id, expiry, chain and contract all bound. The agent keeps
+its key and remains the only party that can propose a payment; it cannot
+move a wei alone. Moat holds no funds and cannot move anything either.
+
+Run against the live chain, five results:
+
+| What is tried | Outcome |
+|---|---|
+| The only keyholder executes with a signature it invented | reverted on chain |
+| An approved payment is proposed, allowed, co-signed, executed | paid, exactly the approved amount |
+| The identical signature is presented a second time | reverted on chain |
+| A signature is requested for a payment Moat denied | refused: only an allow can be co-signed |
+| A signature is requested for ten times the allowed amount | refused: checked against the evidence, not against the request |
+
+This is the difference between a policy engine and a control, and it is
+where every wallet-policy product in the landscape sits on the wrong side:
+CDP Wallet Policies, ERC-4337 session keys and Safe spending caps are the
+`cap` and `allowlist` arms of the table below, enforced by whoever holds
+the key.
+
+What it does not cover: funds the contract does not hold, Solana (designed
+in ADR 0010, not built), and correctness — a verdict that should have been
+a denial will be executed faithfully. On-chain enforcement closes the
+bypass, not the false negative. The contract is unaudited and testnet-only,
+and the co-signing key is a file, which is why a KMS is named in ADR 0010
+as the first hard production dependency.
+
 ### Four rails, one control (2026-09-20)
 
 The same corpus, the same four arms and the same scoring, run on card, bank

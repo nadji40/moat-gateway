@@ -181,7 +181,7 @@ export function defaultStateDir(): string {
  * enough on its own, because the next request can land on a different
  * replica; asking again is what gets a node that has it.
  */
-async function retrying<T>(read: () => Promise<T>, tries = 10): Promise<T> {
+export async function retrying<T>(read: () => Promise<T>, tries = 10): Promise<T> {
   for (let i = 0; ; i += 1) {
     try {
       return await read();
@@ -190,6 +190,23 @@ async function retrying<T>(read: () => Promise<T>, tries = 10): Promise<T> {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
+}
+
+/**
+ * How many base units `amount` of `symbol` is, or throw.
+ *
+ * The throw is the point: an amount with more decimal places than the asset
+ * has is an instruction the chain cannot carry out, and rounding it would
+ * hide the unit confusion Moat exists to catch.
+ */
+export function baseUnitsFor(
+  config: Pick<WalletConfig, "token">,
+  amount: string | number,
+  symbol: string,
+): bigint {
+  const asset = assetsOf(config).find((a) => a.symbol.toUpperCase() === symbol.trim().toUpperCase());
+  if (!asset) throw new Error(`this wallet cannot move ${symbol}`);
+  return toBaseUnits(amount, asset.decimals);
 }
 
 /** The assets this wallet can move: ether always, the test token if configured. */

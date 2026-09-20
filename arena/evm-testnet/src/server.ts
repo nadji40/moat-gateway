@@ -13,7 +13,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { assetsOf, CHAIN, configFromEnv, NETWORK, Wallet } from "./evm.js";
+import { assetsOf, baseUnitsFor, CHAIN, configFromEnv, NETWORK, Wallet } from "./evm.js";
 
 const wallet = new Wallet(configFromEnv());
 const chainId = await wallet.assertChain();
@@ -182,6 +182,64 @@ server.registerTool(
     return {
       content: [{ type: "text", text: JSON.stringify(summary) }],
       structuredContent: { ...summary },
+    };
+  },
+);
+
+// The guarded path: propose a payment the chain will refuse without Moat.
+//
+// This tool moves nothing. It exists because the guarded wallet separates
+// deciding from executing: Moat evaluates the proposal and writes an
+// evidence record, the operator turns that record into a signature through
+// POST /v1/session/{id}/cosign, and only then can the owner call
+// MoatGuardedWallet.execute. `send` above is the unguarded wallet, where
+// Moat's verdict is advice; this is the guarded one, where it is a
+// precondition. See ADR 0010 and src/guard-smoke.ts.
+server.registerTool(
+  "propose",
+  {
+    description:
+      "Propose a payment from the Moat-guarded wallet. Moves nothing on its own: it records " +
+      "what is intended so the verdict can be co-signed, and the guarded contract will not " +
+      "execute without that signature.",
+    inputSchema: {
+      counterparty: z.string().describe("Who the address is believed to belong to"),
+      to_address: z.string().describe("Destination address"),
+      token: z.string().describe("Asset symbol, e.g. ETH"),
+      amount: Amount.describe("Amount in whole units"),
+      network: z.string().describe("CAIP-2 network, e.g. eip155:84532"),
+      authorization_id: z.string().optional(),
+      invoice_id: z.string().optional(),
+    },
+  },
+  async (args) => {
+    let baseUnits: string;
+    try {
+      baseUnits = baseUnitsFor(wallet.config, String(args.amount), args.token).toString();
+    } catch (error) {
+      return refuse(`Proposal refused: ${(error as Error).message}`, "rejected");
+    }
+    const proposal = {
+      // "pending", not some word of its own, and the reason is the whole
+      // shape of the guarded flow. Moat's last chance to refuse is here:
+      // once it co-signs, the owner can execute whenever it likes and Moat
+      // cannot recall the signature. So the payment is committed against
+      // the mandate from this moment, exactly as a broadcast transfer is
+      // (ADR 0009), and settles when an operator reconciles the hash. A
+      // status the outcome machine could not place would be `unknown`,
+      // which on an irreversible rail quarantines the authorization -- and
+      // correctly so, which is how this was found.
+      status: "pending",
+      receipt: `proposal_${args.invoice_id ?? args.authorization_id ?? "unknown"}`,
+      to_address: args.to_address,
+      token: args.token,
+      amount: String(args.amount),
+      base_units: baseUnits,
+      network: args.network,
+    };
+    return {
+      content: [{ type: "text", text: JSON.stringify(proposal) }],
+      structuredContent: proposal,
     };
   },
 );

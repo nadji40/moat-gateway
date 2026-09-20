@@ -1,0 +1,21 @@
+# The guarded wallet: Moat's verdict enforced by the chain, not by the proxy.
+#
+# Same upstream and the same policy as moat.evm-testnet.yaml, with two
+# differences. The payment tool is `propose`, which moves nothing, and this
+# gateway holds a secp256k1 co-signing key. A verdict here becomes an
+# EIP-712 signature that MoatGuardedWallet requires before it will pay
+# anyone; without it the owner's own key moves nothing. ADR 0010.
+#
+# Run from arena/ with Node 22 on PATH. See evm-testnet/README.md.
+listen: { transport: stdio }
+upstreams:
+  - name: wallet
+    rail: crypto
+    transport: stdio
+    command:
+      ["node", "--env-file=../.env.evm-testnet", "--import", "tsx", "evm-testnet/src/server.ts"]
+policy: ../policies/rails/evm-guard.yaml
+evidence: ./results/evm-guard-evidence.jsonl
+keys: ./keys
+cosign_keys: ./keys
+intent_api: { addr: "127.0.0.1:7076" }

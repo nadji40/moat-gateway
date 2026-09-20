@@ -12,14 +12,18 @@ use axum::extract::{Path, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use moat_core::cosign;
+use moat_core::destination::Destination;
 use moat_core::money::parse_major;
 use moat_core::outcome::OutcomeStatus;
+use moat_core::policy::{payment_amount, PaymentCall};
 use moat_core::session::{lock, PaymentAuthorization};
+use moat_core::verdict::Decision;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::proxy::now_unix_ms;
-use crate::state::Shared;
+use crate::state::{PolicyState, Shared};
 
 #[derive(Deserialize)]
 struct IntentBody {
@@ -537,6 +541,230 @@ async fn reconcile_outcome(
     Ok(Json(json!({ "session": id, "outcome": outcome })))
 }
 
+/// What a caller asks Moat to co-sign.
+///
+/// Every field is checked against the evidence record rather than trusted.
+/// The caller says what it intends to execute; Moat signs only if that is
+/// what it allowed.
+#[derive(Debug, Deserialize)]
+struct CosignBody {
+    /// The evidence record whose verdict is being turned into a signature.
+    evidence_id: String,
+    /// The guarded wallet that will check the signature.
+    wallet: String,
+    /// EVM chain id. Part of the EIP-712 domain, so a signature for one
+    /// chain is worthless on another.
+    chain_id: u64,
+    /// Recipient, which must be the destination the record carries.
+    to: String,
+    /// ERC-20 contract, or absent for native value.
+    #[serde(default)]
+    token: Option<String>,
+    /// Amount in the token's base units, as a decimal integer string.
+    value: String,
+    /// How many seconds the signature stays good for. Bounded.
+    #[serde(default = "default_cosign_ttl")]
+    ttl_seconds: u64,
+}
+
+fn default_cosign_ttl() -> u64 {
+    300
+}
+
+/// The longest a verdict may stay executable.
+///
+/// A signature with a long life is a standing grant by another name, which
+/// is the thing the arena's standing-approval attack is about. Five minutes
+/// is enough to get a transaction mined on an L2 and short enough that a
+/// leaked signature is nearly always already dead.
+const MAX_COSIGN_TTL_SECONDS: u64 = 900;
+
+async fn cosign_verdict(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(body): Json<CosignBody>,
+) -> ApiResult {
+    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let session = session_for_request(&shared, &tenant_id, &id).await?;
+    let Some(cosign) = shared.cosign() else {
+        return Err(err(
+            StatusCode::NOT_IMPLEMENTED,
+            "this gateway has no co-signing key; run it with `cosign_keys` configured",
+        ));
+    };
+
+    if body.ttl_seconds == 0 || body.ttl_seconds > MAX_COSIGN_TTL_SECONDS {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            format!("ttl_seconds must be between 1 and {MAX_COSIGN_TTL_SECONDS}"),
+        ));
+    }
+    let wallet = address_arg(&body.wallet, "wallet")?;
+    let to = address_arg(&body.to, "to")?;
+    let token = match body
+        .token
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty())
+    {
+        Some(text) => address_arg(text, "token")?,
+        None => [0u8; 20],
+    };
+    let value = cosign::value_from_decimal(&body.value)
+        .map_err(|why| err(StatusCode::BAD_REQUEST, format!("value: {why}")))?;
+
+    // The verdict, as recorded. Not as described by whoever is asking.
+    let Some(record) = shared
+        .evidence_for(&id)
+        .into_iter()
+        .find(|record| record.id == body.evidence_id)
+    else {
+        return Err(err(
+            StatusCode::NOT_FOUND,
+            "no evidence record in this session carries that id",
+        ));
+    };
+    if record.verdict != Decision::Allow {
+        return Err(err(
+            StatusCode::CONFLICT,
+            format!(
+                "evidence {} is a {:?}, and only an allow can be co-signed",
+                record.id, record.verdict
+            ),
+        ));
+    }
+
+    let call = PaymentCall {
+        server: record.call.server.clone(),
+        tool: record.call.tool.clone(),
+        call_id: record.call.call_id.clone(),
+        args: record.call.args.clone(),
+    };
+    let PolicyState::Loaded(policy) = shared.policies.for_upstream(&call.server) else {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "the policy that produced this verdict is no longer loadable",
+        ));
+    };
+
+    // The destination the verdict was about, compared as an address rather
+    // than as text, so that hex casing cannot turn one address into another.
+    let mapped = policy.map_fields(&call.args);
+    let recorded_destination = mapped
+        .get("destination")
+        .map(|(_, value)| *value)
+        .or_else(|| call.args.get("recipient_account_id"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let asked = format!("0x{}", hex::encode(to));
+    if !Destination::parse(recorded_destination).same_as(&Destination::parse(&asked)) {
+        return Err(err(
+            StatusCode::CONFLICT,
+            format!(
+                "evidence {} allowed a payment to {recorded_destination}, not to {asked}",
+                record.id
+            ),
+        ));
+    }
+
+    // And the amount, in the base units the chain counts in. Reading it
+    // through the policy's own mapping is what makes this the amount that
+    // was evaluated rather than whatever argument happens to be named
+    // `amount`.
+    let Some((_asset, minor)) = payment_amount(policy, &call) else {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "the amount of the allowed payment could not be read through the policy's \
+             field mapping, so there is nothing to bind a signature to",
+        ));
+    };
+    let recorded_value = cosign::value_from_decimal(&minor.0.to_string())
+        .map_err(|why| err(StatusCode::INTERNAL_SERVER_ERROR, why))?;
+    if recorded_value != value {
+        return Err(err(
+            StatusCode::CONFLICT,
+            format!(
+                "evidence {} allowed {} base units, not {}",
+                record.id, minor.0, body.value
+            ),
+        ));
+    }
+
+    // A payment Moat cannot account for is held (ADR 0009). Signing for an
+    // authorization with an unreconciled outcome would hand out a second
+    // executable verdict while the first is still unaccounted for.
+    let authorization_id = call
+        .args
+        .get("authorization_id")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned();
+    {
+        let session = lock(&session);
+        if let Some(quarantined) = session
+            .payment_outcomes()
+            .iter()
+            .find(|outcome| outcome.quarantined && outcome.authorization_id == authorization_id)
+        {
+            return Err(err(
+                StatusCode::CONFLICT,
+                format!(
+                    "an earlier payment under {} is unaccounted for (evidence {}); \
+                     reconcile it before asking for another signature",
+                    authorization_id, quarantined.evidence_id
+                ),
+            ));
+        }
+        if let Some(authorization) = session.payment_authorization(&authorization_id) {
+            if authorization.cancelled {
+                return Err(err(
+                    StatusCode::CONFLICT,
+                    format!("authorization {authorization_id} has been cancelled"),
+                ));
+            }
+        }
+    }
+
+    let expiry = now_unix_ms() / 1000 + body.ttl_seconds;
+    let verdict = cosign::Verdict {
+        wallet,
+        to,
+        token,
+        value,
+        evidence_id: cosign::evidence_id_to_bytes32(&record.id),
+        expiry,
+    };
+    let signature = cosign.sign_verdict(&verdict, body.chain_id, &wallet);
+    tracing::info!(
+        session = %id,
+        evidence_id = %record.id,
+        authorization_id = %authorization_id,
+        wallet = %body.wallet,
+        chain_id = body.chain_id,
+        expiry,
+        "verdict co-signed"
+    );
+    Ok(Json(json!({
+        "session": id,
+        "evidence_id": record.id,
+        "signature": signature,
+        "signer": cosign.address_hex(),
+        "wallet": format!("0x{}", hex::encode(wallet)),
+        "to": asked,
+        "token": format!("0x{}", hex::encode(token)),
+        "value": body.value,
+        "evidence_id_bytes32": format!("0x{}", hex::encode(verdict.evidence_id)),
+        "expiry": expiry,
+        "chain_id": body.chain_id,
+    })))
+}
+
+fn address_arg(text: &str, field: &str) -> Result<[u8; 20], (StatusCode, Json<ErrorBody>)> {
+    cosign::address_from_hex(text)
+        .map_err(|why| err(StatusCode::BAD_REQUEST, format!("{field}: {why}")))
+}
+
 async fn get_workflow(
     State(shared): State<Arc<Shared>>,
     headers: HeaderMap,
@@ -595,6 +823,19 @@ async fn live() -> StatusCode {
     StatusCode::OK
 }
 
+/// The address a guarded wallet must be constructed around.
+///
+/// Public and unauthenticated: it is a public key, the contract that
+/// checks it is public, and a deployer needs it before there is a session
+/// to authenticate against. Says so plainly when this gateway has none,
+/// rather than 404, so the answer to "can this Moat co-sign?" is one call.
+async fn cosigner(State(shared): State<Arc<Shared>>) -> Json<Value> {
+    Json(match shared.cosign() {
+        Some(key) => json!({ "cosign_address": key.address_hex(), "enabled": true }),
+        None => json!({ "cosign_address": Value::Null, "enabled": false }),
+    })
+}
+
 async fn ready(State(shared): State<Arc<Shared>>) -> StatusCode {
     match shared.storage_ready().await {
         Ok(()) => StatusCode::OK,
@@ -621,8 +862,10 @@ pub fn router(shared: Arc<Shared>) -> Router {
             "/v1/session/{id}/outcomes/{evidence_id}/reconcile",
             post(reconcile_outcome),
         )
+        .route("/v1/session/{id}/cosign", post(cosign_verdict))
         .route("/v1/session/{id}/workflow", get(get_workflow))
         .route("/v1/session/{id}/evidence", get(get_evidence))
+        .route("/v1/cosigner", get(cosigner))
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
         .with_state(shared)

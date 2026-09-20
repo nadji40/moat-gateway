@@ -10,11 +10,15 @@
     "smoke": "node --env-file=../../.env.evm-testnet --import tsx src/smoke.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json",
-    "bridge": "node --env-file=../../.env.evm-testnet --import tsx src/bridge.ts"
+    "bridge": "node --env-file=../../.env.evm-testnet --import tsx src/bridge.ts",
+    "guard": "node --env-file=../../.env.evm-testnet --import tsx src/guard-smoke.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "viem": "^2.56.8",
     "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "solc": "^0.8.37"
   }
 }

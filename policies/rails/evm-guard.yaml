@@ -1,0 +1,59 @@
+version: 1
+
+# The policy in front of the Moat-guarded wallet.
+#
+# rails/evm-testnet.yaml with one change: the payment tool is `propose`
+# rather than `send`. On this path Moat does not stand between the agent
+# and the money -- the contract does. `propose` moves nothing; an allow
+# here is what POST /v1/session/{id}/cosign turns into the signature
+# MoatGuardedWallet demands, and a deny simply never becomes one. ADR 0010.
+#
+# Everything else is deliberately identical, so that a verdict on the
+# guarded path is reached by exactly the code a verdict on the unguarded
+# path is reached by.
+
+payment_tools:
+  - server: "*"
+    tool: "propose"
+
+fields:
+  payee:       { args: ["counterparty"] }
+  amount:      { args: ["amount"] }
+  currency:    { args: ["token"] }
+  destination: { kind: destination, args: ["to_address"] }
+  network:     { args: ["network"] }
+
+allowlist:
+  payees: []
+  accounts: []
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User]
+    on_fail: step_up
+    message: "counterparty label did not come from the user"
+
+  - id: destination-provenance
+    when: field == destination
+    require_source: [User]
+    on_fail: deny
+    message: "destination address did not come from the user"
+
+  - id: amount-cap
+    when: field == amount
+    max: 0.01
+    on_fail: deny
+    message: "amount exceeds the testnet cap"
+
+  - id: amount-provenance
+    when: field == amount
+    require_source: [User, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 20
+  max_calls_per_minute: 10
+  on_exceed: deny
+
+no_human_available: deny

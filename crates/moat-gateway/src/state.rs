@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, PoisonError};
 
 use anyhow::{Context, Result};
+use moat_core::cosign::CosignKey;
 use moat_core::evidence::Record;
 use moat_core::keys::Keys;
 use moat_core::money::{Asset, AssetRegistry};
@@ -180,6 +181,12 @@ pub struct Shared {
     evidence: Mutex<EvidenceLog>,
     storage: Option<DurableStore>,
     auth_required: bool,
+    /// The secp256k1 key a guarded wallet requires before it will move
+    /// money (ADR 0010). Separate from `keys`, which signs evidence:
+    /// evidence proves what Moat decided, this causes money to move, and a
+    /// compromise of one must not be a compromise of the other. Absent
+    /// unless the deployment has one.
+    cosign: Option<CosignKey>,
 }
 
 impl Shared {
@@ -222,7 +229,21 @@ impl Shared {
             }),
             storage,
             auth_required,
+            cosign: None,
         })
+    }
+
+    /// Attach the co-signing key. Builder-style so every existing caller of
+    /// `new` keeps working and a deployment without one is the default.
+    #[must_use]
+    pub fn with_cosign(mut self, cosign: Option<CosignKey>) -> Shared {
+        self.cosign = cosign;
+        self
+    }
+
+    /// The co-signing key, if this deployment has one.
+    pub fn cosign(&self) -> Option<&CosignKey> {
+        self.cosign.as_ref()
     }
 
     /// Whether HTTP callers must present a database-backed bearer key.

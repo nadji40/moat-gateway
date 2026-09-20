@@ -20,6 +20,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod cosign;
 pub mod destination;
 pub mod evidence;
 pub mod extract;
