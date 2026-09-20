@@ -647,3 +647,492 @@ impl DurableStore {
             .collect())
     }
 }
+
+#[cfg(test)]
+mod ledger_tests {
+    /// The payment ledger, against a real PostgreSQL.
+    ///
+    /// Skipped unless `MOAT_TEST_DATABASE_URL` names a database with migration
+    /// 3 applied, so `cargo test` stays green on a machine with no database and
+    /// CI needs no service. Point it at a scratch database, never a production
+    /// one: these tests create a tenant, write rows and delete them again.
+    ///
+    ///   MOAT_TEST_DATABASE_URL=postgres://... cargo test -p moat-gateway --test storage_ledger
+    ///
+    /// The role in that URL needs to reach the `moat` schema and insert into
+    /// `moat.tenants`; `moat_migrator` does not, which is what broke the deploy
+    /// script, so use an owner or superuser connection.
+    ///
+    /// What is worth testing here is not that a row round-trips. It is the two
+    /// things the ledger exists for and that no unit test can reach:
+    ///
+    ///   the aggregate counts committed payments and open reservations across
+    ///   sessions, and a reversal stops counting;
+    ///
+    ///   and two sessions racing the same mandate cannot both be granted it,
+    ///   because the check and the write happen inside one row lock. That one
+    ///   is the reason the tables exist at all, and it is exactly the bug that
+    ///   a single-process test would never see.
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    /// Run one statement against the test database.
+    async fn exec(
+        store: &DurableStore,
+        sql: &str,
+        params: &[&(dyn tokio_postgres::types::ToSql + Sync)],
+    ) {
+        let client = store.pool.get().await.expect("test connection");
+        client
+            .execute(sql, params)
+            .await
+            .unwrap_or_else(|e| panic!("{sql}: {e}"));
+    }
+
+    use ::moat_core::money::Minor;
+    use ::moat_core::outcome::OutcomeStatus;
+    use ::moat_core::rail::Rail;
+    use ::moat_core::session::{PaymentAuthorization, PaymentOutcome, PaymentReservation, Session};
+
+    /// The database to test against, or `None` to skip.
+    fn database_url() -> Option<String> {
+        let url = std::env::var("MOAT_TEST_DATABASE_URL").ok()?;
+        let url = url.trim().to_owned();
+        if url.is_empty() {
+            return None;
+        }
+        Some(url)
+    }
+
+    macro_rules! store_or_skip {
+        () => {
+            match database_url() {
+                Some(url) => DurableStore::connect(&url, 8)
+                    .await
+                    .expect("connecting to MOAT_TEST_DATABASE_URL"),
+                None => {
+                    eprintln!("skipped: set MOAT_TEST_DATABASE_URL to run the ledger tests");
+                    return;
+                }
+            }
+        };
+    }
+
+    fn unique(prefix: &str) -> String {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        format!("{prefix}-{nanos}")
+    }
+
+    /// A tenant of our own, so a test never touches another's rows.
+    async fn tenant(store: &DurableStore, id: &str) {
+        exec(
+            store,
+            "INSERT INTO moat.tenants (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+            &[&id, &"ledger test"],
+        )
+        .await;
+    }
+
+    /// Remove everything this test wrote, in foreign-key order.
+    async fn cleanup(store: &DurableStore, id: &str) {
+        for sql in [
+            "DELETE FROM moat.payment_reservations WHERE tenant_id = $1",
+            "DELETE FROM moat.payment_outcomes WHERE tenant_id = $1",
+            "DELETE FROM moat.payment_authorizations WHERE tenant_id = $1",
+            "DELETE FROM moat.sessions WHERE tenant_id = $1",
+            "DELETE FROM moat.tenants WHERE id = $1",
+        ] {
+            exec(store, sql, &[&id]).await;
+        }
+    }
+
+    fn authorization(id: &str, amount: u128, aggregate: Option<u128>) -> PaymentAuthorization {
+        PaymentAuthorization {
+            id: id.to_owned(),
+            payee: "Monitoring Pro Inc".into(),
+            recipient_account_id: Some("acct_supplier_001".into()),
+            amount_minor: Minor(amount),
+            tolerance_minor: Minor(0),
+            currency: "USD".into(),
+            network: None,
+            asset_contract: None,
+            invoice_id: format!("INV-{id}"),
+            invoice_fingerprint: None,
+            require_invoice_fingerprint: false,
+            aggregate_limit_minor: aggregate.map(Minor),
+            expires_unix_ms: 4_000_000_000_000,
+            repeat_payments: true,
+            max_payments: 10,
+            cancelled: false,
+        }
+    }
+
+    fn outcome(
+        evidence_id: &str,
+        authorization_id: &str,
+        amount: u128,
+        kind: OutcomeStatus,
+    ) -> PaymentOutcome {
+        PaymentOutcome {
+            authorization_id: authorization_id.to_owned(),
+            invoice_id: format!("INV-{authorization_id}"),
+            amount_minor: Minor(amount),
+            evidence_id: evidence_id.to_owned(),
+            provider: "stripe".into(),
+            receipt: Some(unique("rcpt")),
+            status: format!("{kind:?}").to_lowercase(),
+            succeeded: kind == OutcomeStatus::Succeeded,
+            status_kind: kind,
+            invoice_fingerprint: None,
+            committed: !matches!(kind, OutcomeStatus::Failed | OutcomeStatus::Reversed),
+            quarantined: false,
+            rail: Rail::Card,
+            unix_ms: 1_700_000_000_000,
+            reconciled_unix_ms: None,
+        }
+    }
+
+    /// A mandate registered in one session is found from another.
+    ///
+    /// The whole reason the tables exist: before them, reconnecting lost the
+    /// mandate, so every long-lived agreement had to be re-granted.
+    #[tokio::test]
+    async fn an_authorization_outlives_the_session_that_registered_it() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-outlives", 50_000, None))
+            .expect("registering");
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving the ledger");
+
+        // A different session, which has never seen this mandate.
+        let found = store
+            .payment_authorization(&id, "auth-outlives")
+            .await
+            .expect("reading back")
+            .expect("the mandate should be in the ledger");
+        assert_eq!(found.payee, "Monitoring Pro Inc");
+        assert_eq!(found.amount_minor, Minor(50_000));
+        assert_eq!(
+            found.recipient_account_id.as_deref(),
+            Some("acct_supplier_001")
+        );
+
+        assert!(store
+            .payment_authorization(&id, "auth-never-registered")
+            .await
+            .expect("reading a missing mandate")
+            .is_none());
+
+        cleanup(&store, &id).await;
+    }
+
+    /// Committed payments and open reservations both count; a reversal does not.
+    #[tokio::test]
+    async fn the_aggregate_counts_what_the_mandate_is_answerable_for() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-agg", 10_000, Some(100_000)))
+            .expect("registering");
+        session.record_payment_outcome(outcome(
+            "ev-a",
+            "auth-agg",
+            10_000,
+            OutcomeStatus::Succeeded,
+        ));
+        session.record_payment_outcome(outcome(
+            "ev-b",
+            "auth-agg",
+            30_000,
+            OutcomeStatus::Confirmed,
+        ));
+        // Failed money never moved, so it must not be held against the mandate.
+        session.record_payment_outcome(outcome("ev-c", "auth-agg", 70_000, OutcomeStatus::Failed));
+        session.reserve_payment(PaymentReservation {
+            fingerprint: "fp-open".into(),
+            authorization_id: "auth-agg".into(),
+            invoice_id: "INV-auth-agg".into(),
+            invoice_fingerprint: None,
+            amount_minor: Minor(5_000),
+        });
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+
+        let aggregate = store
+            .aggregate_for(&id, "auth-agg")
+            .await
+            .expect("aggregate");
+        assert_eq!(aggregate.committed, Minor(40_000), "succeeded + confirmed");
+        assert_eq!(aggregate.reserved, Minor(5_000), "the open reservation");
+        assert_eq!(aggregate.payments, 2, "the failed one is not a payment");
+        assert_eq!(aggregate.total(), Minor(45_000));
+
+        cleanup(&store, &id).await;
+    }
+
+    /// u128 amounts survive the round trip through `numeric(39,0)`.
+    ///
+    /// Eighteen decimals in base units leaves `bigint` behind at about 9.2
+    /// units, so anything that quietly went through an i64 would truncate here.
+    #[tokio::test]
+    async fn an_eighteen_decimal_amount_survives_the_database() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        // 1,234.5 ETH in wei.
+        let wei = 1_234_500_000_000_000_000_000u128;
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-wei", wei, Some(wei * 2)))
+            .expect("registering");
+        session.record_payment_outcome(outcome(
+            "ev-wei",
+            "auth-wei",
+            wei,
+            OutcomeStatus::Succeeded,
+        ));
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+
+        let found = store
+            .payment_authorization(&id, "auth-wei")
+            .await
+            .expect("reading")
+            .expect("present");
+        assert_eq!(found.amount_minor, Minor(wei));
+        let aggregate = store
+            .aggregate_for(&id, "auth-wei")
+            .await
+            .expect("aggregate");
+        assert_eq!(aggregate.committed, Minor(wei));
+
+        cleanup(&store, &id).await;
+    }
+
+    /// Two sessions racing one mandate: exactly one gets it.
+    ///
+    /// This is the test the ledger was built for. Before it, each session read
+    /// its own document, each saw the whole allowance unspent, and both spent
+    /// it. `reserve_if_within` computes the aggregate and takes the reservation
+    /// inside one row lock, so the loser queues and then sees the winner's
+    /// reservation.
+    #[tokio::test]
+    async fn two_sessions_cannot_both_spend_the_same_allowance() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        // Room for one payment of 60, not two.
+        session
+            .register_payment_authorization(authorization("auth-race", 60_000, Some(100_000)))
+            .expect("registering");
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+
+        let limit = Minor(100_000);
+        let amount = Minor(60_000);
+        let a = {
+            let store = store.clone();
+            let id = id.clone();
+            tokio::spawn(async move {
+                store
+                    .reserve_if_within(&id, "auth-race", "fp-a", "session-a", amount, limit)
+                    .await
+            })
+        };
+        let b = {
+            let store = store.clone();
+            let id = id.clone();
+            tokio::spawn(async move {
+                store
+                    .reserve_if_within(&id, "auth-race", "fp-b", "session-b", amount, limit)
+                    .await
+            })
+        };
+        let a = a.await.expect("task a").expect("query a");
+        let b = b.await.expect("task b").expect("query b");
+
+        assert!(
+            a.is_some() ^ b.is_some(),
+            "exactly one of the two should have been granted; got a={a:?} b={b:?}"
+        );
+
+        let aggregate = store
+            .aggregate_for(&id, "auth-race")
+            .await
+            .expect("aggregate");
+        assert_eq!(
+            aggregate.reserved,
+            Minor(60_000),
+            "only the winner's reservation is held"
+        );
+
+        cleanup(&store, &id).await;
+    }
+
+    /// The same payment proposed twice is one reservation, not two.
+    #[tokio::test]
+    async fn one_fingerprint_is_one_reservation() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-dup", 10_000, Some(100_000)))
+            .expect("registering");
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+
+        let first = store
+            .reserve_if_within(
+                &id,
+                "auth-dup",
+                "fp-same",
+                "s1",
+                Minor(10_000),
+                Minor(100_000),
+            )
+            .await
+            .expect("first");
+        let second = store
+            .reserve_if_within(
+                &id,
+                "auth-dup",
+                "fp-same",
+                "s2",
+                Minor(10_000),
+                Minor(100_000),
+            )
+            .await
+            .expect("second");
+        assert!(first.is_some(), "the first proposal is granted");
+        assert!(
+            second.is_none(),
+            "the identical proposal is not granted twice"
+        );
+        assert_eq!(
+            store
+                .aggregate_for(&id, "auth-dup")
+                .await
+                .expect("aggregate")
+                .reserved,
+            Minor(10_000)
+        );
+
+        store
+            .release_reservation(&id, "fp-same")
+            .await
+            .expect("releasing");
+        assert_eq!(
+            store
+                .aggregate_for(&id, "auth-dup")
+                .await
+                .expect("aggregate")
+                .reserved,
+            Minor::ZERO,
+            "releasing frees the mandate"
+        );
+
+        cleanup(&store, &id).await;
+    }
+
+    /// A cancelled mandate grants nothing, whatever room is left in it.
+    #[tokio::test]
+    async fn a_cancelled_mandate_reserves_nothing() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        let mut cancelled = authorization("auth-cancelled", 10_000, Some(100_000));
+        cancelled.cancelled = true;
+        session
+            .register_payment_authorization(cancelled)
+            .expect("registering");
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+
+        let granted = store
+            .reserve_if_within(
+                &id,
+                "auth-cancelled",
+                "fp-x",
+                "s1",
+                Minor(10),
+                Minor(100_000),
+            )
+            .await
+            .expect("query");
+        assert!(granted.is_none(), "a cancelled mandate is not a mandate");
+
+        cleanup(&store, &id).await;
+    }
+
+    /// Quarantined and non-terminal outcomes are what an operator has to clear.
+    #[tokio::test]
+    async fn open_outcomes_are_the_ones_somebody_has_to_deal_with() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-open", 10_000, None))
+            .expect("registering");
+        session.record_payment_outcome(outcome(
+            "ev-done",
+            "auth-open",
+            1_000,
+            OutcomeStatus::Succeeded,
+        ));
+        let mut stuck = outcome("ev-stuck", "auth-open", 2_000, OutcomeStatus::Unknown);
+        stuck.quarantined = true;
+        session.record_payment_outcome(stuck);
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+
+        let open = store.open_outcomes(&id, 50).await.expect("open outcomes");
+        let ids: Vec<&str> = open
+            .iter()
+            .filter_map(|o| o.get("evidence_id").and_then(|v| v.as_str()))
+            .collect();
+        assert!(
+            ids.contains(&"ev-stuck"),
+            "the quarantined one is open: {ids:?}"
+        );
+        assert!(
+            !ids.contains(&"ev-done"),
+            "a settled payment is not open: {ids:?}"
+        );
+
+        cleanup(&store, &id).await;
+    }
+}
