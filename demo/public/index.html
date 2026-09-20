@@ -66,50 +66,27 @@ nav{position:sticky;top:0;z-index:20;padding-top:14px}
 @keyframes fade{to{opacity:1}}
 
 /* hero */
-header.hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:clamp(24px,5vw,72px);align-items:center;
-  padding-block:clamp(48px,8vw,96px) clamp(36px,6vw,64px)}
-@media(max-width:900px){header.hero{grid-template-columns:1fr}.hero-art{order:-1;max-width:260px;margin:0 auto}}
-.kicker{display:inline-flex;align-items:center;gap:10px;font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:22px}
-.kicker i{width:22px;height:2px;background:linear-gradient(90deg,var(--red),var(--orange),var(--yellow))}
-h1 .g{background:linear-gradient(92deg,var(--red-l) 0%,var(--orange-l) 45%,var(--yellow-l) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+header.hero{padding-block:clamp(48px,8vw,96px) clamp(36px,6vw,64px)}
+.kicker{display:inline-block;font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:22px}
+h1 .g{color:var(--orange)}
 .hero .lede{color:var(--ink-2);max-width:48ch;margin-top:22px;font-size:1.0625rem}
 .hero .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:32px}
-.btn{position:relative;display:inline-flex;align-items:center;gap:10px;color:#fff;border:0;border-radius:999px;padding:14px 26px;
-  font:700 .9375rem var(--font);cursor:pointer;letter-spacing:-.01em;isolation:isolate;overflow:hidden;
-  background:linear-gradient(100deg,var(--red) 0%,var(--orange) 100%);box-shadow:0 10px 30px -10px rgba(255,95,0,.6);
-  transition:transform .2s var(--ease),box-shadow .2s var(--ease),filter .2s}
-.btn:hover{transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 14px 34px -10px rgba(255,95,0,.75)}
+.btn{display:inline-flex;align-items:center;gap:10px;color:#000;border:0;border-radius:999px;padding:14px 26px;
+  font:700 .9375rem var(--font);cursor:pointer;letter-spacing:-.01em;background:var(--orange);
+  transition:transform .2s var(--ease),background .2s}
+.btn:hover{transform:translateY(-1px);background:#FF7A2B}
 .btn:active{transform:translateY(0)}
-.btn:before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
-  transform:translateX(-120%);transition:transform .7s var(--ease);z-index:-1}
-.btn:hover:before{transform:translateX(120%)}
-.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none;filter:none}
-.btn.ghost{background:rgba(255,255,255,.05);color:var(--ink);border:1px solid var(--line-2);box-shadow:none;
+.btn[disabled]{opacity:.4;cursor:not-allowed;transform:none}
+.btn.ghost{background:rgba(255,255,255,.05);color:var(--ink);border:1px solid var(--line-2);
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .btn.ghost:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.28)}
-.btn.ghost:before{display:none}
 .tally{display:grid;grid-template-columns:repeat(4,auto);gap:12px;margin-top:38px}
 @media(max-width:560px){.tally{grid-template-columns:1fr 1fr}}
 .tally div{border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
 .tally div:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c,var(--orange))}
 .tally .n{display:block;font-size:1.45rem;font-weight:800;letter-spacing:-.03em;line-height:1}
 .tally .l{display:block;font-size:.75rem;color:var(--ink-2);font-weight:600;margin-top:6px}
-.hero-art{position:relative;aspect-ratio:1;display:grid;place-items:center}
-.hero-art svg{position:relative;width:100%;height:100%;filter:drop-shadow(0 12px 28px rgba(0,0,0,.9))}
-.hero-art .ring{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.6s var(--ease) forwards}
-.hero-art .ring.two{animation-delay:.25s}
-.hero-art .spin{animation:turn 60s linear infinite}
-.hero-art .d{opacity:0;animation:fade .6s var(--ease) 1.4s forwards}
-.hero-art .d.two{animation-delay:1.6s}
-.hero-art .beat{animation:beat 3.2s var(--ease) infinite}
 @keyframes turn{to{transform:rotate(360deg)}}
-@keyframes beat{0%,100%{opacity:1}50%{opacity:.55}}
-.hero-art .tag{position:absolute;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border-radius:999px;
-  border:1px solid var(--line);color:var(--ink-2);opacity:0;animation:rise .6s var(--ease) forwards}
-.hero-art .tag b{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px}
-.hero-art .t1{left:-2%;top:16%;animation-delay:1.8s}
-.hero-art .t2{right:-4%;top:34%;animation-delay:2s}
-.hero-art .t3{left:6%;bottom:12%;animation-delay:2.2s}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
 section{padding-block:var(--sec);scroll-margin-top:96px}
@@ -125,13 +102,10 @@ section.tight{padding-block:clamp(48px,7vw,80px)}
   opacity:0;animation:rise .55s var(--ease) forwards;animation-delay:calc(var(--i,0)*55ms);
   transition:transform .25s var(--ease),border-color .25s,box-shadow .25s}
 .test:hover{transform:translateY(-2px);border-color:var(--line-2)}
-.test.running{border-color:transparent}
-.test.running:before{content:"";position:absolute;inset:-1px;border-radius:19px;padding:1px;
-  background:conic-gradient(from var(--ang,0deg),transparent 0 70%,var(--c) 85%,transparent 100%);
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
-  animation:orbit 1.4s linear infinite;pointer-events:none}
-@property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
-@keyframes orbit{to{--ang:360deg}}
+.test.running{border-color:var(--c)}
+.test.running:before{content:"";position:absolute;inset:-1px;border-radius:19px;border:1px solid var(--c);
+  animation:pulse 1.2s ease-in-out infinite;pointer-events:none}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
 .test.done{border-color:color-mix(in srgb,var(--v) 45%,transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 50px -24px color-mix(in srgb,var(--v) 55%,transparent)}
 .test .icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
   background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);
@@ -172,7 +146,7 @@ details.sc dd.q{font-style:italic}
 details.sc .note{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);color:var(--ink-2)}
 
 .summary{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:22px;border-radius:16px;padding:14px 18px;position:relative;overflow:hidden}
-.summary .bar{position:absolute;left:0;bottom:0;height:2px;width:var(--p,0%);background:linear-gradient(90deg,var(--red),var(--orange),var(--yellow),var(--green));transition:width .5s var(--ease)}
+.summary .bar{position:absolute;left:0;bottom:0;height:2px;width:var(--p,0%);background:var(--orange);transition:width .5s var(--ease)}
 .summary .big{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;line-height:1}
 .summary .big small{font-size:.75rem;color:var(--ink-2);font-weight:600;letter-spacing:0;display:block;margin-top:4px}
 .summary .sep{width:1px;height:30px;background:var(--line)}
@@ -216,8 +190,8 @@ footer.foot p{max-width:64ch}
 .spinner{display:inline-block;width:.8em;height:.8em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:turn .7s linear infinite;vertical-align:-1px}
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-  .test,.hero-art .tag,.mark .dot,.mark .body,.hero-art .d{opacity:1}
-  .mark .arc,.hero-art .ring{stroke-dashoffset:0}
+  .test,.mark .dot,.mark .body{opacity:1}
+  .mark .arc{stroke-dashoffset:0}
 }
 </style>
 </head>
@@ -242,7 +216,7 @@ footer.foot p{max-width:64ch}
 
 <header class="hero">
   <div>
-    <p class="kicker"><i></i>Live sandbox, Thirduni 2026</p>
+    <p class="kicker">Live sandbox, Thirduni 2026</p>
     <h1>Try to get a payment<br><span class="g">past it.</span></h1>
     <p class="lede">
       This is a running gateway, not a recording. Fire the attacks we measure
@@ -262,29 +236,6 @@ footer.foot p{max-width:64ch}
       <div class="glass" style="--c:var(--yellow)"><span class="n mono" data-n="4">0</span><span class="l">payment rails</span></div>
       <div class="glass" style="--c:var(--green)"><span class="n mono" data-n="2060">0</span><span class="l">measured runs</span></div>
     </div>
-  </div>
-  <div class="hero-art" aria-hidden="true">
-    <svg viewBox="0 0 144 144" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#EB001B"/><stop offset="1" stop-color="#FF5F00"/></linearGradient>
-        <linearGradient id="g2" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#F79E1B"/><stop offset="1" stop-color="#00A650"/></linearGradient>
-      </defs>
-      <g transform="translate(-69 -43)">
-        <g class="spin">
-          <animateTransform attributeName="transform" type="rotate" from="0 141 115" to="360 141 115" dur="60s" repeatCount="indefinite"/>
-          <g fill="none" stroke-width="9" stroke-linecap="round">
-            <path class="ring" pathLength="1" stroke="url(#g1)" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
-            <path class="ring two" pathLength="1" stroke="url(#g2)" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
-          </g>
-          <circle class="d beat" cx="99.7" cy="62.2" r="10" fill="#EB001B"></circle>
-          <circle class="d two beat" cx="192.3" cy="158.1" r="10" fill="#00A650"></circle>
-        </g>
-        <path fill="#F4F4F6" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
-      </g>
-    </svg>
-    <span class="tag glass t1"><b style="background:var(--red-l)"></b>deny</span>
-    <span class="tag glass t2"><b style="background:var(--yellow-l)"></b>step up</span>
-    <span class="tag glass t3"><b style="background:var(--green-l)"></b>allow</span>
   </div>
 </header>
 
