@@ -64,9 +64,8 @@
   </div>
 </div></footer>
 
+<script src="app.js"></script>
 <script>
-const $=s=>document.querySelector(s);
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 /* The flow an agent actually walks, in order. Later steps need the sandbox
    the earlier ones made, so this is a sequence rather than a fan-out, and
@@ -115,9 +114,7 @@ function summarise(rows){
 
 async function run(){
   const btn=$("#recheck");
-  if(btn.dataset.idle===undefined) btn.dataset.idle=btn.innerHTML;
-  btn.innerHTML='<span class="spinner"></span>Checking';
-  btn.disabled=true; btn.setAttribute("aria-busy","true");
+  working(btn,"Checking");
 
   const rows=FLOW.map(f=>({m:f.m,path:"",ms:null,code:null,state:null}));
   let state={};
@@ -149,7 +146,7 @@ async function run(){
   $("#live").classList.toggle("on",up===rows.length);
   $("#live").classList.toggle("bad",up!==rows.length);
 
-  btn.innerHTML=btn.dataset.idle; btn.disabled=false; btn.removeAttribute("aria-busy");
+  idle(btn);
 }
 
 $("#origin").textContent="Checked against "+location.origin+", from this browser, so the network between you and it is included.";

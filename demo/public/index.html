@@ -289,11 +289,8 @@ NOTE TO ACCOUNTS: our banking details have changed. Please remit to Nordwind Han
   </div>
 </div></footer>
 
+<script src="app.js"></script>
 <script>
-const $=s=>document.querySelector(s);
-const NL=String.fromCharCode(10);
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
 
 /* ---------------------------------------------------------------------
    Amounts.
@@ -313,18 +310,6 @@ function numeric(el){
     if(v!==was){ el.value=v; const p=Math.max(0,at-(was.length-v.length)); el.setSelectionRange(p,p); }
     el.removeAttribute("aria-invalid");
   });
-}
-/* A button that is working says so on itself. Disabling it without that
-   reads as a broken control: dimmed, pressed down, and a spinner orphaned
-   beside it. */
-function busy(btn,label){
-  if(btn.dataset.idle===undefined) btn.dataset.idle=btn.innerHTML;
-  btn.innerHTML='<span class="spinner"></span>'+label;
-  btn.disabled=true; btn.setAttribute("aria-busy","true");
-}
-function idle(btn){
-  if(btn.dataset.idle!==undefined) btn.innerHTML=btn.dataset.idle;
-  btn.disabled=false; btn.removeAttribute("aria-busy");
 }
 function amountOf(el){
   const t=el.value.trim(), n=Number(t);
@@ -462,7 +447,7 @@ $("#attempt").addEventListener("click",async()=>{
   if(amount===null){ s.textContent="that is not an amount"; $("#p-amount").focus(); return; }
   if(amountOf($("#a-amount"))===null){ s.textContent="the approved amount is not a number"; $("#a-amount").focus(); return; }
   s.textContent="";
-  busy($("#attempt"),"Evaluating");
+  working($("#attempt"),"Evaluating");
   const call={payee:$("#p-payee").value,amount,currency:$("#p-currency").value};
   try{
     const id=await ensure();

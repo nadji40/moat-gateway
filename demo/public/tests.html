@@ -67,11 +67,8 @@
   </div>
 </div></footer>
 
+<script src="app.js"></script>
 <script>
-const $=s=>document.querySelector(s);
-const NL=String.fromCharCode(10);
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
 
 const ICONS={
   inject:'<path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 14l4 4m0-4l-4 4"/>',
@@ -130,15 +127,6 @@ function testCard(t,i){
   </article>`;
 }
 
-function working(btn,label){
-  if(btn.dataset.idle===undefined) btn.dataset.idle=btn.innerHTML;
-  btn.innerHTML='<span class="spinner"></span>'+label;
-  btn.disabled=true; btn.setAttribute("aria-busy","true");
-}
-function idle(btn){
-  if(btn.dataset.idle!==undefined) btn.innerHTML=btn.dataset.idle;
-  idle(btn); btn.removeAttribute("aria-busy");
-}
 const openState=()=>new Set([...document.querySelectorAll("details.sc[open]")].map(d=>d.closest("[data-id]").dataset.id));
 function draw(){
   const open=openState();
@@ -178,7 +166,7 @@ async function runTests(ids){
     }
   };
   await Promise.all([worker(),worker(),worker()]);
-  btn.disabled=false;
+  idle(btn);
 }
 $("#run-all").addEventListener("click",()=>runTests(TESTS.map(t=>t.id)));
 
