@@ -3,358 +3,441 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Moat sandbox — try to get a payment past it</title>
-<meta name="description" content="A live authorization gateway. Say what the user asked for, then try to pay someone else.">
+<title>moat — try to get a payment past it</title>
+<meta name="description" content="A live risk layer for agent payments. Run the attacks, or compose your own, against a real gateway.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
 <style>
-  :root{
-    --ground:#f5f6f9; --surface:#fff; --surface-2:#edeff4; --ink:#14171d; --muted:#59626f;
-    --rule:#d7dce4; --accent:#2f4bd4; --focus:#2f4bd4;
-    --allow:#17663f; --allow-bg:#e4f1ea; --deny:#9d2b2b; --deny-bg:#f7e5e5;
-    --stepup:#84590a; --stepup-bg:#f8eed9;
-  }
-  @media (prefers-color-scheme:dark){:root{
-    --ground:#0f1217; --surface:#171b22; --surface-2:#1f242c; --ink:#e6e9ef; --muted:#98a1b0;
-    --rule:#2a313b; --accent:#8fa0ff; --focus:#8fa0ff;
-    --allow:#54bd88; --allow-bg:#122e1e; --deny:#e3726c; --deny-bg:#321a1a;
-    --stepup:#d4a442; --stepup-bg:#2f2411;
-  }}
-  *{box-sizing:border-box}
-  html,body{margin:0}
-  body{background:var(--ground);color:var(--ink);
-    font:400 15px/1.55 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:72rem;margin:0 auto;padding-inline:20px;padding-block:0 4rem}
-  code,.mono,input,textarea{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
-  a{color:var(--accent)}
-  h1,h2,h3{font-weight:600;letter-spacing:-.01em;margin:0}
+:root{
+  --bg:#FFFFFF; --ink:#111111; --ink-2:#6E6E73;
+  --surface:#F7F7F8; --sand:#E6E6E8; --sand-2:#C7C7CC;
+  --red:#EB001B; --orange:#FF5F00; --yellow:#F79E1B; --green:#00A650;
+  --red-tint:#FDE7E9; --yellow-tint:#FEF3E0; --red-ink:#C4001A;
+  --green-tint:#E3F4EA;
+  --max:1240px; --pad:clamp(20px,5vw,64px); --sec:clamp(72px,10vw,128px);
+  --font:"Manrope","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+.wrap{max-width:var(--max);margin:0 auto;padding-inline:var(--pad)}
+a{color:inherit}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.03em;line-height:1.02;text-wrap:balance}
+h1{font-size:clamp(2.2rem,6vw,3.6rem)}
+h2{font-size:clamp(1.6rem,3.6vw,2.4rem)}
+h3{font-size:1.0625rem;letter-spacing:-.015em;line-height:1.25}
+p{margin:0}
+.mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
 
-  header{border-bottom:1px solid var(--rule);padding-block:2.5rem 1.75rem;margin-bottom:2rem}
-  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.16em;
-    text-transform:uppercase;color:var(--muted);margin:0 0 .8rem}
-  h1{font-size:clamp(1.6rem,3.6vw,2.2rem);line-height:1.15}
-  .lede{color:var(--muted);max-width:60ch;margin:.8rem 0 0}
+/* nav */
+nav{position:sticky;top:0;z-index:20;padding-top:16px;background:linear-gradient(var(--bg) 70%,transparent)}
+.navbar{display:flex;align-items:center;gap:20px;background:var(--surface);border-radius:18px;padding:12px 18px}
+.mark{width:30px;height:30px;flex:none;color:var(--ink)}
+.navlinks{display:flex;gap:22px;margin-left:auto;font-size:.875rem;color:var(--ink-2);font-weight:600}
+.navlinks a{text-decoration:none}
+.navlinks a:hover{color:var(--ink)}
+.when{font-size:.8125rem;color:var(--ink-2);font-weight:600;white-space:nowrap}
+@media(max-width:720px){.navlinks{display:none}}
 
-  .layout{display:grid;gap:1.25rem;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-  @media (max-width:860px){.layout{grid-template-columns:1fr}}
+/* hero */
+header.hero{padding-block:clamp(48px,9vw,104px) clamp(36px,6vw,64px)}
+.hero .lede{color:var(--ink-2);max-width:48ch;margin-top:20px;font-size:1.0625rem}
+.hero .row{display:flex;gap:28px;flex-wrap:wrap;align-items:center;margin-top:32px}
+.btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border:0;
+  border-radius:999px;padding:14px 26px;font:700 .9375rem var(--font);cursor:pointer;letter-spacing:-.01em}
+.btn:hover{background:#000}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--sand);padding:12.5px 24px}
+.btn.ghost:hover{border-color:var(--ink);background:transparent}
+.tally{display:flex;gap:26px;flex-wrap:wrap;margin-top:34px;padding-top:26px;border-top:1px solid var(--sand)}
+.tally div span{display:block}
+.tally .n{font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
+.tally .l{font-size:.8125rem;color:var(--ink-2);font-weight:600}
 
-  .box{background:var(--surface);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
-  .box > h2{font-size:.82rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
-    padding:.7rem 1rem;border-bottom:1px solid var(--rule);background:var(--surface-2)}
-  .box .body{padding:1rem}
-  .box .body > * + *{margin-top:.85rem}
+section{padding-block:var(--sec);scroll-margin-top:96px}
+section.tight{padding-block:clamp(48px,7vw,80px)}
+.head{max-width:58ch;margin-bottom:36px}
+.head p{color:var(--ink-2);margin-top:14px}
+.eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin-bottom:14px}
 
-  label{display:block;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:.3rem}
-  input,textarea{width:100%;padding:.5rem .6rem;font-size:.9rem;color:var(--ink);
-    background:var(--ground);border:1px solid var(--rule);border-radius:4px}
-  input:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
-  textarea{resize:vertical;min-height:4.5rem;line-height:1.5}
-  .pair{display:grid;grid-template-columns:1fr 7rem 6rem;gap:.6rem}
-  @media (max-width:520px){.pair{grid-template-columns:1fr}}
-  .help{font-size:.8rem;color:var(--muted);margin-top:.35rem}
+/* tests */
+.tests{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr))}
+.test{background:var(--bg);border:1.5px solid var(--sand);border-radius:16px;padding:20px;
+  display:flex;flex-direction:column;gap:12px;transition:border-color .15s}
+.test:hover{border-color:var(--sand-2)}
+.test.done{border-color:var(--ink)}
+.test .icon{width:36px;height:36px;border-radius:10px;background:var(--surface);
+  display:grid;place-items:center;color:var(--ink);flex:none}
+.test .icon svg{width:19px;height:19px}
+.test .top{display:flex;gap:14px;align-items:flex-start}
+.test .sum{color:var(--ink-2);font-size:.9rem;margin-top:5px}
+.test .fam{font-size:.6875rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sand-2)}
+.test footer{margin-top:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 12px;
+  font-size:.8125rem;font-weight:700;letter-spacing:-.01em}
+.pill.allow{background:var(--green-tint);color:var(--green)}
+.pill.deny{background:var(--red-tint);color:var(--red-ink)}
+.pill.step_up{background:var(--yellow-tint);color:#92600a}
+.pill.idle{background:var(--surface);color:var(--ink-2)}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.why{font-size:.85rem;color:var(--ink-2);border-top:1px solid var(--sand);padding-top:11px;margin-top:2px}
+.why code{font-size:.8125rem;font-weight:700;color:var(--red-ink);font-family:var(--font)}
+.why .ok{color:var(--green)}
+.why .held{color:#92600a}
+.test .ms{font-size:.75rem;color:var(--sand-2);font-weight:600;margin-left:auto}
+.test .link{font-size:.8125rem;color:var(--ink-2);font-weight:600;text-decoration:underline;
+  text-underline-offset:3px;background:none;border:0;cursor:pointer;padding:0;font-family:var(--font)}
 
-  button{font:500 .9rem "IBM Plex Sans",sans-serif;padding:.5rem 1rem;border-radius:4px;
-    border:1px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer}
-  button.ghost{background:transparent;color:var(--accent)}
-  button.small{padding:.3rem .6rem;font-size:.8rem}
-  button[disabled]{opacity:.45;cursor:not-allowed}
-  .actions{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
-  .status{font-size:.82rem;color:var(--muted)}
+.summary{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:26px;
+  background:var(--surface);border-radius:14px;padding:16px 20px}
+.summary strong{font-weight:800;letter-spacing:-.02em}
 
-  .verdict{display:inline-block;font-family:"IBM Plex Mono",monospace;font-weight:500;
-    padding:.22em .7em;border-radius:3px;font-size:.95rem}
-  .verdict.allow{background:var(--allow-bg);color:var(--allow)}
-  .verdict.deny{background:var(--deny-bg);color:var(--deny)}
-  .verdict.step_up{background:var(--stepup-bg);color:var(--stepup)}
+/* composer */
+.grid2{display:grid;gap:18px;grid-template-columns:1fr 1fr}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.panel{border:1.5px solid var(--sand);border-radius:16px;overflow:hidden}
+.panel > .ph{padding:14px 20px;border-bottom:1.5px solid var(--sand);background:var(--surface);
+  font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+.panel .pb{padding:20px;display:grid;gap:14px}
+label{display:block;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-2);margin-bottom:7px}
+input,textarea{width:100%;padding:11px 13px;font:600 .9375rem var(--font);color:var(--ink);
+  background:var(--bg);border:1.5px solid var(--sand);border-radius:10px}
+input:focus,textarea:focus{outline:0;border-color:var(--ink)}
+textarea{resize:vertical;min-height:88px;line-height:1.5;font-weight:500}
+.three{display:grid;grid-template-columns:1fr 6.5rem 5.5rem;gap:10px}
+@media(max-width:520px){.three{grid-template-columns:1fr}}
+.hint{font-size:.8125rem;color:var(--ink-2)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font:600 .8125rem var(--font);padding:7px 13px;border:1.5px solid var(--sand);border-radius:999px;
+  background:var(--bg);color:var(--ink-2);cursor:pointer}
+.chip:hover{border-color:var(--ink);color:var(--ink)}
+.out{display:grid;gap:10px;max-height:24rem;overflow:auto}
+.rec{border:1.5px solid var(--sand);border-radius:12px;padding:14px 16px;display:grid;gap:8px}
+.rec .call{font-size:.85rem;color:var(--ink-2);overflow-wrap:anywhere}
+.rec ul{margin:0;padding-left:18px;font-size:.85rem;color:var(--ink-2)}
 
-  .log{max-height:26rem;overflow:auto;font-size:.85rem}
-  .entry{border-bottom:1px solid var(--rule);padding:.75rem 1rem}
-  .entry:last-child{border-bottom:0}
-  .entry .top{display:flex;gap:.6rem;align-items:baseline;justify-content:space-between}
-  .entry .call{color:var(--muted);overflow-wrap:anywhere;margin-top:.35rem}
-  .entry ul{margin:.45rem 0 0;padding-left:1.05rem}
-  .entry li{margin-bottom:.2rem}
-  .rid{font-family:"IBM Plex Mono",monospace;font-size:.82em;color:var(--deny)}
-  .empty{padding:1.5rem 1rem;color:var(--muted);font-size:.88rem}
+pre{background:var(--ink);color:#F2F2F3;border-radius:16px;padding:22px;overflow-x:auto;
+  font-size:.8125rem;line-height:1.65;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+pre .c{color:#8A8A90}
 
-  .chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem}
-  .chip{font-size:.78rem;padding:.25em .6em;border:1px solid var(--rule);border-radius:999px;
-    background:var(--ground);color:var(--muted);cursor:pointer}
-  .chip:hover{border-color:var(--accent);color:var(--accent)}
-
-  pre{background:var(--surface);border:1px solid var(--rule);border-radius:5px;padding:.9rem 1rem;
-    overflow-x:auto;font-size:.82rem;line-height:1.5;margin:0}
-  section{margin-top:2.5rem}
-  .sub{color:var(--muted);max-width:64ch;margin:.4rem 0 1rem}
-  footer{margin-top:3rem;border-top:1px solid var(--rule);padding-top:1.25rem;color:var(--muted);font-size:.85rem;max-width:70ch}
-  .spin{display:inline-block;width:.75em;height:.75em;border:2px solid currentColor;
-    border-right-color:transparent;border-radius:50%;animation:s .7s linear infinite;vertical-align:-1px}
-  @keyframes s{to{transform:rotate(360deg)}}
-  @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+footer.foot{border-top:1px solid var(--sand);padding-block:36px 56px;color:var(--ink-2);font-size:.875rem}
+footer.foot p{max-width:70ch}
+.spin{display:inline-block;width:.8em;height:.8em;border:2px solid currentColor;border-right-color:transparent;
+  border-radius:50%;animation:s .7s linear infinite;vertical-align:-1px}
+@keyframes s{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.spin{animation:none}}
 </style>
 </head>
 <body>
+
+<nav><div class="wrap"><div class="navbar">
+  <svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg" aria-label="moat">
+    <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
+      <path d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+      <path d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+    </g>
+    <g fill="currentColor"><circle cx="99.7" cy="62.2" r="11"></circle><circle cx="192.3" cy="158.1" r="11"></circle></g>
+    <path fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+  </svg>
+  <div class="navlinks">
+    <a href="#suite">The tests</a><a href="#compose">Compose one</a><a href="#chain">On a real chain</a><a href="#api">API</a>
+  </div>
+  <span class="when">Thirduni, autumn 2026</span>
+</div></div></nav>
+
 <div class="wrap">
 
-<header>
-  <p class="eyebrow">Moat sandbox</p>
-  <h1>Try to get a payment past it</h1>
+<header class="hero">
+  <h1>Try to get a payment<br>past it.</h1>
   <p class="lede">
-    This is a live authorization gateway with a mock payment provider behind
-    it. You say what the user asked for and what an approver signed off, then
-    you attempt any payment you like. Moat compares the two and decides.
-    Everything below is yours alone and disappears when you stop using it.
+    This is a live gateway, not a recording. Run the attacks we measure against,
+    or write your own, and watch the decision. Nine tests, a real chain, and a
+    signed record of every verdict.
   </p>
+  <div class="row">
+    <button class="btn" id="run-all">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="currentColor"/></svg>
+      Run all nine tests
+    </button>
+    <a class="btn ghost" href="#compose">Write your own</a>
+  </div>
+  <div class="tally">
+    <div><span class="n mono">0 / 380</span><span class="l">attacks paid through moat</span></div>
+    <div><span class="n mono">380 / 380</span><span class="l">paid without it</span></div>
+    <div><span class="n mono">4</span><span class="l">payment rails</span></div>
+    <div><span class="n mono">2,060</span><span class="l">measured runs</span></div>
+  </div>
 </header>
 
-<div class="layout">
+<section id="suite" class="tight">
+  <div class="head">
+    <p class="eyebrow">The tests</p>
+    <h2>Nine attacks, each isolating one thing.</h2>
+    <p>
+      Every test gets its own gateway process and its own mandate, because a
+      mandate spent by one test is a duplicate for the next and the verdicts
+      would come back right for the wrong reasons. Drawn from the measured
+      corpus, not written for this page.
+    </p>
+  </div>
+  <div class="summary" id="summary" hidden></div>
+  <div class="tests" id="tests"></div>
+</section>
 
-  <div>
-    <div class="box">
-      <h2>1 · What the user asked for</h2>
-      <div class="body">
+<section id="compose" class="tight">
+  <div class="head">
+    <p class="eyebrow">Compose one</p>
+    <h2>Now try to beat it yourself.</h2>
+    <p>
+      Say what the user asked for, say what an approver signed off, then attempt
+      any payment you like. The gateway is real and so is the refusal.
+    </p>
+  </div>
+  <div class="grid2">
+    <div style="display:grid;gap:18px;align-content:start">
+      <div class="panel"><div class="ph">1 — What the user asked for</div><div class="pb">
         <div>
-          <label for="intent">The user's own words</label>
+          <label for="intent">Their own words</label>
           <textarea id="intent">Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD.</textarea>
-          <p class="help">
-            This is the only channel that confers authority. Anything the agent
-            reads on a page has none, which is the whole mechanism.
-          </p>
+          <p class="hint" style="margin-top:8px">The only channel that confers authority. A page the agent reads has none.</p>
         </div>
-        <div class="actions">
-          <button id="send-intent" class="small">Register intent</button>
-          <span class="status" id="intent-status"></span>
-        </div>
-      </div>
-    </div>
-
-    <div class="box" style="margin-top:1.25rem">
-      <h2>2 · What an approver signed off <span style="text-transform:none;letter-spacing:0">(optional)</span></h2>
-      <div class="body">
-        <div class="pair">
+      </div></div>
+      <div class="panel"><div class="ph">2 — What an approver signed off</div><div class="pb">
+        <div class="three">
           <div><label for="a-payee">Payee</label><input id="a-payee" value="Acme Cloud Ltd"></div>
-          <div><label for="a-amount">Amount</label><input id="a-amount" value="480"></div>
+          <div><label for="a-amount">Amount</label><input id="a-amount" value="480" class="mono"></div>
           <div><label for="a-currency">Currency</label><input id="a-currency" value="USD"></div>
         </div>
-        <div class="actions">
-          <button id="send-auth" class="small ghost">Register mandate</button>
-          <span class="status" id="auth-status"></span>
-        </div>
-        <p class="help">
-          Without a mandate, Moat has only the user's words to match against and
-          will step up rather than decide alone.
-        </p>
-      </div>
+        <p class="hint">Leave it and Moat has only the user's words to go on — it will ask rather than decide.</p>
+      </div></div>
     </div>
-  </div>
-
-  <div>
-    <div class="box">
-      <h2>3 · What the agent tries to pay</h2>
-      <div class="body">
-        <div class="pair">
+    <div style="display:grid;gap:18px;align-content:start">
+      <div class="panel"><div class="ph">3 — What the agent tries to pay</div><div class="pb">
+        <div class="three">
           <div><label for="p-payee">Payee</label><input id="p-payee" value="Nordwind Handels GmbH"></div>
-          <div><label for="p-amount">Amount</label><input id="p-amount" value="480"></div>
+          <div><label for="p-amount">Amount</label><input id="p-amount" value="480" class="mono"></div>
           <div><label for="p-currency">Currency</label><input id="p-currency" value="USD"></div>
         </div>
         <div class="chips" id="chips"></div>
-        <div class="actions">
-          <button id="pay">Attempt payment</button>
-          <span class="status" id="pay-status">Ready.</span>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <button class="btn" id="attempt">Attempt payment</button>
+          <span class="hint" id="attempt-status"></span>
         </div>
-      </div>
-    </div>
-
-    <div class="box" style="margin-top:1.25rem">
-      <h2>Verdicts</h2>
-      <div class="log" id="log"><div class="empty">Nothing attempted yet.</div></div>
+      </div></div>
+      <div class="panel"><div class="ph">Verdicts</div><div class="pb">
+        <div class="out" id="out"><p class="hint">Nothing attempted yet.</p></div>
+      </div></div>
     </div>
   </div>
+</section>
+
+<section id="chain" class="tight" hidden>
+  <div class="head">
+    <p class="eyebrow">On a real chain</p>
+    <h2>The refusal that leaves no transaction.</h2>
+    <p>
+      The same decision in front of a wallet on Base Sepolia. The approved
+      payment produces a transaction you can open in a block explorer. The
+      forged one produces nothing at all, because Moat refuses before the
+      wallet is ever asked.
+    </p>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <button class="btn" id="chain-ok">Pay the approved address</button>
+    <button class="btn ghost" id="chain-bad">Send to a different one</button>
+    <span class="hint" id="chain-status"></span>
+  </div>
+  <div id="chain-out" style="margin-top:18px"></div>
+</section>
+
+<section id="api" class="tight">
+  <div class="head">
+    <p class="eyebrow">API</p>
+    <h2>Point your own agent at it.</h2>
+    <p>Four calls. No key, no account. Sandboxes expire after ten idle minutes.</p>
+  </div>
+  <pre id="curl">loading…</pre>
+</section>
 
 </div>
 
-<section>
-  <h2>The same thing, from your own code</h2>
-  <p class="sub">
-    Four calls, no key, no account. Point an agent at it and see what it can
-    and cannot get through. Sandboxes expire after ten idle minutes.
-  </p>
-  <pre id="api">loading…</pre>
-</section>
-
-<section id="chain" hidden>
-  <h2>Against a real chain</h2>
-  <p class="sub">
-    The same decision in front of a wallet on Base Sepolia, a public test
-    network. The approved payment produces a transaction you can open in a
-    block explorer; the forged one produces nothing, because Moat refuses
-    before the wallet is asked.
-  </p>
-  <div class="actions">
-    <button id="chain-ok">Pay the approved address</button>
-    <button id="chain-bad" class="ghost">Try a different address</button>
-    <span class="status" id="chain-status"></span>
-  </div>
-  <div id="chain-out" style="margin-top:1rem"></div>
-</section>
-
-<footer>
+<footer class="foot"><div class="wrap">
   <p>
-    Test networks and a mock provider; nothing here can move money that
-    matters. Every verdict is written to a signed, hash-chained evidence
-    record — the same one an auditor would read. The measured results, the
-    attack corpus and the evidence format are in the repository.
+    Test networks and a mock provider throughout; nothing here can move money
+    that matters. Every verdict is written to a signed, hash-chained evidence
+    record — the same one an auditor reads. moat is the risk layer for AI agent
+    payments.
   </p>
-</footer>
-
-</div>
+</div></footer>
 
 <script>
-const $ = (s) => document.querySelector(s);
-const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let sandbox = null, mandate = null, n = 0;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ICONS={
+  inject:'<path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 14l4 4m0-4l-4 4"/>',
+  lookalike:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M9 11h4"/>',
+  amount:'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  currency:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18"/>',
+  replay:'<path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 20v-5h5"/>',
+  cap:'<path d="M12 3l8 4v5c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/>',
+  none:'<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>'
+};
+const icon=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.none}</svg>`;
+let TESTS=[],results={};
 
-const PRESETS = [
-  ["A payee nobody named", { payee: "Nordwind Handels GmbH", amount: "480", currency: "USD" }],
-  ["The approved payment", { payee: "Acme Cloud Ltd", amount: "480", currency: "USD" }],
-  ["One character off", { payee: "Acme Cloud Ltd.", amount: "480", currency: "USD" }],
-  ["A higher price", { payee: "Acme Cloud Ltd", amount: "499", currency: "USD" }],
-  ["A different currency", { payee: "Acme Cloud Ltd", amount: "480", currency: "EUR" }],
-];
+async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
 
-$("#chips").innerHTML = PRESETS.map(([label], i) =>
-  `<button type="button" class="chip" data-i="${i}">${esc(label)}</button>`).join("");
-for (const el of document.querySelectorAll(".chip")) {
-  el.addEventListener("click", () => {
-    const [, v] = PRESETS[Number(el.dataset.i)];
-    $("#p-payee").value = v.payee; $("#p-amount").value = v.amount; $("#p-currency").value = v.currency;
-  });
+function testCard(t){
+  const r=results[t.id];
+  const pill=r?`<span class="pill ${r.decision}"><span class="dot"></span>${r.decision}</span>`
+               :`<span class="pill idle">not run</span>`;
+  // Branch on the decision, never on whether there are reasons. A step-up
+  // often carries none, and showing it as "allowed" because the list was
+  // empty is the page lying about the one thing it exists to show.
+  let body="";
+  if(r){
+    if(r.error) body=esc(r.error);
+    else if(r.reasons.length) body=r.reasons.map(x=>`<code>${esc(x.id)}</code> ${esc(x.message)}`).join("<br>");
+    else if(r.decision==="allow") body=`<span class="ok">allowed — the provider ${r.paid?"was paid":"was called"}</span>`;
+    else if(r.decision==="step_up") body=`<span class="held">held — a person has to approve this before it moves</span>`;
+    else body="refused";
+  }
+  const why=r?`<div class="why">${body}</div>`:"";
+  return `<article class="test${r?" done":""}">
+    <div class="top">
+      <div class="icon">${icon(t.icon)}</div>
+      <div><span class="fam">${esc(t.family)}</span><h3>${esc(t.title)}</h3><p class="sum">${esc(t.summary)}</p></div>
+    </div>
+    ${why}
+    <footer>${pill}
+      <button class="link" data-run="${esc(t.id)}">${r?"run again":"run"}</button>
+      ${r?`<span class="ms mono">${r.ms} ms</span>`:""}</footer>
+  </article>`;
 }
 
-async function api(path, opts) {
-  const r = await fetch(path, opts);
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || `${r.status}`);
-  return j;
+function draw(){
+  $("#tests").innerHTML=TESTS.map(testCard).join("");
+  for(const b of document.querySelectorAll("[data-run]"))
+    b.addEventListener("click",()=>runTests(b.dataset.run));
+  const done=Object.values(results);
+  if(done.length){
+    const met=done.filter(r=>r.met).length;
+    const paid=done.filter(r=>r.paid&&r.expected!=="allow").length;
+    $("#summary").hidden=false;
+    $("#summary").innerHTML=`<strong>${met} of ${done.length}</strong> behaved as the corpus says
+      · <strong>${paid}</strong> attacker payments got through
+      · <span class="hint">every verdict signed and recorded</span>`;
+  }
 }
 
-async function ensure() {
-  if (sandbox) return sandbox;
-  const j = await api("/v1/sandbox", { method: "POST" });
-  sandbox = j.id;
+async function runTests(only){
+  const btn=$("#run-all");
+  btn.disabled=true;
+  const label=btn.innerHTML;
+  btn.innerHTML='<span class="spin"></span> running…';
+  try{
+    const j=await api("/v1/suite"+(only?"?test="+encodeURIComponent(only):""),{method:"POST"});
+    for(const r of j.results) results[r.id]=r;
+    draw();
+  }catch(e){ $("#summary").hidden=false; $("#summary").textContent=String(e.message||e); }
+  btn.disabled=false; btn.innerHTML=label;
+}
+$("#run-all").addEventListener("click",()=>runTests());
+
+/* composer */
+const PRESETS=[["A payee nobody named",["Nordwind Handels GmbH","480","USD"]],
+  ["Exactly what was approved",["Acme Cloud Ltd","480","USD"]],
+  ["One character off",["Acme Cloud Ltd.","480","USD"]],
+  ["A higher price",["Acme Cloud Ltd","499","USD"]],
+  ["Another currency",["Acme Cloud Ltd","480","EUR"]]];
+$("#chips").innerHTML=PRESETS.map(([l],i)=>`<button type="button" class="chip" data-i="${i}">${esc(l)}</button>`).join("");
+for(const el of document.querySelectorAll(".chip"))
+  el.addEventListener("click",()=>{const[,v]=PRESETS[+el.dataset.i];
+    $("#p-payee").value=v[0];$("#p-amount").value=v[1];$("#p-currency").value=v[2];});
+
+let sandbox=null,mandate=null,first=true;
+async function ensure(){
+  if(sandbox)return sandbox;
+  sandbox=(await api("/v1/sandbox",{method:"POST"})).id;
+  await api(`/v1/sandbox/${sandbox}/intent`,{method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({text:$("#intent").value})});
+  if($("#a-payee").value.trim()){
+    mandate=await api(`/v1/sandbox/${sandbox}/authorization`,{method:"POST",
+      headers:{"content-type":"application/json"},
+      body:JSON.stringify({payee:$("#a-payee").value,amount:$("#a-amount").value,currency:$("#a-currency").value})});
+  }
   return sandbox;
 }
+for(const id of ["intent","a-payee","a-amount","a-currency"])
+  $("#"+id).addEventListener("change",()=>{sandbox=null;mandate=null;});
 
-$("#send-intent").addEventListener("click", async () => {
-  const s = $("#intent-status"); s.innerHTML = '<span class="spin"></span>';
-  try {
-    const id = await ensure();
-    await api(`/v1/sandbox/${id}/intent`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: $("#intent").value }),
-    });
-    s.textContent = "registered";
-  } catch (e) { s.textContent = e.message; }
+$("#attempt").addEventListener("click",async()=>{
+  const s=$("#attempt-status"); s.innerHTML='<span class="spin"></span> evaluating…';
+  $("#attempt").disabled=true;
+  const call={payee:$("#p-payee").value,amount:Number($("#p-amount").value),currency:$("#p-currency").value};
+  try{
+    const id=await ensure();
+    const body={...call}; if(mandate)body.authorization_id=mandate.authorization_id;
+    const v=await api(`/v1/sandbox/${id}/pay`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+    if(first){$("#out").innerHTML="";first=false;}
+    const el=document.createElement("div"); el.className="rec";
+    el.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="pill ${esc(v.decision)}"><span class="dot"></span>${esc(v.decision)}</span>
+        <span class="hint">${v.paid?"the provider was paid":"the provider was never called"}</span>
+        <span class="ms mono" style="margin-left:auto">${v.ms} ms</span></div>
+      <div class="call mono">${esc(JSON.stringify(call))}</div>
+      ${v.reasons.length?`<ul>${v.reasons.map(r=>`<li><strong>${esc(r.id)}</strong> — ${esc(r.message)}</li>`).join("")}</ul>`:""}
+      ${v.evidence_id?`<div class="call mono">evidence ${esc(v.evidence_id)}</div>`:""}`;
+    $("#out").prepend(el); s.textContent="";
+  }catch(e){ s.textContent=String(e.message||e); }
+  $("#attempt").disabled=false;
 });
 
-$("#send-auth").addEventListener("click", async () => {
-  const s = $("#auth-status"); s.innerHTML = '<span class="spin"></span>';
-  try {
-    const id = await ensure();
-    mandate = await api(`/v1/sandbox/${id}/authorization`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        payee: $("#a-payee").value, amount: $("#a-amount").value, currency: $("#a-currency").value,
-      }),
-    });
-    s.textContent = `registered ${mandate.authorization_id}`;
-  } catch (e) { s.textContent = e.message; }
-});
-
-$("#pay").addEventListener("click", async () => {
-  const s = $("#pay-status"); s.innerHTML = '<span class="spin"></span> evaluating…';
-  $("#pay").disabled = true;
-  const call = {
-    payee: $("#p-payee").value,
-    amount: Number($("#p-amount").value),
-    currency: $("#p-currency").value,
-  };
-  if (mandate) { call.authorization_id = mandate.authorization_id; call.invoice_id = mandate.invoice_id; }
-  try {
-    const id = await ensure();
-    const v = await api(`/v1/sandbox/${id}/pay`, {
-      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(call),
-    });
-    add(call, v);
-    s.textContent = `${v.ms} ms`;
-  } catch (e) { s.textContent = e.message; }
-  $("#pay").disabled = false;
-});
-
-function add(call, v) {
-  if (n === 0) $("#log").innerHTML = "";
-  n += 1;
-  const el = document.createElement("div");
-  el.className = "entry";
-  el.innerHTML = `
-    <div class="top">
-      <span class="verdict ${esc(v.decision)}">${esc(v.decision)}</span>
-      <span class="status">${v.paid ? "provider was paid" : "provider never called"}</span>
-    </div>
-    <div class="call mono">${esc(JSON.stringify(call))}</div>
-    ${v.reasons.length ? `<ul>${v.reasons.map(r =>
-      `<li><span class="rid">${esc(r.id)}</span> — ${esc(r.message)}</li>`).join("")}</ul>` : ""}
-    ${v.evidence_id ? `<div class="call mono">evidence ${esc(v.evidence_id)}</div>` : ""}`;
-  $("#log").prepend(el);
+/* chain */
+async function chain(mode){
+  const s=$("#chain-status"); s.innerHTML='<span class="spin"></span> talking to Base Sepolia…';
+  $("#chain-ok").disabled=true;$("#chain-bad").disabled=true;
+  try{
+    const j=await api("/v1/chain?mode="+mode,{method:"POST"});
+    $("#chain-out").innerHTML=`<div class="rec">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="pill ${esc(j.decision)}"><span class="dot"></span>${esc(j.decision)}</span>
+        <span class="hint mono">to ${esc(j.to)}</span></div>
+      ${j.reasons&&j.reasons.length?`<ul>${j.reasons.map(r=>`<li><strong>${esc(r.id)}</strong> — ${esc(r.message)}</li>`).join("")}</ul>`:""}
+      <div class="call mono">${j.tx?`<a href="${esc(j.explorer)}" target="_blank" rel="noopener">${esc(j.tx)}</a>`
+        :(j.wallet_refused?"the wallet refused: "+esc(j.wallet_refused):"no transaction exists")}</div></div>`;
+    s.textContent=typeof j.remaining==="number"?`${j.remaining} payments left`:"";
+  }catch(e){ s.textContent=String(e.message||e); }
+  $("#chain-ok").disabled=false;$("#chain-bad").disabled=false;
 }
+$("#chain-ok").addEventListener("click",()=>chain("approved"));
+$("#chain-bad").addEventListener("click",()=>chain("forged"));
 
-async function chain(mode) {
-  const s = $("#chain-status"); s.innerHTML = '<span class="spin"></span> talking to Base Sepolia…';
-  $("#chain-ok").disabled = true; $("#chain-bad").disabled = true;
-  try {
-    const j = await api(`/v1/chain?mode=${mode}`, { method: "POST" });
-    $("#chain-out").innerHTML = `<div class="box"><div class="body">
-      <div><span class="verdict ${esc(j.decision)}">${esc(j.decision)}</span></div>
-      <div class="mono" style="overflow-wrap:anywhere">to ${esc(j.to)}</div>
-      ${j.reasons && j.reasons.length ? `<ul>${j.reasons.map(r=>`<li><span class="rid">${esc(r.id)}</span> — ${esc(r.message)}</li>`).join("")}</ul>` : ""}
-      <div>${j.tx ? `<a href="${esc(j.explorer)}" target="_blank" rel="noopener" class="mono">${esc(j.tx)}</a>` : "no transaction exists"}</div>
-    </div></div>`;
-    s.textContent = typeof j.remaining === "number" ? `${j.remaining} payments left` : "";
-  } catch (e) { s.textContent = e.message; }
-  $("#chain-ok").disabled = false; $("#chain-bad").disabled = false;
-}
-$("#chain-ok").addEventListener("click", () => chain("approved"));
-$("#chain-bad").addEventListener("click", () => chain("forged"));
-
-(async () => {
-  const base = location.origin;
-  $("#api").textContent = [
-    `# 1. a sandbox of your own (expires after 10 idle minutes)`,
-    `S=$(curl -s -XPOST ${base}/v1/sandbox | jq -r .id)`,
-    ``,
-    `# 2. what the user asked for -- the only channel that confers authority`,
-    `curl -s -XPOST ${base}/v1/sandbox/$S/intent \\`,
+(async()=>{
+  const b=location.origin;
+  $("#curl").innerHTML=[
+    '<span class="c"># a sandbox of your own</span>',
+    `S=$(curl -s -XPOST ${b}/v1/sandbox | jq -r .id)`,'',
+    '<span class="c"># what the user asked for — the only channel that confers authority</span>',
+    `curl -s -XPOST ${b}/v1/sandbox/$S/intent \\`,
     `  -H 'content-type: application/json' \\`,
-    `  -d '{"text":"Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD."}'`,
-    ``,
-    `# 3. what an approver signed off (optional)`,
-    `curl -s -XPOST ${base}/v1/sandbox/$S/authorization \\`,
+    `  -d '{"text":"Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD."}'`,'',
+    '<span class="c"># what an approver signed off</span>',
+    `curl -s -XPOST ${b}/v1/sandbox/$S/authorization \\`,
     `  -H 'content-type: application/json' \\`,
-    `  -d '{"payee":"Acme Cloud Ltd","amount":"480","currency":"USD"}'`,
-    ``,
-    `# 4. try to pay someone else`,
-    `curl -s -XPOST ${base}/v1/sandbox/$S/pay \\`,
+    `  -d '{"payee":"Acme Cloud Ltd","amount":"480","currency":"USD"}'`,'',
+    '<span class="c"># now try to pay someone else</span>',
+    `curl -s -XPOST ${b}/v1/sandbox/$S/pay \\`,
     `  -H 'content-type: application/json' \\`,
-    `  -d '{"payee":"Nordwind Handels GmbH","amount":480,"currency":"USD"}'`,
-    ``,
-    `# the signed record of every verdict`,
-    `curl -s ${base}/v1/sandbox/$S/evidence`,
+    `  -d '{"payee":"Nordwind Handels GmbH","amount":480,"currency":"USD"}'`,'',
+    '<span class="c"># the signed record of every verdict</span>',
+    `curl -s ${b}/v1/sandbox/$S/evidence`,
   ].join("\n");
-  try {
-    const l = await api("/v1/limits");
-    if (l.chain && l.chain.enabled) $("#chain").hidden = false;
-  } catch { /* the page works without it */ }
+  TESTS=(await api("/v1/tests")).tests; draw();
+  try{ const l=await api("/v1/limits"); if(l.chain&&l.chain.enabled) $("#chain").hidden=false; }catch{}
 })();
 </script>
 </body>

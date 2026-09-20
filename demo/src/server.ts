@@ -17,6 +17,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chainDemo, chainState } from "./chain.js";
+import { runSuite, TESTS } from "./suite.js";
 import {
   authorize,
   create,
@@ -44,6 +45,8 @@ const PORT = Number(process.env["MOAT_DEMO_PORT"] ?? "8787");
 const WINDOW_MS = 60_000;
 const PER_WINDOW = 90;
 const seen = new Map<string, { n: number; from: number }>();
+/** Addresses with a suite in flight, so nobody can start nine more. */
+const running = new Set<string>();
 
 function caller(h: Record<string, string | string[] | undefined>): string {
   const fwd = h["cf-connecting-ip"] ?? h["x-forwarded-for"];
@@ -118,6 +121,24 @@ const server = createServer(async (req, res) => {
     if (path.startsWith("/v1/")) {
       if (overLimit(caller(req.headers))) {
         return json(res, 429, { error: "too many requests from here; wait a minute" });
+      }
+    }
+
+    if (path === "/v1/tests") {
+      return json(res, 200, { tests: TESTS });
+    }
+
+    if (path === "/v1/suite" && method === "POST") {
+      const only = url.searchParams.get("test") ?? undefined;
+      // A suite run is nine gateway processes; one per address at a time.
+      if (running.has(caller(req.headers))) {
+        return json(res, 429, { error: "a suite is already running for you" });
+      }
+      running.add(caller(req.headers));
+      try {
+        return json(res, 200, { results: await runSuite(CFG, only) });
+      } finally {
+        running.delete(caller(req.headers));
       }
     }
 
