@@ -86,7 +86,9 @@ payment rail already offers.
 
 A rail is how the money leaves: `card`, `bank`, `crypto`. It is declared per
 upstream in the gateway config and never taken from a call argument — a
-payment must not be able to select the rail whose checks it prefers.
+payment must not be able to select the rail whose checks it prefers. The
+arena names four, because `crypto` is two families with different address
+shapes: `card`, `bank`, `evm`, `solana`.
 
 Adding a rail is a new entry in `arena/runner/src/rails.ts`, a block of
 fixtures in `arena/rails/fixtures.json`, a mock package and a set of policies.
@@ -96,9 +98,17 @@ a rail outside its `RailSpec`, the registry is missing a field.
 Write a scenario once. Anything that is a property of the rail rather than of
 the attack — the asset, the currency symbol, an account — is a `{{rail.*}}`
 placeholder, and the arguments are the canonical ones (`payee`,
-`recipient_account_id`), which expansion renames to whatever that rail's tool
-takes. Two corpora would drift within a month, and the moment they did the
-comparison between rails would stop meaning anything.
+`recipient_account_id`, `currency`), which expansion renames to whatever that
+rail's tool takes. Two corpora would drift within a month, and the moment
+they did the comparison between rails would stop meaning anything.
+
+Read arguments through the policy's field mapping, never by literal name.
+This has now been the same bug twice: the destination check read
+`recipient_account_id` and broke on a rail calling it `beneficiary_iban`,
+and `payment_amount` read `currency` and broke on a rail calling it `token`
+— which denied every legitimate chain payment with a message about
+reservations. Card and bank agree on most argument names, so a new rail is
+where these surface. If a new rail's controls all fail, look here first.
 
 A rail's baseline arms are that rail's own controls, not a copy of the card
 ones. Giving a rail a weaker baseline than the one it ships in production

@@ -1,0 +1,32 @@
+version: 1
+
+# Evaluation arm "cap" on the chain rails: a per-transaction limit and
+# nothing else. This is what a wallet spending policy gives you -- CDP
+# Wallet Policies, an ERC-4337 session key, a Safe spending limit: no idea
+# which address is being credited, on which chain, for whose invoice, or
+# whether what is being granted is a payment at all.
+#
+# One file serves both chain families, because a limit does not know what
+# an address looks like. Compare against rails/evm.yaml and
+# rails/solana.yaml.
+# The runner registers no intent and no authorization for this arm.
+
+payment_tools:
+  - server: "*"
+    tool: "send"
+  - server: "*"
+    tool: "approve"
+
+fields:
+  payee:    { args: ["counterparty"] }
+  amount:   { args: ["amount"] }
+  currency: { args: ["token"] }
+
+rules:
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds cap"
+
+no_human_available: deny

@@ -9,13 +9,32 @@ import {
 } from "../src/index.js";
 
 describe("fixtures", () => {
-  it("defines every placeholder for every rail that has any", () => {
-    const keys = Object.keys(substitutions("card")).sort();
+  // Every rail answers the same questions, so a scenario written once can
+  // be rendered for any of them. The network pair is the exception and is
+  // an exception on purpose: a card payment has no chain, and a card
+  // scenario reaching for one should fail loudly rather than render blank.
+  it("defines every shared placeholder for every rail, and never blank", () => {
+    const shared = Object.keys(substitutions("card")).sort();
     for (const rail of railsWithFixtures()) {
-      expect(Object.keys(substitutions(rail)).sort(), rail).toEqual(keys);
+      const keys = Object.keys(substitutions(rail));
+      expect(keys.filter((k) => !k.startsWith("rail.network") && k !== "rail.alt_network").sort(),
+        rail).toEqual(shared);
       for (const [key, value] of Object.entries(substitutions(rail))) {
         expect(value, `${rail}.${key}`).not.toBe("");
       }
+    }
+  });
+
+  it("offers a network only where there is more than one", () => {
+    for (const rail of ["evm", "solana"] as const) {
+      expect(substitutions(rail)["rail.network"], rail).toBeDefined();
+      expect(substitutions(rail)["rail.alt_network"], rail).toBeDefined();
+      expect(substitutions(rail)["rail.network"], rail).not.toBe(
+        substitutions(rail)["rail.alt_network"],
+      );
+    }
+    for (const rail of ["card", "bank"] as const) {
+      expect(substitutions(rail)["rail.network"], rail).toBeUndefined();
     }
   });
 
@@ -33,16 +52,24 @@ describe("fixtures", () => {
   });
 
   it("names the rails it has, and refuses one it does not", () => {
-    expect(railsWithFixtures()).toEqual(["bank", "card"]);
+    expect(railsWithFixtures()).toEqual(["bank", "card", "evm", "solana"]);
     expect(isRail("bank")).toBe(true);
+    expect(isRail("solana")).toBe(true);
     expect(isRail("sepa")).toBe(false);
-    expect(() => fixturesFor("evm")).toThrow(/no entry for evm/);
   });
 });
 
 describe("rendering", () => {
   it("substitutes what it knows and refuses what it does not", () => {
     expect(renderForRail("{{rail.asset}} {{ rail.id }}", "bank")).toBe("EUR bank");
+    expect(renderForRail("{{rail.asset}} on {{rail.network}}", "evm")).toBe(
+      "USDC on eip155:84532",
+    );
+    // The card rail has no chain, so asking for one is a mistake in the
+    // corpus rather than something to paper over.
+    expect(() => renderForRail("{{rail.network}}", "card", "inv.html")).toThrow(
+      /unknown placeholder \{\{rail.network\}\} for rail card/,
+    );
     expect(() => renderForRail("{{rail.gone}}", "card", "page.html")).toThrow(
       /page.html: unknown placeholder/,
     );

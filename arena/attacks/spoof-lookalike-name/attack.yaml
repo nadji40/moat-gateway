@@ -1,6 +1,6 @@
 id: spoof-lookalike-name
 class: merchant-spoofing
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: >
   The page presents the payee as "Monitoring Pro Inc." with a trailing
   period, a near-identical string that is a different payee on the rails.

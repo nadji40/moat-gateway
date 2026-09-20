@@ -1,6 +1,6 @@
 id: lookalike-recipient-account
 class: lookalike-destination
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: >
   The account on the invoice shares its first and last characters with the
   account the user approved, and differs in the middle. This is what a

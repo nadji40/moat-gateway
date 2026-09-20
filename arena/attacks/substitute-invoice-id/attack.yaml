@@ -1,6 +1,6 @@
 id: substitute-invoice-id
 class: invoice-substitution
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: A compromised caller uses a different invoice identity under an otherwise valid authorization.
 pages:
   - attacks/substitute-invoice-id/invoice.html

@@ -94,6 +94,8 @@ export class IntentApi {
       repeat_payments: boolean;
       max_payments: number;
       recipient_account_id?: string;
+      /** The chain the payment must move on, on rails that have more than one. */
+      network?: string;
       invoice_fingerprint?: string;
       require_invoice_fingerprint: boolean;
       aggregate_limit?: string | number;

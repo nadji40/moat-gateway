@@ -71,11 +71,22 @@ export interface RailSpec {
   readonly tools: {
     /** The tool that moves money. */
     readonly pay: string;
+    /**
+     * The tool that grants a standing right to move money later, where the
+     * rail has one. A card and a bank transfer have no equivalent: there is
+     * no way to hand someone the ability to debit you at will and call it a
+     * single instruction.
+     */
+    readonly approve?: string;
   };
   /** What this rail's pay tool calls each canonical scenario argument. */
   readonly args: {
     readonly payee: string;
     readonly destination: string;
+    /** What the rail calls the unit: a currency code, or a token symbol. */
+    readonly currency: string;
+    /** What it calls the chain, on rails that have more than one. */
+    readonly network: string;
   };
   /**
    * Whether a call has to name a destination. A card payment identifies a
@@ -83,6 +94,13 @@ export interface RailSpec {
    * there is nothing to send without one.
    */
   readonly destinationRequired: boolean;
+  /**
+   * Whether a call has to name a network. An address without one is not an
+   * account: the same twenty bytes exist on every EVM chain. Rails whose
+   * accounts identify themselves -- a card account, an IBAN with its
+   * country -- have nothing to name.
+   */
+  readonly networkRequired: boolean;
   /** Gateway config per gateway arm, relative to the arena root. */
   readonly configs: Readonly<Record<Exclude<Arm, "none">, string>>;
   /** Values the scenarios are rendered with. */
@@ -98,8 +116,14 @@ const CARD: RailSpec = {
     ledgerEnv: "MOCK_STRIPE_LEDGER",
   },
   tools: { pay: "pay" },
-  args: { payee: "payee", destination: "recipient_account_id" },
+  args: {
+    payee: "payee",
+    destination: "recipient_account_id",
+    currency: "currency",
+    network: "network",
+  },
   destinationRequired: false,
+  networkRequired: false,
   configs: {
     cap: "moat.arena-cap.yaml",
     allowlist: "moat.arena-allowlist.yaml",
@@ -117,8 +141,14 @@ const BANK: RailSpec = {
     ledgerEnv: "MOCK_BANK_LEDGER",
   },
   tools: { pay: "transfer" },
-  args: { payee: "beneficiary_name", destination: "beneficiary_iban" },
+  args: {
+    payee: "beneficiary_name",
+    destination: "beneficiary_iban",
+    currency: "currency",
+    network: "network",
+  },
   destinationRequired: true,
+  networkRequired: false,
   configs: {
     cap: "rails/bank/moat.arena-cap.yaml",
     allowlist: "rails/bank/moat.arena-allowlist.yaml",
@@ -127,8 +157,49 @@ const BANK: RailSpec = {
   fixtures: fixturesFor("bank"),
 };
 
+/**
+ * The two chain families, which differ in almost nothing the runner can
+ * see. Same tool, same arguments, same policy: an address is the payment,
+ * the network is half of the address, and the name beside it is a label
+ * the chain has never heard of. What differs is the shape of an address
+ * and which chain the sandbox is pretending to be, and both of those live
+ * in the fixtures and in the mock's own environment.
+ */
+function chainRail(id: "evm" | "solana"): RailSpec {
+  return {
+    id,
+    family: "crypto",
+    upstream: "wallet",
+    mock: {
+      entry: ["mock-chain", "src", "server.ts"],
+      ledgerEnv: "MOCK_CHAIN_LEDGER",
+      env: { MOCK_CHAIN: id },
+    },
+    tools: { pay: "send", ...(id === "evm" ? { approve: "approve" } : {}) },
+    args: {
+      payee: "counterparty",
+      destination: "to_address",
+      currency: "token",
+      network: "network",
+    },
+    destinationRequired: true,
+    networkRequired: true,
+    configs: {
+      cap: `rails/${id}/moat.arena-cap.yaml`,
+      allowlist: `rails/${id}/moat.arena-allowlist.yaml`,
+      moat: `rails/${id}/moat.arena.yaml`,
+    },
+    fixtures: fixturesFor(id),
+  };
+}
+
 /** Every rail the arena can run today. */
-export const RAILS: Readonly<Partial<Record<Rail, RailSpec>>> = { card: CARD, bank: BANK };
+export const RAILS: Readonly<Partial<Record<Rail, RailSpec>>> = {
+  card: CARD,
+  bank: BANK,
+  evm: chainRail("evm"),
+  solana: chainRail("solana"),
+};
 
 /** The rail a run uses when none is named. */
 export const DEFAULT_RAIL: Rail = "card";
@@ -175,6 +246,13 @@ export function namespacedPayTool(spec: RailSpec): string {
   return `${spec.upstream}__${spec.tools.pay}`;
 }
 
+/** The same for the allowance tool, on rails that have one. */
+export function namespacedApproveTool(spec: RailSpec): string | undefined {
+  return spec.tools.approve === undefined
+    ? undefined
+    : `${spec.upstream}__${spec.tools.approve}`;
+}
+
 /** Render a scenario or page for this rail. */
 export function renderForRail(text: string, spec: RailSpec, where = "text"): string {
   return renderWithFixtures(text, spec.id, where);
@@ -185,11 +263,36 @@ export function sameDestinationOn(_spec: RailSpec, a: string, b: string): boolea
   return sameDestination(a, b);
 }
 
-/** Whether two amounts agree to the last minor unit of the rail's asset. */
+/**
+ * Whether two amounts agree exactly.
+ *
+ * Compared at whichever is finer: the rail's own asset, or the number of
+ * decimal places either amount actually carries. A rail's headline asset is
+ * not the only one a scenario may use -- a chain rail prices invoices in a
+ * six-decimal stablecoin and pays gas in an eighteen-decimal coin -- and
+ * comparing an eighteen-decimal amount at six would call two different
+ * payments equal.
+ */
 export function sameAmountOn(spec: RailSpec, a: string | number, b: string | number): boolean {
+  const places = (value: string | number): number => {
+    const text = String(value);
+    const dot = text.indexOf(".");
+    return dot === -1 ? 0 : text.length - dot - 1;
+  };
+  const decimals = Math.max(spec.fixtures.decimals, places(a), places(b));
   try {
-    return toMinor(a, spec.fixtures.decimals) === toMinor(b, spec.fixtures.decimals);
+    return toMinor(a, decimals) === toMinor(b, decimals);
   } catch {
     return false;
   }
+}
+
+/** The network a call on this rail runs on unless it names another. */
+export function defaultNetworkOn(spec: RailSpec): string | undefined {
+  return spec.fixtures.network;
+}
+
+/** Whether two network identifiers name the same chain. */
+export function sameNetwork(a: string | undefined, b: string | undefined): boolean {
+  return (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
 }

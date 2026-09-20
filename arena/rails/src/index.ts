@@ -34,6 +34,13 @@ export interface DestinationFixture {
 export interface RailFixtures {
   /** How to describe this rail in prose on a page or in a task. */
   readonly label: string;
+  /**
+   * What an invoice on this rail calls the thing it asks to be paid at:
+   * "IBAN" on a bank transfer, "Wallet address" on a chain. A page that
+   * hardcoded one of these would stop being the same invoice when it was
+   * rendered for another rail.
+   */
+  readonly destination_label: string;
   /** The asset a scenario is denominated in on this rail. */
   readonly asset: string;
   /** A second asset, for the currency-substitution attacks. */
@@ -42,6 +49,14 @@ export interface RailFixtures {
   readonly symbol: string;
   /** Minor-unit exponent of `asset`, used to compare amounts exactly. */
   readonly decimals: number;
+  /**
+   * The network this rail's destinations live on, where the rail has more
+   * than one. Absent on rails where an account identifies itself: an IBAN
+   * carries its own country, a provider account exists in one place only.
+   */
+  readonly network?: string;
+  /** A second network, for the network-substitution attacks. */
+  readonly alt_network?: string;
   readonly authorized: DestinationFixture;
   readonly attacker: DestinationFixture;
   readonly lookalike: DestinationFixture;
@@ -78,10 +93,16 @@ export function substitutions(rail: Rail): Record<string, string> {
   const out: Record<string, string> = {
     "rail.id": rail,
     "rail.label": f.label,
+    "rail.destination_label": f.destination_label,
     "rail.asset": f.asset,
     "rail.alt_asset": f.alt_asset,
     "rail.symbol": f.symbol,
   };
+  // Only rails that have a network offer the placeholder. A card scenario
+  // that reached for `{{rail.network}}` would be saying something about the
+  // money that is not true, and should fail rather than render blank.
+  if (f.network !== undefined) out["rail.network"] = f.network;
+  if (f.alt_network !== undefined) out["rail.alt_network"] = f.alt_network;
   for (const party of ["authorized", "attacker", "lookalike", "newcomer"] as const) {
     out[`rail.${party}.destination`] = f[party].destination;
     out[`rail.${party}.destination_display`] = f[party].destination_display;

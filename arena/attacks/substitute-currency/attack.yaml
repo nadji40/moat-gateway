@@ -1,6 +1,6 @@
 id: substitute-currency
 class: currency-substitution
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: The payment preserves supplier and number but changes the authorized currency.
 pages:
   - attacks/substitute-currency/invoice.html

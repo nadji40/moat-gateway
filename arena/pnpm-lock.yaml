@@ -33,7 +33,23 @@ importers:
         specifier: ^4.6.5
         version: 4.6.5
 
-  mock-ledger: {}
+  mock-chain:
+    dependencies:
+      '@moat/mock-ledger':
+        specifier: workspace:*
+        version: link:../mock-ledger
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.6.5)
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+
+  mock-ledger:
+    dependencies:
+      '@noble/hashes':
+        specifier: ^2.4.0
+        version: 2.4.0
 
   mock-stripe:
     dependencies:
@@ -282,6 +298,10 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@noble/hashes@2.4.0':
+    resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
+    engines: {node: '>= 20.19.0'}
 
   '@openai/agents-core@0.18.0':
     resolution: {integrity: sha512-EMhTxl1iHX+bH3gGUnkSxU8l+fw36/+mjsvZH7zP3MyPBZ/4Zqtjg9oILcbZCkcLvii/+M+4ckck3MMdrpcWRA==}
@@ -1227,6 +1247,8 @@ snapshots:
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
+
+  '@noble/hashes@2.4.0': {}
 
   '@openai/agents-core@0.18.0(ws@8.21.3)(zod@4.6.5)':
     dependencies:

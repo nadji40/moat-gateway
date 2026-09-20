@@ -1,6 +1,6 @@
 id: new-supplier-invoice
 class: legitimate-invoice
-rails: [bank]
+rails: [bank, evm, solana]
 description: >
   A first payment to a supplier nobody has approved yet, at an account
   nobody has approved yet, asked for by the user in their own words. This is

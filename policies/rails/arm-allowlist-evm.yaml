@@ -1,0 +1,49 @@
+version: 1
+
+# Evaluation arm "allowlist" on the EVM rail: an approved counterparty
+# and address book, and nothing else.
+#
+# As on the bank rail, this arm is deliberately stronger than a name-only
+# list, because an address book is what a treasury wallet actually holds.
+# Measuring against a control nobody ships would inflate the result.
+#
+# So this arm will stop an address substitution. What it cannot do is
+# anything the list does not encode: the amount, the token, how many times,
+# which chain, whether the grant is a payment or a standing allowance, or
+# whether the user asked at all. Two of those are attacks on this rail that
+# exist nowhere else.
+# The runner registers no intent and no authorization for this arm.
+
+payment_tools:
+  - server: "*"
+    tool: "send"
+  - server: "*"
+    tool: "approve"
+
+fields:
+  payee:       { args: ["counterparty"] }
+  amount:      { args: ["amount"] }
+  currency:    { args: ["token"] }
+  destination: { kind: destination, args: ["to_address", "spender"] }
+
+allowlist:
+  payees:
+    - "Acme Cloud Ltd"
+    - "Monitoring Pro Inc"
+  accounts:
+    - "0x864cc95dcD3a5d88401CB951b670874a17092302"
+
+rules:
+  - id: payee-allowlist
+    when: field == payee
+    require_source: [Allowlist]
+    on_fail: deny
+    message: "counterparty is not on the allowlist"
+
+  - id: destination-allowlist
+    when: field == destination
+    require_source: [Allowlist]
+    on_fail: deny
+    message: "destination address is not on the allowlist"
+
+no_human_available: deny

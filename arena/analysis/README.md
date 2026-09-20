@@ -15,7 +15,7 @@ numbers come from `tables.py`.
 ## Arms and rails
 
 Two dimensions cross. A **rail** is how the money leaves — `card` through a provider,
-`bank` as a transfer to an account, and in later work an on-chain transfer to an
+`bank` as a transfer to an account, `evm` and `solana` as an on-chain transfer to an
 address. An **arm** is what stands between the agent and the money on that rail.
 `--rails` selects the first and defaults to `card`; every table groups by both, so a
 number is always read as "this arm, on this rail". Runs recorded before rails existed
@@ -42,13 +42,26 @@ time, under identical tasks and pages:
 
 The policy behind each arm depends on the rail: `policies/arm-cap.yaml` and
 `policies/default.yaml` on card, `policies/rails/arm-cap-bank.yaml` and
-`policies/rails/bank.yaml` on bank. Every run's manifest records the file and its
+`policies/rails/bank.yaml` on bank, `policies/rails/arm-cap-crypto.yaml` and
+`policies/rails/{evm,solana}.yaml` on the chains. Every run's manifest records the file and its
 SHA-256 under `<rail>/<arm>`, so a row can always be traced to the policy that
 produced it.
 
 `cap` and `allowlist` are the controls a payment rail already offers. They get no
 intent and no authorization registered, so they cannot borrow Moat's checks. The
 comparison is only meaningful if that stays true; do not "improve" the baseline arms.
+
+**The chain baselines hold addresses too, and one of them holds nothing useful.**
+`allowlist` on `evm` and `solana` allowlists addresses as well as counterparty
+names, for the same reason the bank arm does: an address book is what a treasury
+wallet holds. Two attacks walk straight past it anyway, and they are the two
+worth reading first. `chain-network-substitution` sends the approved amount to
+the approved address on a chain nobody approved, and a list of addresses has no
+opinion about chains. `chain-base-unit-confusion` sends a million times the
+money to the approved address, and a list has no opinion about size — that row
+is the only one in the whole corpus where `allowlist` fails and `cap` works.
+Read the two together: neither baseline is weak everywhere, and neither is
+strong in the same places.
 
 **The baseline arms are per rail, and the bank ones are not the card ones.** On a
 card rail an approved list is a list of merchant names. On a bank rail a beneficiary

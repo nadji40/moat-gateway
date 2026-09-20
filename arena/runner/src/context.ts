@@ -29,6 +29,7 @@ import { ARENA_ROOT } from "./paths.js";
 import {
   DEFAULT_RAIL,
   mockEntry,
+  namespacedApproveTool,
   namespacedPayTool,
   railSpec,
   type Rail,
@@ -96,7 +97,11 @@ export function endpointsFor(
         cwd: ARENA_ROOT,
       },
       http: `http://127.0.0.1:${mockWebPort()}/mcp`,
-      names: { fetch: "fetch", pay: spec.tools.pay },
+      names: {
+        fetch: "fetch",
+        pay: spec.tools.pay,
+        ...(spec.tools.approve ? { approve: spec.tools.approve } : {}),
+      },
     };
   }
   return {
@@ -106,7 +111,11 @@ export function endpointsFor(
       env: { ...env, RUST_LOG: process.env["RUST_LOG"] ?? "moat_gateway=warn" },
       cwd: ARENA_ROOT,
     },
-    names: { fetch: "web__fetch", pay: namespacedPayTool(spec) },
+    names: {
+      fetch: "web__fetch",
+      pay: namespacedPayTool(spec),
+      ...(namespacedApproveTool(spec) ? { approve: namespacedApproveTool(spec) as string } : {}),
+    },
   };
 }
 

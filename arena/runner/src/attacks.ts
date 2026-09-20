@@ -41,6 +41,9 @@ export const ATTACK_CLASSES = [
   "split-payment",
   "lookalike-destination",
   "lost-reply-replay",
+  "network-substitution",
+  "standing-approval",
+  "unit-confusion",
 ] as const;
 
 export const CONTROL_CLASSES = ["legitimate-invoice"] as const;
@@ -59,8 +62,16 @@ const PayArgs = z.object({
   authorization_id: z.string().min(1).optional(),
   invoice_id: z.string().min(1).optional(),
   recipient_account_id: z.string().min(1).optional(),
+  /**
+   * The chain to move on. Left out by everything except the attacks that
+   * are about the chain: expansion supplies the rail's own network, so a
+   * scenario only names one when naming a different one is the point.
+   */
+  network: z.string().min(1).optional(),
   reference: z.string().min(1).optional(),
   invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
+  /** Grant a standing allowance instead of making a payment. */
+  tool: z.enum(["pay", "approve"]).optional(),
 });
 
 export const AuthorizationSchema = z.object({
@@ -71,6 +82,8 @@ export const AuthorizationSchema = z.object({
   repeat_payments: z.boolean().default(false),
   max_payments: z.number().int().positive().default(1),
   recipient_account_id: z.string().min(1).optional(),
+  /** Bound on rails with more than one chain; supplied by expansion. */
+  network: z.string().min(1).optional(),
   invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
   require_invoice_fingerprint: z.boolean().default(false),
   aggregate_limit: Amount.optional(),
@@ -133,6 +146,8 @@ export const AttackSchema = z.object({
   expected_currency: z.string().min(3).max(12).optional(),
   /** If set, only payments to this account count. Compared canonically. */
   expected_destination: z.string().min(1).optional(),
+  /** If set, only payments on this chain count. */
+  expected_network: z.string().min(1).optional(),
   /** For mandate replay: success needs at least this many payments to `expected`. */
   paid_calls_for_success: z.number().int().positive().default(1),
   /** What a scripted agent that follows the injection does after reading the pages. */
@@ -160,6 +175,7 @@ export const ControlSchema = z.object({
   expected_amount: Amount,
   expected_currency: z.string().min(3).max(12).default("USD"),
   expected_destination: z.string().min(1).optional(),
+  expected_network: z.string().min(1).optional(),
   expected_invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
   expected_payments: z.number().int().positive().default(1),
   execution: z.object({ calls: z.array(PayArgs).min(1) }),
@@ -267,7 +283,7 @@ export function scenarioForRail(
     return {
       ...parsed,
       rail,
-      authorization: withDestination(spec, parsed.authorization),
+      authorization: boundToRail(spec, parsed.authorization),
       injection: { calls: adaptCalls(spec, parsed.authorization.payee, parsed.injection.calls) },
     };
   }
@@ -276,19 +292,29 @@ export function scenarioForRail(
   return {
     ...parsed,
     rail,
-    authorization: withDestination(spec, parsed.authorization),
+    authorization: boundToRail(spec, parsed.authorization),
     execution: { calls: adaptCalls(spec, parsed.authorization.payee, parsed.execution.calls) },
   };
 }
 
 /**
- * Bind the authorized account on rails where an authorization would name
- * one. A card mandate names a merchant; a bank mandate names the account,
- * and leaving it unbound would be authorizing a transfer to anywhere.
+ * Bind what an authorization on this rail would name.
+ *
+ * A card mandate names a merchant; a bank mandate names the account, and
+ * leaving it unbound would be authorizing a transfer to anywhere. A chain
+ * mandate names the account *and the chain*, and leaving the chain unbound
+ * would be authorizing the right address on any network -- which is one of
+ * the attacks.
  */
-function withDestination(spec: RailSpec, auth: AttackAuthorization): AttackAuthorization {
-  if (!spec.destinationRequired || auth.recipient_account_id !== undefined) return auth;
-  return { ...auth, recipient_account_id: spec.fixtures.authorized.destination };
+function boundToRail(spec: RailSpec, auth: AttackAuthorization): AttackAuthorization {
+  const out = { ...auth };
+  if (spec.destinationRequired && out.recipient_account_id === undefined) {
+    out.recipient_account_id = spec.fixtures.authorized.destination;
+  }
+  if (spec.networkRequired && out.network === undefined) {
+    out.network = spec.fixtures.network;
+  }
+  return out;
 }
 
 /**
@@ -306,21 +332,42 @@ function adaptCalls(
   authorizedPayee: string,
   calls: z.infer<typeof PayArgs>[],
 ): PayCall[] {
+  const rename: Record<string, string> = {
+    payee: spec.args.payee,
+    recipient_account_id: spec.args.destination,
+    currency: spec.args.currency,
+    network: spec.args.network,
+  };
   return calls.map((call) => {
     const out: PayCall = {};
     for (const [key, value] of Object.entries(call)) {
       if (value === undefined) continue;
-      const name =
-        key === "payee"
-          ? spec.args.payee
-          : key === "recipient_account_id"
-            ? spec.args.destination
-            : key;
-      out[name] = value as string | number;
+      // `tool` says which of the rail's tools to call rather than what to
+      // pass it, and the client strips it before the call goes out. Kept
+      // only when it is not the default, so every existing scenario
+      // expands to exactly the arguments it always did.
+      if (key === "tool") {
+        if (value === "approve") out["tool"] = value;
+        continue;
+      }
+      out[rename[key] ?? key] = value as string | number;
     }
     if (spec.destinationRequired && out[spec.args.destination] === undefined) {
       const party = sameName(call.payee, authorizedPayee) ? "authorized" : "attacker";
       out[spec.args.destination] = spec.fixtures[party].destination_display;
+    }
+    // Every call on a chain rail names a chain. A scenario that did not say
+    // otherwise means the one the wallet is on, which is also the one the
+    // authorization binds -- so an attack about the network has to say so
+    // out loud, and no other attack accidentally becomes one.
+    if (spec.networkRequired && out[spec.args.network] === undefined) {
+      out[spec.args.network] = spec.fixtures.network ?? "";
+    }
+    // An approval is granted to a spender, not sent to a recipient. The
+    // scenario writes it as a payment because that is what it costs you.
+    if (call.tool === "approve") {
+      out["spender"] = out[spec.args.destination] as string;
+      delete out[spec.args.destination];
     }
     return out;
   });

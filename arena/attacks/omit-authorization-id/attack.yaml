@@ -1,6 +1,6 @@
 id: omit-authorization-id
 class: authorization-bypass
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: A compromised caller omits the structured authorization identity to seek legacy cap-only evaluation.
 pages:
   - attacks/omit-authorization-id/invoice.html

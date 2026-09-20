@@ -105,3 +105,53 @@ fiat minor units; a typed destination with canonical comparison and
 exact-only provenance matching, because substring matching an address is how
 address poisoning succeeds; and a provider outcome state machine in which a
 broadcast-but-unconfirmed transfer counts as committed rather than retryable.
+
+## Addendum, September 2026: the crypto rails, and binding a network
+
+Two more rails are implemented: `evm` and `solana`, both `Rail::Crypto`,
+both irreversible and therefore inheriting every hold-and-quarantine
+behaviour ADR 0009 built, without a line of new code deciding that. The
+tool is `send`, the destination is an address, and the unit is a token.
+
+Three things are new, and only one of them is a mechanism.
+
+**A network is bound.** `PaymentAuthorization` gains an optional `network`,
+and `authorization-network` denies a call that names another one. An
+address is not an account on its own: the same twenty bytes exist on every
+EVM chain, and value sent to the right address on the wrong network is as
+gone as value sent to the wrong address, with the added trap that every
+check a person makes by eye still passes. This is the one attack on which
+an approved-address book is not merely incomplete but useless — the
+address is on the list. The field is absent on every card and bank
+authorization, where the check passes and says so, which is why adding it
+moved no published cell.
+
+**The amount is read through the field mapping.** `payment_amount` read
+the literal arguments `amount` and `currency`. A wallet says `token`, so
+no currency was found, so no asset, so no amount — and a payment with no
+amount cannot be reserved. Every legitimate chain payment was denied with
+a message about reservations that said nothing about the cause. This is
+the same bug the bank rail hit with `recipient_account_id` in the previous
+addendum, in the one place it had not been fixed, and the reason it took a
+whole new rail to find it is that card and bank happen to agree on those
+two argument names. It is now read the way the destination is: through the
+mapping, falling back to the literal name.
+
+**An allowance is listed as a payment tool.** `approve` grants a spender
+the right to move funds later. It is evaluated as a payment of the size it
+grants, because that is what it puts at risk, and it is recorded in the
+ledger at that amount. What Moat does not do is treat a standing grant as
+a different kind of thing from a payment: an allowance for exactly the
+authorized amount is allowed and consumes the mandate while leaving the
+invoice unpaid. That is a real gap, it is in `docs/attack-backlog.yaml`
+under `standing-approval`, and the arena measures the part that does work
+rather than claiming the part that does not.
+
+What this still does not claim. There is no on-chain enforcement: Moat
+decides and the customer's wallet executes, and a wallet that ignores the
+verdict is not stopped by anything here. That is the co-signer design, and
+it is not built. Nothing in the arena touches a real network; the testnet
+adapters are the next piece of work. The replay key is still the invoice
+id rather than a reference or a memo. And the token contract is not
+checked, so a fake USDC deployed at another address would pass the asset
+lookup — the network check bounds which chain, not which contract on it.

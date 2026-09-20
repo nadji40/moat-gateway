@@ -611,6 +611,41 @@ fn structured_authorization_checks(
         },
     ));
 
+    // An address is only an account together with its network. The same
+    // twenty bytes exist on every EVM chain, often under a different key,
+    // and value sent to the right address on the wrong chain is as gone as
+    // value sent to the wrong address -- with the added trap that every
+    // check a person makes by eye still passes. An authorization that names
+    // a network binds it here.
+    //
+    // Nothing is inferred when the authorization names none: card and bank
+    // authorizations do not, and this check passes for them, which is why
+    // adding it moved no existing verdict.
+    let network = mapped
+        .get("network")
+        .and_then(|(_, value)| value.as_str())
+        .unwrap_or("")
+        .trim();
+    let network_matches = authorization
+        .network
+        .as_deref()
+        .is_none_or(|expected| network.eq_ignore_ascii_case(expected.trim()));
+    outcomes.push(structured_outcome(
+        "authorization-network",
+        network_matches,
+        Decision::Deny,
+        match authorization.network.as_deref() {
+            Some(_) if network_matches => "ok: network matches authorization".to_owned(),
+            Some(expected) if network.is_empty() => {
+                format!("payment names no network; authorization is for {expected}")
+            }
+            Some(expected) => {
+                format!("payment is on {network}; authorization is for {expected}")
+            }
+            None => "ok: authorization does not bind a network".to_owned(),
+        },
+    ));
+
     let invoice_matches = authorization.repeat_payments || invoice_id == authorization.invoice_id;
     outcomes.push(structured_outcome(
         "authorization-invoice",
@@ -847,14 +882,30 @@ fn amount_in(value: &Value, asset: &Asset) -> Option<Minor> {
     parse_major(value, asset, false).ok()
 }
 
-/// Amount carried by a payment call, normalized to the currency's minor unit.
 /// The asset and amount a call proposes, resolved through the policy's
 /// registry so a six-decimal token is not read as two-decimal fiat.
+///
+/// Every part of this is read through the policy's field mapping rather
+/// than by literal argument name, because the argument names are the
+/// provider's and not ours. A card and a bank transfer both happen to say
+/// `amount` and `currency`; a wallet says `amount` and `token`. Reading
+/// the literal name there found no currency, so no asset, so no amount --
+/// and a payment with no amount cannot be reserved, which denied every
+/// legitimate chain payment with a message about reservations. The fallback
+/// to the literal names is what keeps a policy that declares no fields
+/// behaving as it always did.
 pub fn payment_amount(policy: &Policy, call: &PaymentCall) -> Option<(Asset, Minor)> {
-    let currency = call.args.get("currency").and_then(Value::as_str)?;
-    let network = call.args.get("network").and_then(Value::as_str);
+    let mapped = policy.map_fields(&call.args);
+    let arg = |field: &str, literal: &str| -> Option<&Value> {
+        mapped
+            .get(field)
+            .map(|(_, value)| *value)
+            .or_else(|| call.args.get(literal))
+    };
+    let currency = arg("currency", "currency").and_then(Value::as_str)?;
+    let network = arg("network", "network").and_then(Value::as_str);
     let asset = policy.assets().lookup(currency, network)?;
-    let minor = amount_in(call.args.get("amount")?, &asset)?;
+    let minor = amount_in(arg("amount", "amount")?, &asset)?;
     Some((asset, minor))
 }
 
@@ -1084,6 +1135,7 @@ mod tests {
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(500),
                 currency: "USD".into(),
+                network: None,
                 invoice_id: "INV-100".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1452,6 +1504,7 @@ mod tests {
                 amount_minor: Minor(9_900),
                 tolerance_minor: Minor(500),
                 currency: "USD".into(),
+                network: None,
                 invoice_id: "INV-PRICE".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1495,6 +1548,7 @@ fields:
   amount: { args: ["amount"] }
   currency: { args: ["currency"] }
   destination: { kind: destination, args: ["recipient_account_id", "to_address", "iban"] }
+  network: { args: ["network"] }
 allowlist:
   payees: ["Monitoring Pro Inc"]
   accounts: ["DE89 3704 0044 0532 0130 00"]
@@ -1679,6 +1733,7 @@ rules:
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
+                network: None,
                 invoice_id: "INV-IBAN".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1712,6 +1767,195 @@ rules:
             .any(|r| r.id == "authorization-recipient-account"));
     }
 
+    /// A wallet calls the unit a `token`, not a `currency`, and reading
+    /// the literal argument name found nothing there. No currency meant no
+    /// asset, no asset meant no amount, and a payment with no amount could
+    /// not be reserved -- so every legitimate payment on the rail was
+    /// denied, with a message about reservations that said nothing about
+    /// the cause. The mapping is the only thing that knows what this
+    /// provider calls its arguments.
+    #[test]
+    fn the_amount_is_read_from_whichever_arguments_the_policy_declares() {
+        let p = Policy::from_yaml(
+            r#"
+version: 1
+payment_tools:
+  - server: "*"
+    tool: send
+fields:
+  payee:    { args: ["counterparty"] }
+  amount:   { args: ["amount"] }
+  currency: { args: ["token"] }
+  network:  { args: ["network"] }
+rules: []
+"#,
+        )
+        .unwrap();
+        let proposal = call(json!({
+            "counterparty": "Monitoring Pro Inc", "amount": "250.50",
+            "token": "USDC", "network": "eip155:84532"
+        }));
+        let (asset, minor) = payment_amount(&p, &proposal).expect("an amount was found");
+        assert_eq!(asset.code, "USDC");
+        // Six decimal places, not two. Reading USDC as fiat would make
+        // 250.50 into 25050 minor units instead of 250_500_000.
+        assert_eq!(asset.exponent, 6);
+        assert_eq!(minor, Minor(250_500_000));
+
+        // A policy that declares nothing still reads the literal names,
+        // which is every card policy written before rails existed.
+        let bare = Policy::from_yaml(
+            r#"
+version: 1
+payment_tools:
+  - server: "*"
+    tool: pay
+rules: []
+"#,
+        )
+        .unwrap();
+        let card = call(json!({ "payee": "X", "amount": 99, "currency": "USD" }));
+        let (asset, minor) = payment_amount(&bare, &card).expect("an amount was found");
+        assert_eq!((asset.code.as_str(), asset.exponent), ("USD", 2));
+        assert_eq!(minor, Minor(9_900));
+    }
+
+    /// An address on the wrong chain is the attack every visual check
+    /// passes. The address is right -- the user can compare it character by
+    /// character and be satisfied -- and the money still goes somewhere they
+    /// will never see it, because those twenty bytes exist on every EVM
+    /// network and only one of them is controlled by the supplier.
+    ///
+    /// An approved-address list cannot see this at all: the address is on
+    /// the list. Only something that recorded which chain the user agreed to
+    /// can refuse it.
+    #[test]
+    fn the_right_address_on_the_wrong_chain_is_denied() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent(concat!(
+            "Pay invoice INV-CHAIN to Monitoring Pro Inc at ",
+            "0x864cc95dcD3a5d88401CB951b670874a17092302 on eip155:84532",
+        ));
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-chain".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("0x864cc95dcD3a5d88401CB951b670874a17092302".into()),
+                amount_minor: Minor(250_000_000),
+                tolerance_minor: Minor(0),
+                currency: "USDC".into(),
+                network: Some("eip155:84532".into()),
+                invoice_id: "INV-CHAIN".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let proposal = |network: Option<&str>| {
+            let mut args = json!({
+                "authorization_id": "auth-chain", "invoice_id": "INV-CHAIN",
+                "payee": "Monitoring Pro Inc", "amount": 250, "currency": "USDC",
+                "to_address": "0x864cc95dcD3a5d88401CB951b670874a17092302"
+            });
+            if let Some(network) = network {
+                args["network"] = json!(network);
+            }
+            call(args)
+        };
+
+        let right = evaluate(&p, &session, proposal(Some("eip155:84532")), 10_000);
+        assert!(
+            right
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-network" && r.passed),
+            "the approved chain must pass: {:?}",
+            right.verdict.failures().collect::<Vec<_>>()
+        );
+
+        let wrong = evaluate(&p, &session, proposal(Some("eip155:1")), 10_000);
+        assert!(wrong
+            .verdict
+            .failures()
+            .any(|r| r.id == "authorization-network"));
+        // The address itself is still the approved one, which is the whole
+        // point: nothing about the destination is wrong.
+        assert!(
+            wrong
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-recipient-account" && r.passed),
+            "the address is the approved one: {:?}",
+            wrong.verdict.failures().collect::<Vec<_>>()
+        );
+
+        // Saying nothing about the chain is not the same as saying the right
+        // thing about it, and a bound network fails closed.
+        let silent = evaluate(&p, &session, proposal(None), 10_000);
+        assert!(silent
+            .verdict
+            .failures()
+            .any(|r| r.id == "authorization-network"));
+    }
+
+    /// Every authorization written before chains existed binds no network,
+    /// and must go on evaluating exactly as it did. This is the check that
+    /// adding the rule moved nothing on the card and bank rails.
+    #[test]
+    fn an_authorization_that_binds_no_network_passes_whatever_the_call_says() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent(
+            "Pay invoice INV-CARD to Monitoring Pro Inc at DE89 3704 0044 0532 0130 00",
+        );
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-card".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("DE89370400440532013000".into()),
+                amount_minor: Minor(10_000),
+                tolerance_minor: Minor(0),
+                currency: "EUR".into(),
+                network: None,
+                invoice_id: "INV-CARD".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        for network in [None, Some("eip155:1")] {
+            let mut args = json!({
+                "authorization_id": "auth-card", "invoice_id": "INV-CARD",
+                "payee": "Monitoring Pro Inc", "amount": 100, "currency": "EUR",
+                "recipient_account_id": "DE89370400440532013000"
+            });
+            if let Some(network) = network {
+                args["network"] = json!(network);
+            }
+            let evaluation = evaluate(&p, &session, call(args), 10_000);
+            assert!(
+                evaluation
+                    .verdict
+                    .reasons
+                    .iter()
+                    .any(|r| r.id == "authorization-network" && r.passed),
+                "an unbound network never refuses: {network:?} {:?}",
+                evaluation.verdict.failures().collect::<Vec<_>>()
+            );
+        }
+    }
+
     /// A bank transfer does not call its destination `recipient_account_id`,
     /// and the check has to follow the policy's field mapping rather than a
     /// literal argument name. Reading the literal one here would compare an
@@ -1731,6 +1975,7 @@ rules:
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
+                network: None,
                 invoice_id: "INV-BANK".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1813,6 +2058,7 @@ rules:
                 amount_minor: Minor(100_000_000),
                 tolerance_minor: Minor(500_000),
                 currency: "USDC".into(),
+                network: None,
                 invoice_id: "INV-USDC".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1864,6 +2110,7 @@ rules:
                 amount_minor: Minor(100_000_000),
                 tolerance_minor: Minor(0),
                 currency: "USDC".into(),
+                network: None,
                 invoice_id: "INV-PRECISION".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1913,6 +2160,7 @@ rules:
                 amount_minor: one_eth,
                 tolerance_minor: Minor(0),
                 currency: "ETH".into(),
+                network: None,
                 invoice_id: "INV-ETH".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -2034,6 +2282,7 @@ rules:
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(0),
                 currency: "USD".into(),
+                network: None,
                 invoice_id: "INV-BASE".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: true,

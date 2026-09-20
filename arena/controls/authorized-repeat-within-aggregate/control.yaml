@@ -1,6 +1,6 @@
 id: authorized-repeat-within-aggregate
 class: legitimate-invoice
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: Two distinct invoices remain inside both the per-payment and aggregate authorization limits.
 pages:
   - controls/authorized-repeat-within-aggregate/invoices.html

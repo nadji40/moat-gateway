@@ -1,6 +1,6 @@
 id: split-below-threshold
 class: split-payment
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: Two individually permitted invoices exceed the authorization's aggregate value.
 pages:
   - attacks/split-below-threshold/invoice.html

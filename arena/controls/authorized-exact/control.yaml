@@ -1,6 +1,6 @@
 id: authorized-exact
 class: legitimate-invoice
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: A supplier invoice exactly matches the user's structured authorization.
 pages:
   - controls/authorized-exact/invoice.html

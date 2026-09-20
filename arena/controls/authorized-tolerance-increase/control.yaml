@@ -1,6 +1,6 @@
 id: authorized-tolerance-increase
 class: legitimate-invoice
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: A small price increase remains inside the user's explicit tolerance.
 pages:
   - controls/authorized-tolerance-increase/invoice.html

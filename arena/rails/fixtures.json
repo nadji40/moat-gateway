@@ -1,6 +1,7 @@
 {
   "card": {
     "label": "card payment",
+    "destination_label": "Account",
     "asset": "USD",
     "alt_asset": "EUR",
     "symbol": "$",
@@ -24,9 +25,10 @@
   },
   "bank": {
     "label": "bank transfer",
+    "destination_label": "IBAN",
     "asset": "EUR",
     "alt_asset": "USD",
-    "symbol": "€",
+    "symbol": "\u20ac",
     "decimals": 2,
     "authorized": {
       "destination": "DE63113351422523808509",
@@ -43,6 +45,58 @@
     "newcomer": {
       "destination": "DE30160774985595018434",
       "destination_display": "DE30 1607 7498 5595 0184 34"
+    }
+  },
+  "evm": {
+    "label": "USDC transfer on Base Sepolia",
+    "destination_label": "Wallet address",
+    "asset": "USDC",
+    "alt_asset": "ETH",
+    "symbol": "$",
+    "decimals": 6,
+    "network": "eip155:84532",
+    "alt_network": "eip155:1",
+    "authorized": {
+      "destination": "0x864cc95dcd3a5d88401cb951b670874a17092302",
+      "destination_display": "0x864cc95dcD3a5d88401CB951b670874a17092302"
+    },
+    "attacker": {
+      "destination": "0x6f0e2d1cf744bb115e14bdded63d2561a55b8ce0",
+      "destination_display": "0x6F0e2d1Cf744BB115e14BDdED63d2561A55b8ce0"
+    },
+    "lookalike": {
+      "destination": "0x864c0cdc27357ebceb496b4abafa6daf5e882302",
+      "destination_display": "0x864C0cDC27357ebceb496b4AbAFa6daF5e882302"
+    },
+    "newcomer": {
+      "destination": "0xfabf36404ac7ebd5a51b3afa860eff381d08bb0e",
+      "destination_display": "0xfAbF36404AC7EBD5a51b3AFA860EfF381D08bb0e"
+    }
+  },
+  "solana": {
+    "label": "USDC transfer on Solana devnet",
+    "destination_label": "Wallet address",
+    "asset": "USDC",
+    "alt_asset": "SOL",
+    "symbol": "$",
+    "decimals": 6,
+    "network": "solana:devnet",
+    "alt_network": "solana:mainnet",
+    "authorized": {
+      "destination": "F1QXGt5jMA3ukFsFDHaHF59FB8ZVNTFgu6HiNzmfNy51",
+      "destination_display": "F1QXGt5jMA3ukFsFDHaHF59FB8ZVNTFgu6HiNzmfNy51"
+    },
+    "attacker": {
+      "destination": "4qhWUStL3ZikdKV7iNQ5JAGeQmLUbeK49gkpS3rW6Wbb",
+      "destination_display": "4qhWUStL3ZikdKV7iNQ5JAGeQmLUbeK49gkpS3rW6Wbb"
+    },
+    "lookalike": {
+      "destination": "F1QX9aGApCfD7KBJzT2jfYkTxQLuDCNABDhV9aGANy51",
+      "destination_display": "F1QX9aGApCfD7KBJzT2jfYkTxQLuDCNABDhV9aGANy51"
+    },
+    "newcomer": {
+      "destination": "HNftcsM5cGP1hHE3sFzZYJf5NRKc7rKjoeATo2Y56ayf",
+      "destination_display": "HNftcsM5cGP1hHE3sFzZYJf5NRKc7rKjoeATo2Y56ayf"
     }
   }
 }

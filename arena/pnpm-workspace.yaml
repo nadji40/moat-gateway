@@ -1,5 +1,6 @@
 packages:
   - mock-bank
+  - mock-chain
   - mock-ledger
   - mock-stripe
   - mock-web

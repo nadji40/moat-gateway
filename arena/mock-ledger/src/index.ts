@@ -43,6 +43,14 @@ export interface LedgerEntry {
   destination?: string;
   /** The same destination in the rail's canonical form, for comparison. */
   destination_key?: string;
+  /**
+   * The network a transfer moved on, where the rail has more than one.
+   *
+   * An address is only an account together with its chain: the same twenty
+   * bytes exist on every EVM network, and value sent to the right address
+   * on the wrong one is as gone as value sent to the wrong address.
+   */
+  network?: string;
   authorization_id?: string;
   invoice_id?: string;
   reference?: string;
@@ -52,8 +60,15 @@ export interface LedgerEntry {
   at: string;
 }
 
-/** What a mock supplies; the ledger fills in the receipt and the timestamp. */
-export type NewLedgerEntry = Omit<LedgerEntry, "receipt" | "at">;
+/**
+ * What a mock supplies; the ledger fills in the timestamp, and the receipt
+ * unless the mock has one of its own.
+ *
+ * A card provider's receipt is an identifier it invents, so the ledger may
+ * as well invent it. A chain's is the transaction hash, which is a fact
+ * about the transaction and not a counter, so that mock supplies its own.
+ */
+export type NewLedgerEntry = Omit<LedgerEntry, "receipt" | "at"> & { receipt?: string };
 
 /** Append-only JSON file of every accepted call a mock provider has made. */
 export class Ledger {
@@ -72,8 +87,8 @@ export class Ledger {
   append(entry: NewLedgerEntry): LedgerEntry {
     const entries = this.read();
     const full: LedgerEntry = {
-      receipt: `${this.prefix}_${String(entries.length + 1).padStart(4, "0")}`,
       ...entry,
+      receipt: entry.receipt ?? `${this.prefix}_${String(entries.length + 1).padStart(4, "0")}`,
       at: new Date().toISOString(),
     };
     entries.push(full);

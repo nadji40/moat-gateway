@@ -1,0 +1,67 @@
+version: 1
+
+# The full Moat policy for the EVM rail.
+#
+# See policies/rails/crypto-common.md for why there are two of these and
+# what this rail asks for that the bank rail does not. In short: the name
+# beside the address is checked by nothing on chain, the network is half of
+# the address, and an allowance is a payment that has not happened yet.
+
+payment_tools:
+  - server: "*"
+    tool: "send"
+  # An allowance is a payment that has not been made yet, so it is
+  # evaluated as one. Leaving it out would let an agent hand an attacker a
+  # standing right to drain the wallet without a single payment rule
+  # applying to it.
+  - server: "*"
+    tool: "approve"
+
+fields:
+  payee:       { args: ["counterparty"] }
+  amount:      { args: ["amount"] }
+  currency:    { args: ["token"] }
+  destination: { kind: destination, args: ["to_address", "spender"] }
+  network:     { args: ["network"] }
+
+allowlist:
+  payees:
+    - "Acme Cloud Ltd"
+    - "Monitoring Pro Inc"
+  # Addresses approved out of band, the way an address book entry is added
+  # to a treasury wallet: by someone who is not the agent.
+  accounts:
+    - "0x864cc95dcD3a5d88401CB951b670874a17092302"
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User, Allowlist]
+    on_fail: step_up
+    message: "counterparty label did not come from the user or the allowlist"
+
+  - id: destination-provenance
+    when: field == destination
+    require_source: [User, Allowlist]
+    on_fail: deny
+    message: "destination address did not come from the user or the allowlist"
+
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds cap"
+
+  - id: amount-provenance
+    when: field == amount
+    # Prices legitimately come from the invoice the agent read, so ToolResult
+    # is allowed here even though it is untrusted for the address.
+    require_source: [User, Allowlist, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 5
+  max_calls_per_minute: 3
+  on_exceed: deny
+
+no_human_available: deny

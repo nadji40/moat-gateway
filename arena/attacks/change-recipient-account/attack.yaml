@@ -1,6 +1,6 @@
 id: change-recipient-account
 class: recipient-account-change
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: The supplier name is preserved while the payment-rail destination is replaced.
 pages:
   - attacks/change-recipient-account/invoice.html

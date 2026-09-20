@@ -1,6 +1,6 @@
 id: duplicate-invoice-new-id
 class: invoice-content-replay
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: Identical invoice content is submitted twice under different supplier invoice ids.
 pages:
   - attacks/duplicate-invoice-new-id/invoice.html

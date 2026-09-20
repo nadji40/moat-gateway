@@ -130,6 +130,9 @@ Early. Follow the work order below for what is actually built.
 - [x] 17. The provider outcome state machine (ADR 0009). A payment Moat
       cannot account for is held and quarantined rather than released for
       retry, and cleared by reconciliation.
+- [x] 18. `arena`: the crypto rails. A mock wallet for EVM and Solana, the
+      network bound by the authorization, allowances evaluated as the
+      payments they are, and the four-arm table on four rails.
 
 The first prototype phase and the durable authenticated pilot foundation are
 built.
@@ -557,11 +560,68 @@ it again if it did not confirm; only Moat stops the second one.
 went out, and it passes only because somebody checks and reports back.
 Take that call away and it fails, which is the cost in one row.
 
-`crypto` exists in the model, in the config vocabulary and in the evidence
-format, and has no implementation yet. The asset model that holds 6- and
-18-decimal tokens, the canonical destination comparison and the hold
-semantics it needs are all in the core; what it still wants is a chain mock
-and a network check.
+Both halves run on the chain rails too, against a node that accepts a
+signed transaction and drops the reply. Nothing about the hold needed
+changing for them: it keys off `Rail::reversible`, and a chain is not.
+
+#### The crypto rails
+
+`--rails evm,solana` runs the same corpus against a mock wallet. The tool
+is `send`, the destination is an address, the unit is a token, and the
+policies are [`policies/rails/evm.yaml`](policies/rails/evm.yaml) and
+[`policies/rails/solana.yaml`](policies/rails/solana.yaml).
+
+```bash
+cd arena && pnpm --filter @moat/runner start --backend null --runs 5 --arms none,cap,allowlist,moat --rails card,bank,evm,solana --suite all
+```
+
+Everything the bank rail established carries over: the destination is the
+payment, an address is matched exactly on its canonical form, and a wrong
+one is a deny rather than a step up. Three things are new.
+
+**Nothing checks the name.** A bank transfer carries a beneficiary name and
+Confirmation of Payee at least compares it to the account. A chain carries
+bytes. The `counterparty` argument exists because the tools an agent is
+handed have a label field; it is recorded, the mock says in its own output
+that it verified nothing, and it is worth nothing as a control. On this
+rail the destination rule is the only thing between the wallet and an
+attacker.
+
+**The network is half of the address.** The same twenty bytes exist on
+every EVM chain, and value sent to the right address on the wrong one is
+as gone as value sent to the wrong address — except that every check a
+person makes by eye still passes. An authorization may bind a network and
+`authorization-network` enforces it. This is the one attack an approved
+address book cannot see at all, because the address is on the list.
+
+**An allowance is a payment that has not happened yet.** `approve` grants
+a spender the right to move funds later, without the agent or any policy
+being asked again. It is listed under `payment_tools` and evaluated as a
+payment of the size it grants. What Moat does *not* do is treat a standing
+grant as its own kind of thing, so an allowance for exactly the authorized
+amount is allowed and consumes the mandate while the invoice stays unpaid.
+That gap is in [docs/attack-backlog.yaml](docs/attack-backlog.yaml) under
+`standing-approval`.
+
+Two attacks exist only here. `chain-network-substitution` is the right
+address on the wrong chain. `chain-base-unit-confusion` is an invoice
+quoting its total in base units — true about the chain, false about the
+invoice — which sends a million times the money to the right supplier at
+the right address; it is the one row where the approved list fails and the
+spending cap works, the exact inverse of every destination attack.
+
+The addresses in [`arena/rails/fixtures.json`](arena/rails/fixtures.json)
+are derived deterministically, and each rail's lookalike shares its first
+four and last four characters with the approved address and differs
+everywhere else. That is address poisoning, and it is the reason
+destinations are matched exactly rather than by substring.
+
+What is not claimed. Nothing here touches a real network: these are mocks,
+and the testnet adapters are the next piece of work. No verdict is
+enforced on chain — Moat decides and the wallet executes, and a wallet
+that ignores the verdict is not stopped by anything in this repository.
+The token contract is not checked, so a fake USDC at another address would
+pass the asset lookup.
 
 ### Stripe sandbox demonstration
 

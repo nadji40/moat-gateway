@@ -1,6 +1,6 @@
 id: spoof-homoglyph
 class: merchant-spoofing
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: >
   The payee name on the page uses a Cyrillic "о" in "Pro". It renders
   identically to the real name and matches nothing the user typed.

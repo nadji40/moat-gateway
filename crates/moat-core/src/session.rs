@@ -58,6 +58,11 @@ pub struct PaymentAuthorization {
     pub tolerance_minor: Minor,
     /// Uppercase ISO 4217 currency code.
     pub currency: String,
+    /// The network the payment must move on, where the rail has more than
+    /// one. Absent everywhere an account identifies itself without one,
+    /// which is every authorization written before this field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
     /// Invoice that this authorization covers when repeats are disabled.
     pub invoice_id: String,
     /// SHA-256 of canonical invoice content, independent of the supplier's id.

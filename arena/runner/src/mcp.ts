@@ -29,8 +29,11 @@ export interface Endpoints {
   stdio: { command: string; args: string[]; env: Record<string, string>; cwd: string };
   /** HTTP MCP endpoint to connect to directly, if any (mock-web in direct mode). */
   http?: string;
-  /** Tool names as this mode exposes them. */
-  names: { fetch: string; pay: string };
+  /**
+   * Tool names as this mode exposes them. `approve` is present only on
+   * rails that have a standing-allowance tool.
+   */
+  names: { fetch: string; pay: string; approve?: string };
 }
 
 export interface Connected {
@@ -113,9 +116,17 @@ export async function connect(endpoints: Endpoints): Promise<Connected> {
       return { text: textOf(result), ms: performance.now() - t0 };
     },
     async pay(args: PayCall) {
+      // A scripted call may name which of the rail's tools to make it
+      // with. That is not an argument, so it is taken off here rather than
+      // sent to a provider that has never heard of it.
+      const { tool, ...arguments_ } = args as PayCall & { tool?: string };
+      const name =
+        tool === "approve" && endpoints.names.approve !== undefined
+          ? endpoints.names.approve
+          : endpoints.names.pay;
       const t0 = performance.now();
       try {
-        const result = await stdio.callTool({ name: endpoints.names.pay, arguments: args });
+        const result = await stdio.callTool({ name, arguments: arguments_ });
         const ms = performance.now() - t0;
         const sc = (result as { structuredContent?: { receipt?: string } }).structuredContent;
         const receipt = sc?.receipt ?? receiptInText(textOf(result)) ?? "?";

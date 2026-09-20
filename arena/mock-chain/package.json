@@ -1,0 +1,17 @@
+{
+  "name": "@moat/mock-chain",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fake on-chain wallet MCP server over stdio, for EVM and Solana. Records instructions to a JSON file, never touches a network.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@moat/mock-ledger": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

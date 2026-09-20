@@ -50,6 +50,10 @@ struct AuthorizationBody {
     #[serde(default = "zero_amount")]
     tolerance: Value,
     currency: String,
+    /// CAIP-2 network the payment must move on, on rails that have more
+    /// than one. Omitted on card and bank, which have exactly one each.
+    #[serde(default)]
+    network: Option<String>,
     #[serde(default)]
     invoice_fingerprint: Option<String>,
     #[serde(default)]
@@ -257,13 +261,23 @@ async fn post_authorization(
         .filter(|value| !value.is_empty())
         .map(str::to_ascii_lowercase);
     let currency = body.currency.trim().to_ascii_uppercase();
+    let network = body
+        .network
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
     if authorization_id.is_empty() || invoice_id.is_empty() || payee.is_empty() {
         return Err(err(
             StatusCode::BAD_REQUEST,
             "authorization_id, invoice_id and payee are required",
         ));
     }
-    let Some(asset) = shared.policies.assets().lookup(&currency, None) else {
+    let Some(asset) = shared
+        .policies
+        .assets()
+        .lookup(&currency, network.as_deref())
+    else {
         return Err(err(
             StatusCode::BAD_REQUEST,
             "unknown asset; declare it under `assets` in the policy",
@@ -318,6 +332,14 @@ async fn post_authorization(
         .as_deref()
         .map(|account| format!(" at {account}"))
         .unwrap_or_default();
+    // The network is part of what the approver agreed to, so it belongs in
+    // the same sentence. It is bound by its own structured check rather
+    // than by provenance, but a person reading the evidence should see the
+    // chain they approved beside the address they approved.
+    let network_note = network
+        .as_deref()
+        .map(|network| format!(" on {network}"))
+        .unwrap_or_default();
     let authorization = PaymentAuthorization {
         id: authorization_id.to_owned(),
         payee: payee.to_owned(),
@@ -325,6 +347,7 @@ async fn post_authorization(
         amount_minor,
         tolerance_minor,
         currency: currency.clone(),
+        network: network.clone(),
         invoice_id: invoice_id.to_owned(),
         invoice_fingerprint,
         require_invoice_fingerprint: body.require_invoice_fingerprint,
@@ -342,8 +365,8 @@ async fn post_authorization(
             .map_err(|message| message.to_owned())?;
         // Feed the same user-approved values into the existing provenance engine.
         session.register_intent(&format!(
-            "Authorize invoice {} to {}{} for {} {} until {}",
-            invoice_id, payee, account_note, body.amount, currency, body.expires_at
+            "Authorize invoice {} to {}{}{} for {} {} until {}",
+            invoice_id, payee, account_note, network_note, body.amount, currency, body.expires_at
         ));
         Ok(())
     })

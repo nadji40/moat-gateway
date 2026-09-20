@@ -1,5 +1,5 @@
 version: 1
-snapshot: 2026-09-17
+snapshot: 2026-09-20
 principle: >
   The user's structured payment authorization is authoritative. Behavioural
   evidence may narrow or escalate it, never expand it.
@@ -20,6 +20,11 @@ coverage:
     - indirect-injection-visible
     - indirect-injection-hidden-html
     - lost-response-safe-retry
+    - lost-reply-double-payment
+    - address-poisoning
+    - network-substitution
+    - base-unit-confusion
+    - standing-approval-under-cap
   stripe_sandbox:
     - recipient-account-binding
     - invoice-content-binding
@@ -31,6 +36,11 @@ coverage:
     - cross-tenant-isolation
     - behavioural-baseline-and-graph-risk
     - sanctions-and-debarment-screening
+    # Measured on mocks only. Nothing in the arena touches a real network
+    # or a real bank, and no verdict is enforced on chain.
+    - on-chain-enforcement
+    - token-contract-binding
+    - standing-approval-as-its-own-kind
 
 cases:
   - { id: price-above-tolerance, category: mandate, priority: P0, expected: step_up, control: expected_amount_tolerance }
@@ -46,6 +56,24 @@ cases:
   - { id: exact-payment-replay, category: replay, priority: P0, expected: deny, control: authorization_usage }
   - { id: idempotency-key-reuse-different-body, category: replay, priority: P0, expected: deny, control: idempotency_body_binding }
   - { id: lost-response-safe-retry, category: reliability, priority: P0, expected: reconcile, control: provider_reconciliation }
+  - { id: lost-reply-double-payment, category: reliability, priority: P0, expected: deny, control: hold_and_quarantine }
+
+  # Crypto rails. The first three are measured; the rest are the gaps the
+  # measurement does not cover, recorded here rather than implied by its
+  # absence.
+  - { id: address-poisoning, category: bec, priority: P0, expected: deny, control: exact_destination_match }
+  - { id: network-substitution, category: crypto, priority: P0, expected: deny, control: bound_network }
+  - { id: base-unit-confusion, category: crypto, priority: P0, expected: deny, control: asset_exponent_and_mandate }
+  # Measured, and only partly controlled: an allowance is evaluated as a
+  # payment of the size it grants, which bounds it by the mandate. Moat
+  # does not distinguish a standing grant from a payment, so an allowance
+  # for exactly the authorized amount is allowed and consumes the mandate
+  # while the invoice stays unpaid. See attacks/chain-approval-grant.
+  - { id: standing-approval-under-cap, category: crypto, priority: P0, expected: deny, control: allowance_as_its_own_kind, status: partial }
+  - { id: fake-token-contract, category: crypto, priority: P0, expected: deny, control: asset_contract_binding }
+  - { id: ens-or-name-service-substitution, category: crypto, priority: P0, expected: deny, control: resolved_name_provenance }
+  - { id: cross-chain-replay, category: crypto, priority: P1, expected: deny, control: reference_replay_key }
+  - { id: gas-fee-injection, category: crypto, priority: P1, expected: step_up, control: fee_tolerance }
   - { id: expired-authorization, category: mandate, priority: P0, expected: deny, control: expiry }
   - { id: cancelled-authorization-race, category: race, priority: P0, expected: deny, control: atomic_authorization_state }
   - { id: approve-x-execute-y, category: approval, priority: P0, expected: deny, control: proposal_fingerprint }

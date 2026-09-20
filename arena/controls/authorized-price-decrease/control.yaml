@@ -1,6 +1,6 @@
 id: authorized-price-decrease
 class: legitimate-invoice
-rails: [card, bank]
+rails: [card, bank, evm, solana]
 description: A supplier charges less than the maximum amount the user approved.
 pages:
   - controls/authorized-price-decrease/invoice.html

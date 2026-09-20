@@ -1,0 +1,15 @@
+# Gateway config for the evm rail, "cap" arm: a per-transaction limit and nothing else.
+# The runner registers no intent and no authorization.
+listen: { transport: stdio }
+upstreams:
+  - name: wallet
+    rail: crypto
+    transport: stdio
+    command: ["node", "--import", "tsx", "mock-chain/src/server.ts"]
+  - name: web
+    transport: http
+    url: "http://127.0.0.1:7100/mcp"
+policy: ../../../policies/rails/arm-cap-crypto.yaml
+evidence: ../../results/evidence-evm-cap.jsonl
+keys: ../../keys
+intent_api: { addr: "127.0.0.1:7072" }
