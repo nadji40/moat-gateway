@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>moat, the nine tests</title>
+<meta name="description" content="Nine attacks on an agent payment, each isolating one mechanism, run live against a real gateway.">
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<nav><div class="wrap"><div class="navbar glass">
+  <a class="navmark" href="index.html" aria-label="moat, home"><svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg" aria-label="moat">
+    <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
+      <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+      <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+    </g>
+    <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
+    <path class="body" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+  </svg></a>
+  <div class="navlinks">
+    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="tests.html" aria-current="page">The tests</a>
+  </div>
+  <a class="statusbtn" id="live" href="status.html"><b></b><span>Status</span></a>
+</div></div></nav>
+
+<div class="wrap">
+
+<header class="hero">
+  <div>
+    <p class="kicker">The tests</p>
+    <h1>Nine attacks, each isolating one thing.</h1>
+    <p class="lede">
+      Every test gets its own gateway process and its own mandate. Share one and
+      a mandate spent by the first test is a duplicate for the next, so the
+      verdicts come back right for the wrong reasons. All nine are rows from the
+      measured corpus, not written for this page.
+    </p>
+    <div class="row">
+      <button class="btn" id="run-all">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        Run all nine tests
+      </button>
+      <a class="btn ghost" href="index.html#compose">Compose your own</a>
+    </div>
+  </div>
+</header>
+
+<section id="suite" class="tight">
+  <div class="summary glass" id="summary" hidden><span class="bar"></span></div>
+  <div class="tests" id="tests"></div>
+</section>
+
+</div>
+
+<footer class="foot"><div class="wrap">
+  <p class="rails-lead">One authorization core, four rails.</p>
+  <div class="rails" aria-label="Rails">
+    <span class="rail" style="--c:var(--red-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="3"/><path d="M2.6 9.6h18.8"/><path d="M6 14.5h3.5"/></svg>Cards</span>
+    <span class="rail" style="--c:var(--orange-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.6 12 4.2l9 5.4"/><path d="M5.8 11.4v6.2M10 11.4v6.2M14 11.4v6.2M18.2 11.4v6.2"/><path d="M3.6 20h16.8"/></svg>Bank transfers</span>
+    <span class="rail" style="--c:var(--yellow-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2 5.2 12.1 12 15.9l6.8-3.8z" opacity=".55"/><path d="M12 17.2 5.2 13.4 12 22l6.8-8.6z"/></svg>Ethereum</span>
+    <span class="rail" style="--c:var(--green-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.8 5.6H20.5L17.2 8.9H3.5z"/><path d="M3.5 10.4h13.7l3.3 3.3H6.8z" opacity=".65"/><path d="M6.8 15.1H20.5L17.2 18.4H3.5z"/></svg>Solana</span>
+  </div>
+</div></footer>
+
+<script>
+const $=s=>document.querySelector(s);
+const NL=String.fromCharCode(10);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
+
+const ICONS={
+  inject:'<path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 14l4 4m0-4l-4 4"/>',
+  lookalike:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M9 11h4"/>',
+  amount:'<path d="M12 2v20M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+  currency:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18"/>',
+  replay:'<path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 20v-5h5"/>',
+  cap:'<path d="M12 3l8 4v5c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V7z"/><path d="M9 12l2 2 4-4"/>',
+  none:'<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
+  check:'<path d="M20 6L9 17l-5-5"/>'
+};
+const FAM={provenance:"red",mandate:"yellow",replay:"orange",control:"green"};
+const icon=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.none}</svg>`;
+let TESTS=[],results={},busy=new Set(),firstDraw=true;
+
+
+function scenario(t){
+  const m=t.mandate;
+  return `<details class="sc"><summary>What happens in this test</summary><dl>
+    <dt>User said</dt><dd class="q">${esc(t.task)}</dd>
+    ${t.page?`<dt>Page said</dt><dd class="q">${esc(t.page).split(NL).join("<br>")}</dd>`:""}
+    <dt>Approved</dt><dd>${m?`${esc(m.payee)}, ${esc(m.amount)} ${esc(m.currency)}`:"nothing"}</dd>
+    <dt>Agent tries</dt><dd class="mono">${t.calls.map(c=>`${esc(c.payee)}, ${esc(c.amount)} ${esc(c.currency)}`).join("<br>then again: ")}</dd>
+    <dt>Expected</dt><dd>${esc(t.expect.replace("_"," "))}</dd>
+  </dl><p class="note">${esc(t.note)}</p></details>`;
+}
+
+function testCard(t,i){
+  const r=results[t.id],run=busy.has(t.id);
+  const pill=run?`<span class="pill busy"><span class="spinner"></span>running</span>`
+    :r?`<span class="pill ${r.decision}">${r.decision.replace("_"," ")}</span>`
+    :`<span class="pill idle">not run</span>`;
+  // Branch on the decision, never on whether there are reasons. A step-up
+  // often carries none, and showing it as "allowed" because the list was
+  // empty is the page lying about the one thing it exists to show.
+  let body="";
+  if(r&&!run){
+    if(r.error) body=esc(r.error);
+    else if(r.reasons.length) body=r.reasons.map(x=>`<code>${esc(x.id)}</code> ${esc(x.message)}`).join("<br>");
+    else if(r.decision==="allow") body=`<span class="ok">allowed, the provider ${r.paid?"was paid":"was called"}</span>`;
+    else if(r.decision==="step_up") body=`<span class="held">held, a person has to approve this before it moves</span>`;
+    else body="refused";
+  }
+  const why=body?`<div class="why">${body}</div>`:"";
+  const cls=["test","glass",firstDraw?"enter":"","f-"+(FAM[t.family]||"orange"),run?"running":"",r&&!run?"done v-"+r.decision:""].join(" ");
+  return `<article class="${cls}" style="--i:${i}" data-id="${esc(t.id)}">
+    <div class="top">
+      <div class="icon">${icon(t.icon)}</div>
+      <div><span class="fam">${esc(t.family)}</span><h3>${esc(t.title)}</h3><p class="sum">${esc(t.summary)}</p></div>
+    </div>
+    ${scenario(t)}
+    ${why}
+    <footer>${pill}
+      <button class="link" data-run="${esc(t.id)}" ${run?"disabled":""}>${r?"run again":"run"}</button>
+      ${r&&!run?`<span class="ms mono">${r.ms} ms</span>`:""}</footer>
+  </article>`;
+}
+
+function busy(btn,label){
+  if(btn.dataset.idle===undefined) btn.dataset.idle=btn.innerHTML;
+  btn.innerHTML='<span class="spinner"></span>'+label;
+  btn.disabled=true; btn.setAttribute("aria-busy","true");
+}
+function idle(btn){
+  if(btn.dataset.idle!==undefined) btn.innerHTML=btn.dataset.idle;
+  idle(btn); btn.removeAttribute("aria-busy");
+}
+const openState=()=>new Set([...document.querySelectorAll("details.sc[open]")].map(d=>d.closest("[data-id]").dataset.id));
+function draw(){
+  const open=openState();
+  $("#tests").innerHTML=TESTS.map(testCard).join("");
+  firstDraw=false;
+  for(const d of document.querySelectorAll("[data-id]")) if(open.has(d.dataset.id)) d.querySelector("details").open=true;
+  for(const b of document.querySelectorAll("[data-run]")) b.addEventListener("click",()=>runTests([b.dataset.run]));
+  const done=Object.values(results);
+  if(done.length||busy.size){
+    const met=done.filter(r=>r.met).length;
+    const through=done.filter(r=>r.paid&&r.expected!=="allow").length;
+    const total=done.length+busy.size;
+    $("#summary").hidden=false;
+    $("#summary").innerHTML=`<span class="bar" style="--p:${Math.round(100*done.length/Math.max(total,1))}%"></span>
+      <div class="big mono">${met} / ${done.length}<small>behaved as the corpus says</small></div><span class="sep"></span>
+      <div class="big mono through${through?" bad":""}">${through}<small>attacker payments through</small></div><span class="sep"></span>
+      <div class="big mono">${done.reduce((a,r)=>a+r.ms,0).toLocaleString("en-US")} ms<small>gateway time, in total</small></div>
+      ${busy.size?`<span class="hint"><span class="spinner"></span> ${busy.size} running</span>`:`<span class="hint">every verdict signed and recorded</span>`}`;
+  }
+}
+
+/* three at a time, each its own call, so cards fill in as they finish */
+async function runTests(ids){
+  ids=ids.filter(id=>!busy.has(id)); if(!ids.length)return;
+  const btn=$("#run-all"); busy(btn,"Running");
+  for(const id of ids){busy.add(id);delete results[id];}
+  draw();
+  const queue=[...ids];
+  const worker=async()=>{
+    while(queue.length){
+      const id=queue.shift();
+      try{
+        const j=await api("/v1/suite?test="+encodeURIComponent(id),{method:"POST"});
+        for(const r of j.results) results[r.id]=r;
+      }catch(e){ results[id]={id,decision:"deny",expected:"deny",met:false,reasons:[],paid:false,ms:0,error:String(e.message||e)}; }
+      busy.delete(id); draw();
+    }
+  };
+  await Promise.all([worker(),worker(),worker()]);
+  btn.disabled=false;
+}
+$("#run-all").addEventListener("click",()=>runTests(TESTS.map(t=>t.id)));
+
+(async()=>{
+  try{
+    TESTS=(await api("/v1/tests")).tests; draw();
+    $("#live").classList.add("on"); $("#live").lastElementChild.textContent="Live";
+    // arriving from the hero button on the front page
+    if(new URLSearchParams(location.search).has("run")) runTests(TESTS.map(t=>t.id));
+  }catch(e){ $("#live").classList.add("bad"); $("#live").lastElementChild.textContent="Down"; }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>moat, API status</title>
+<meta name="description" content="Live status and round-trip latency for every endpoint the public sandbox exposes.">
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<nav><div class="wrap"><div class="navbar glass">
+  <a class="navmark" href="index.html" aria-label="moat, home"><svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg" aria-label="moat">
+    <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
+      <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+      <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+    </g>
+    <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
+    <path class="body" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+  </svg></a>
+  <div class="navlinks">
+    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="tests.html">The tests</a>
+  </div>
+  <a class="statusbtn" id="live" href="status.html" aria-current="page"><b></b><span>Status</span></a>
+</div></div></nav>
+
+<div class="wrap">
+
+<header class="hero">
+  <div>
+    <p class="kicker">API status</p>
+    <h1>Every endpoint,<br><span class="g">timed from here.</span></h1>
+    <p class="lede">
+      This page does not read a dashboard. It calls the sandbox itself, in the
+      order an agent would, and reports what came back and how long it took.
+    </p>
+    <div class="row">
+      <button class="btn" id="recheck">Run the checks</button>
+    </div>
+  </div>
+</header>
+
+<section class="tight">
+  <div class="summary glass" id="summary" hidden><span class="bar"></span></div>
+  <div class="panel glass"><div class="ph">Endpoints</div><div class="pb">
+    <div class="checks" id="checks"></div>
+    <p class="hint foot-note" id="origin"></p>
+  </div></div>
+</section>
+
+</div>
+
+<footer class="foot"><div class="wrap">
+  <p class="rails-lead">One authorization core, four rails.</p>
+  <div class="rails" aria-label="Rails">
+    <span class="rail" style="--c:var(--red-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="3"/><path d="M2.6 9.6h18.8"/><path d="M6 14.5h3.5"/></svg>Cards</span>
+    <span class="rail" style="--c:var(--orange-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.6 12 4.2l9 5.4"/><path d="M5.8 11.4v6.2M10 11.4v6.2M14 11.4v6.2M18.2 11.4v6.2"/><path d="M3.6 20h16.8"/></svg>Bank transfers</span>
+    <span class="rail" style="--c:var(--yellow-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2 5.2 12.1 12 15.9l6.8-3.8z" opacity=".55"/><path d="M12 17.2 5.2 13.4 12 22l6.8-8.6z"/></svg>Ethereum</span>
+    <span class="rail" style="--c:var(--green-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.8 5.6H20.5L17.2 8.9H3.5z"/><path d="M3.5 10.4h13.7l3.3 3.3H6.8z" opacity=".65"/><path d="M6.8 15.1H20.5L17.2 18.4H3.5z"/></svg>Solana</span>
+  </div>
+</div></footer>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* The flow an agent actually walks, in order. Later steps need the sandbox
+   the earlier ones made, so this is a sequence rather than a fan-out, and
+   the timings are round trips from this browser: the network is in them. */
+const FLOW=[
+  {m:"GET",    p:()=>"/v1/limits",                     init:()=>({})},
+  {m:"GET",    p:()=>"/v1/tests",                      init:()=>({})},
+  {m:"POST",   p:()=>"/v1/sandbox",                    init:()=>({method:"POST"}), keep:j=>({id:j.id})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/intent`,      init:()=>body({text:"Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD."})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/authorization`,init:()=>body({payee:"Acme Cloud Ltd",amount:"480",currency:"USD"}), keep:j=>({auth:j.authorization_id})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/pay`,         init:s=>body({payee:"Acme Cloud Ltd",amount:480,currency:"USD",authorization_id:s.auth})},
+  {m:"GET",    p:s=>`/v1/sandbox/${s.id}/evidence`,    init:()=>({})},
+  {m:"DELETE", p:s=>`/v1/sandbox/${s.id}`,             init:()=>({method:"DELETE"})},
+];
+const body=o=>({method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(o)});
+/* split rather than a regex: the id is always the fourth segment */
+function label(p){
+  const parts=p.split("/");
+  if(parts[1]==="v1"&&parts[2]==="sandbox"&&parts[3]) parts[3]="{id}";
+  return parts.join("/");
+}
+
+function draw(rows,running){
+  $("#checks").innerHTML=rows.map(r=>`<div class="check ${r.state||""}">
+      <span class="verb ${esc(r.m.toLowerCase())}">${esc(r.m)}</span>
+      <span class="path mono">${esc(r.path)}</span>
+      <span class="ms mono">${r.ms==null?"":r.ms+" ms"}</span>
+      <span class="code mono">${r.code==null?(running?'<span class="spinner"></span>':""):esc(String(r.code))}</span>
+    </div>`).join("");
+}
+
+function summarise(rows){
+  const done=rows.filter(r=>r.code!=null);
+  if(!done.length) return;
+  const ok=done.filter(r=>r.state==="up").length;
+  const times=done.map(r=>r.ms).filter(n=>n!=null).sort((a,b)=>a-b);
+  const median=times.length?times[Math.floor(times.length/2)]:0;
+  const slowest=times.length?times[times.length-1]:0;
+  $("#summary").hidden=false;
+  $("#summary").innerHTML=`<span class="bar" style="--p:${Math.round(100*done.length/rows.length)}%"></span>
+    <div class="big mono ${ok===done.length?"through":"through bad"}">${ok} / ${done.length}<small>responding</small></div><span class="sep"></span>
+    <div class="big mono">${median} ms<small>median round trip</small></div><span class="sep"></span>
+    <div class="big mono">${slowest} ms<small>slowest</small></div>`;
+}
+
+async function run(){
+  const btn=$("#recheck");
+  if(btn.dataset.idle===undefined) btn.dataset.idle=btn.innerHTML;
+  btn.innerHTML='<span class="spinner"></span>Checking';
+  btn.disabled=true; btn.setAttribute("aria-busy","true");
+
+  const rows=FLOW.map(f=>({m:f.m,path:"",ms:null,code:null,state:null}));
+  let state={};
+  for(let i=0;i<FLOW.length;i++){
+    const f=FLOW[i];
+    let path;
+    try{ path=f.p(state); }catch{ path="(needs an earlier step)"; }
+    rows[i].path=label(path);
+    draw(rows,true);
+    // a step whose sandbox never got made cannot be called
+    if(path.includes("undefined")){ rows[i].code="skip"; rows[i].state="down"; continue; }
+    const t0=performance.now();
+    try{
+      const res=await fetch(path,f.init(state));
+      const ms=Math.round(performance.now()-t0);
+      rows[i].ms=ms; rows[i].code=res.status;
+      rows[i].state=!res.ok?"down":(ms>1500?"slow":"up");
+      const j=await res.json().catch(()=>({}));
+      if(f.keep&&res.ok) state={...state,...f.keep(j)};
+    }catch(e){
+      rows[i].ms=Math.round(performance.now()-t0);
+      rows[i].code="error"; rows[i].state="down";
+    }
+    draw(rows,true); summarise(rows);
+  }
+  draw(rows,false); summarise(rows);
+
+  const up=rows.filter(r=>r.state==="up"||r.state==="slow").length;
+  $("#live").classList.toggle("on",up===rows.length);
+  $("#live").classList.toggle("bad",up!==rows.length);
+
+  btn.innerHTML=btn.dataset.idle; btn.disabled=false; btn.removeAttribute("aria-busy");
+}
+
+$("#origin").textContent="Checked against "+location.origin+", from this browser, so the network between you and it is included.";
+$("#recheck").addEventListener("click",run);
+run();
+</script>
+</body>
+</html>
