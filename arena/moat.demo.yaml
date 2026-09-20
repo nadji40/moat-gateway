@@ -1,0 +1,15 @@
+# The gateway behind the public try-it page.
+#
+# A mock payment provider and the default policy, so every scenario on the
+# page is decided by exactly the code the measurements were taken with,
+# and nothing anywhere moves. The chain demonstration is a separate
+# config; this one cannot reach a wallet.
+listen: { transport: stdio }
+upstreams:
+  - name: stripe
+    transport: stdio
+    command: ["node", "--import", "tsx", "mock-stripe/src/server.ts"]
+policy: ../policies/default.yaml
+evidence: ./results/demo-evidence.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7090" }

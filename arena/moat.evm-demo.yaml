@@ -1,0 +1,17 @@
+# The Base Sepolia wallet behind the public try-it page.
+#
+# The same policy as the evm-testnet demonstration -- nothing approved in
+# advance, every payment authorized through the intent API -- pointed at a
+# separate, deliberately poor wallet. See demo/README.md for why the page
+# is allowed to touch a real chain at all.
+listen: { transport: stdio }
+upstreams:
+  - name: wallet
+    rail: crypto
+    transport: stdio
+    command:
+      ["node", "--env-file=../.env.evm-demo", "--import", "tsx", "evm-testnet/src/server.ts"]
+policy: ../policies/rails/evm-testnet.yaml
+evidence: ./results/demo-chain-evidence.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7091" }

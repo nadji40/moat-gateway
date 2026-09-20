@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moat — authorization for agent payments</title>
+<meta name="description" content="An authorization layer agents call before they spend. Try the attacks against a live gateway.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --ground: #f6f7f9;
+    --surface: #fff;
+    --surface-2: #eef0f4;
+    --ink: #14171d;
+    --muted: #5a6373;
+    --rule: #d8dde5;
+    --accent: #2f4bd4;
+    --allow: #1a7048;
+    --allow-bg: #e6f2ec;
+    --deny: #a32f2f;
+    --deny-bg: #f7e7e7;
+    --stepup: #8a5d0a;
+    --stepup-bg: #f8eeda;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #101318; --surface: #181c23; --surface-2: #20252e;
+      --ink: #e6e9ef; --muted: #99a2b1; --rule: #2b323d; --accent: #8c9cff;
+      --allow: #56bf8a; --allow-bg: #13301f;
+      --deny: #e4746e; --deny-bg: #331a1a;
+      --stepup: #d6a544; --stepup-bg: #302512;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--ground); color: var(--ink);
+    font: 400 15px/1.6 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 68rem; margin: 0 auto; padding-inline: 20px; padding-block: 0 4rem; }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: .86em; }
+  a { color: var(--accent); }
+
+  header { border-bottom: 1px solid var(--rule); padding-block: 2.75rem 2rem; margin-bottom: 2.5rem; }
+  .brand {
+    font-family: "IBM Plex Mono", monospace; font-size: .75rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--muted); margin: 0 0 .9rem;
+  }
+  h1 { font-size: clamp(1.7rem, 4vw, 2.4rem); line-height: 1.15; margin: 0; letter-spacing: -.015em; font-weight: 600; }
+  .lede { color: var(--muted); max-width: 54ch; margin: .9rem 0 0; font-size: 1.05rem; }
+  .stats { display: flex; flex-wrap: wrap; gap: 1.75rem; margin-top: 1.75rem; }
+  .stat .n { font-family: "IBM Plex Mono", monospace; font-size: 1.3rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+
+  h2 { font-size: 1.1rem; font-weight: 600; margin: 0 0 .35rem; }
+  .sub { color: var(--muted); font-size: .9rem; margin: 0 0 1.25rem; max-width: 62ch; }
+  section { margin-bottom: 3rem; }
+
+  .grid { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); }
+  .card {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: 5px;
+    padding: 1rem 1.1rem; text-align: left; cursor: pointer; font: inherit; color: inherit;
+    display: flex; flex-direction: column; gap: .35rem; transition: border-color .12s, transform .12s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .card[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  .card h3 { margin: 0; font-size: .95rem; font-weight: 600; }
+  .card p { margin: 0; font-size: .85rem; color: var(--muted); }
+  .card .tag {
+    align-self: flex-start; margin-top: .3rem; font-family: "IBM Plex Mono", monospace;
+    font-size: .68rem; letter-spacing: .05em; text-transform: uppercase;
+    padding: .18em .5em; border-radius: 3px; background: var(--surface-2); color: var(--muted);
+  }
+
+  .run { display: flex; gap: .75rem; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; }
+  button.go {
+    font: 500 .95rem "IBM Plex Sans", sans-serif; padding: .6rem 1.4rem; border-radius: 4px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.go[disabled] { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--accent); }
+  .hint { color: var(--muted); font-size: .85rem; }
+
+  .panel { margin-top: 1.5rem; border: 1px solid var(--rule); border-radius: 5px; background: var(--surface); overflow: hidden; }
+  .panel .row { display: grid; grid-template-columns: 9.5rem 1fr; gap: 1rem; padding: .8rem 1.1rem; border-bottom: 1px solid var(--rule); }
+  .panel .row:last-child { border-bottom: 0; }
+  .panel .k { color: var(--muted); font-size: .82rem; text-transform: uppercase; letter-spacing: .06em; }
+  .panel .v { min-width: 0; overflow-wrap: anywhere; }
+  .quote { color: var(--muted); font-style: italic; white-space: pre-wrap; }
+
+  .verdict { display: inline-flex; align-items: center; gap: .5rem; font-family: "IBM Plex Mono", monospace; font-weight: 500; padding: .25em .7em; border-radius: 3px; }
+  .verdict.allow { background: var(--allow-bg); color: var(--allow); }
+  .verdict.deny { background: var(--deny-bg); color: var(--deny); }
+  .verdict.step_up { background: var(--stepup-bg); color: var(--stepup); }
+
+  ul.reasons { margin: 0; padding-left: 1.1rem; }
+  ul.reasons li { margin-bottom: .3rem; }
+  ul.reasons .rid { font-family: "IBM Plex Mono", monospace; font-size: .82em; color: var(--deny); }
+
+  .note { border-left: 3px solid var(--rule); padding-left: .9rem; color: var(--muted); font-size: .9rem; }
+  footer { border-top: 1px solid var(--rule); padding-top: 1.5rem; color: var(--muted); font-size: .85rem; }
+  .spin { display: inline-block; width: .8em; height: .8em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: s .7s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  @media (max-width: 560px) { .panel .row { grid-template-columns: 1fr; gap: .2rem; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <p class="brand">Moat</p>
+    <h1>An agent is about to pay someone. Should it?</h1>
+    <p class="lede">
+      Moat sits between an AI agent and the thing that moves money. It compares
+      every payment against what the user actually asked for, and refuses the
+      ones that do not match. Pick an attack below and watch a live gateway
+      decide.
+    </p>
+    <div class="stats">
+      <div class="stat"><div class="n">0 / 380</div><div class="l">attacks paid through Moat</div></div>
+      <div class="stat"><div class="n">380 / 380</div><div class="l">paid without it</div></div>
+      <div class="stat"><div class="n">4</div><div class="l">payment rails</div></div>
+      <div class="stat"><div class="n">2,060</div><div class="l">measured runs</div></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Try an attack</h2>
+    <p class="sub">
+      Each one runs against a real gateway process, started for you and thrown
+      away afterwards. The payment provider is a mock, so nothing moves.
+    </p>
+    <div class="grid" id="scenarios"></div>
+    <div class="run">
+      <button class="go" id="run" disabled>Run</button>
+      <span class="hint" id="hint">Choose a scenario.</span>
+    </div>
+    <div id="result"></div>
+  </section>
+
+  <section id="chain-section" hidden>
+    <h2>Now with real money</h2>
+    <p class="sub">
+      The same decision, in front of a wallet on Base Sepolia — a public test
+      network. The approved payment produces a transaction you can open in a
+      block explorer. The forged one produces nothing, because Moat refuses
+      before the wallet is ever asked.
+    </p>
+    <div class="run">
+      <button class="go" id="chain-approved">Pay the approved address</button>
+      <button class="go ghost" id="chain-forged">Try the forged address</button>
+      <span class="hint" id="chain-hint"></span>
+    </div>
+    <div id="chain-result"></div>
+  </section>
+
+  <footer>
+    <p>
+      Test networks only; the ether has no value. The published measurements,
+      the attack corpus and the evidence format are in the repository. Every
+      verdict on this page is written to a signed, hash-chained record —
+      the same one an auditor would read.
+    </p>
+  </footer>
+
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+let chosen = null;
+let scenarios = [];
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function rowsFor(s) {
+  const rows = [["The user asked", `<span class="quote">${esc(s.task)}</span>`]];
+  if (s.page) rows.push(["The agent read", `<span class="quote">${esc(s.page)}</span>`]);
+  if (s.authorization) {
+    rows.push(["Approved", `<span class="mono">${esc(s.authorization.payee)} · ${esc(s.authorization.amount)} ${esc(s.authorization.currency)}</span>`]);
+  } else {
+    rows.push(["Approved", "<span class='hint'>nothing — no mandate was registered</span>"]);
+  }
+  rows.push(["Agent attempts", `<span class="mono">${esc(JSON.stringify(s.call))}</span>`]);
+  return rows;
+}
+
+function panel(rows) {
+  return `<div class="panel">${rows.map(([k, v]) => `<div class="row"><div class="k">${esc(k)}</div><div class="v">${v}</div></div>`).join("")}</div>`;
+}
+
+function render() {
+  $("#scenarios").innerHTML = scenarios.map((s) => `
+    <button class="card" data-id="${esc(s.id)}" aria-pressed="${chosen === s.id}">
+      <h3>${esc(s.title)}</h3>
+      <p>${esc(s.summary)}</p>
+      <span class="tag">expects ${esc(s.expect)}</span>
+    </button>`).join("");
+  for (const el of document.querySelectorAll(".card")) {
+    el.addEventListener("click", () => {
+      chosen = el.dataset.id;
+      const s = scenarios.find((x) => x.id === chosen);
+      $("#run").disabled = false;
+      $("#hint").textContent = "";
+      $("#result").innerHTML = panel(rowsFor(s));
+      render();
+    });
+  }
+}
+
+async function load() {
+  const r = await fetch("/api/scenarios");
+  const j = await r.json();
+  scenarios = j.scenarios;
+  render();
+  if (j.chain && j.chain.enabled) {
+    $("#chain-section").hidden = false;
+    $("#chain-hint").textContent = `${j.chain.amount} ETH per payment · ${j.chain.remaining} left today`;
+  }
+}
+
+$("#run").addEventListener("click", async () => {
+  const s = scenarios.find((x) => x.id === chosen);
+  $("#run").disabled = true;
+  $("#hint").innerHTML = '<span class="spin"></span> starting a gateway…';
+  try {
+    const r = await fetch(`/api/run?scenario=${encodeURIComponent(chosen)}`, { method: "POST" });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "failed");
+    const v = j.verdict;
+    const rows = rowsFor(s);
+    rows.push(["Moat decided", `<span class="verdict ${esc(v.decision)}">${esc(v.decision)}</span>`]);
+    if (v.reasons.length) {
+      rows.push(["Because", `<ul class="reasons">${v.reasons.map((x) => `<li><span class="rid">${esc(x.id)}</span><br>${esc(x.message)}</li>`).join("")}</ul>`]);
+    }
+    rows.push(["Provider paid", j.paid ? "yes" : "no — the call never reached it"]);
+    if (v.evidenceId) rows.push(["Evidence", `<span class="mono">${esc(v.evidenceId)}</span>`]);
+    rows.push(["Why it matters", `<span class="note">${esc(s.note)}</span>`]);
+    $("#result").innerHTML = panel(rows);
+    $("#hint").textContent = `decided in ${j.ms} ms`;
+  } catch (e) {
+    $("#hint").textContent = String(e.message || e);
+  }
+  $("#run").disabled = false;
+});
+
+async function chain(mode) {
+  $("#chain-approved").disabled = true; $("#chain-forged").disabled = true;
+  $("#chain-hint").innerHTML = '<span class="spin"></span> talking to Base Sepolia…';
+  try {
+    const r = await fetch(`/api/chain?mode=${mode}`, { method: "POST" });
+    const j = await r.json();
+    if (!r.ok) { $("#chain-hint").textContent = j.error || "unavailable"; }
+    else {
+      const rows = [["Sending to", `<span class="mono">${esc(j.to)}</span>`],
+                    ["Moat decided", `<span class="verdict ${esc(j.decision)}">${esc(j.decision)}</span>`]];
+      if (j.reasons && j.reasons.length) {
+        rows.push(["Because", `<ul class="reasons">${j.reasons.map((x) => `<li><span class="rid">${esc(x.id)}</span><br>${esc(x.message)}</li>`).join("")}</ul>`]);
+      }
+      rows.push(["Transaction", j.tx ? `<a href="${esc(j.explorer)}" target="_blank" rel="noopener"><span class="mono">${esc(j.tx)}</span></a>` : "none — nothing was broadcast"]);
+      $("#chain-result").innerHTML = panel(rows);
+      $("#chain-hint").textContent = typeof j.remaining === "number" ? `${j.remaining} payments left today` : "";
+    }
+  } catch (e) {
+    $("#chain-hint").textContent = String(e.message || e);
+  }
+  $("#chain-approved").disabled = false; $("#chain-forged").disabled = false;
+}
+$("#chain-approved").addEventListener("click", () => chain("approved"));
+$("#chain-forged").addEventListener("click", () => chain("forged"));
+
+load();
+</script>
+</body>
+</html>
