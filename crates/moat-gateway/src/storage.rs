@@ -37,12 +37,12 @@ impl DurableStore {
         let client = store.pool.get().await.context("checking storage schema")?;
         let found = client
             .query_opt(
-                "SELECT version FROM moat.schema_migrations WHERE version = 3",
+                "SELECT version FROM moat.schema_migrations WHERE version = 4",
                 &[],
             )
             .await
             .context("checking storage migration")?;
-        anyhow::ensure!(found.is_some(), "Moat database migration 3 is not applied");
+        anyhow::ensure!(found.is_some(), "Moat database migration 4 is not applied");
         Ok(store)
     }
 

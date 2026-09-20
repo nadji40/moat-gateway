@@ -19,8 +19,9 @@ Existing application databases are not migration targets. `scripts/migrate.sh`
 checks the exact database and role before it can execute.
 
 **The gateway asserts the schema version it needs and refuses to start
-otherwise.** Since migration 3 (the payment ledger) that means a binary
-installed against a database still on migration 2 will not come up. This is
+otherwise.** Since migration 4 (the payment ledger and its grants) that
+means a binary installed against a database still on an earlier migration
+will not come up. This is
 deliberate: running with the tenant-wide aggregate unenforced is worse than
 not running. It is also why the deploy below migrates before it installs --
 keep that order.

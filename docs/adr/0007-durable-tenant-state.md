@@ -115,7 +115,7 @@ rather than by session.
 
 ### Consequences
 
-**Deploying this requires running migration 3 first.** `connect()` asserts
+**Deploying this requires running migrations 3 and 4 first.** `connect()` asserts
 it, so a gateway pointed at a database still on migration 2 refuses to
 start rather than running with an unenforced aggregate. That is the right
 failure, and it means the database is migrated before the binary is
@@ -132,4 +132,31 @@ receipt)` will now reject a second outcome claiming a receipt another
 already has — correct, and a behaviour change for anything that was
 double-recording quietly. Cross-instance orchestration, webhooks and an
 approval UI remain where ADR 0007 left them.
+
+### Addendum to the addendum: the grants nobody had written down
+
+Applying migration 3 to the pilot found something worse than the thing it
+was applying. **No migration in this repository has ever granted anything
+to the runtime role.** `moat_app`'s privileges were set up by hand when
+the database was first built and were never recorded, so whether a new
+table is reachable by the gateway depends on whether that setup used
+`ALTER DEFAULT PRIVILEGES` or granted table by table -- and nobody knows
+which.
+
+If it was table by table, migration 3 created three tables the gateway
+cannot read, and the failure would have taken the worst available shape:
+the binary starts, because its schema check only counts migrations, and
+then fails on the first ledger write. Healthy at boot, broken on the
+first payment.
+
+Migration 4 grants the three tables explicitly and sets default
+privileges so the next table added to the schema does not repeat it. It
+is idempotent, and tolerant of the role being absent, because a scratch
+or developer database usually has no separate runtime role and a
+migration that failed there would stop anyone testing the schema at all.
+
+The general lesson is the one worth keeping: **a migration that creates a
+table and does not grant it is only half a migration**, and the half that
+is missing fails later, in production, under load, rather than at the
+point of change.
 
