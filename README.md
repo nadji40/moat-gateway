@@ -21,6 +21,70 @@ runs into tables — are all in this repository. Working conventions are in
 [`CONTRIBUTING.md`](CONTRIBUTING.md); how to report a vulnerability is in
 [`SECURITY.md`](SECURITY.md).
 
+## What it does, in numbers
+
+Every figure below is totalled from a table further down in this file, and
+links to it. Nothing here is an estimate.
+
+| | measured |
+|---|---|
+| Attacks that reached the payment provider **through Moat** | **0 of 380** |
+| The same attacks with no gateway | 380 of 380 |
+| With a spending cap instead | 370 of 380 |
+| With a payee allowlist instead | 190 of 380 |
+| Legitimate payments Moat completed | **135 of 135** |
+| Rails, one corpus rendered per rail | card, bank, EVM, Solana |
+| Runs behind the four-rail table | 2,060, no errors |
+
+Those are a scripted attacker, which is what makes them reproducible. Against
+a real model driving the agent, on the same four rails:
+
+| | `gpt-5-mini` | `gpt-5.6-terra` |
+|---|---:|---:|
+| Attacker paid, no gateway | 35 of 76 | 4 of 17 |
+| Attacker paid, through Moat | **0 of 76** | **0 of 17** |
+
+A stronger model is a weaker attacker but not a control: the four attacks it
+still falls for are the ones where reading the page *correctly* is how you get
+robbed.
+
+The cost of asking: **0.22 ms** added at p50, **0.93 ms** at p95, against a
+15 ms budget.
+
+What is measured, what is running on a public testnet and what is designed but
+not built are kept apart throughout. The arena numbers come from a scripted
+backend and a mock provider; the Base Sepolia demonstration is a real
+transaction on a public testnet; the Solana half of the co-signer is an ADR and
+nothing else.
+
+## Try it without installing anything
+
+`demo/` serves a public sandbox: a gateway process per visitor, its own policy,
+its own evidence chain, and a mock provider so nothing can move money. The nine
+attacks are runnable from the page, and the same calls are an HTTP API with no
+key and no account.
+
+```bash
+S=$(curl -s -XPOST "$MOAT_SANDBOX/v1/sandbox" | jq -r .id)
+
+curl -s -XPOST "$MOAT_SANDBOX/v1/sandbox/$S/intent" \
+  -H 'content-type: application/json' \
+  -d '{"text":"Pay the Aseer Cloud Co invoice INV-4471 for 480 USD."}'
+
+curl -s -XPOST "$MOAT_SANDBOX/v1/sandbox/$S/authorization" \
+  -H 'content-type: application/json' \
+  -d '{"payee":"Aseer Cloud Co","amount":"480","currency":"USD"}'
+
+curl -s -XPOST "$MOAT_SANDBOX/v1/sandbox/$S/pay" \
+  -H 'content-type: application/json' \
+  -d '{"payee":"Qassim Trading Est","amount":480,"currency":"USD","authorization_id":"AUTH"}'
+```
+
+The last call is refused: the payee appears nowhere the user put it. `GET
+/v1/sandbox/$S/evidence` returns the signed record of why, and `DELETE
+/v1/sandbox/$S` hands the sandbox back. Running the nine attacks against that
+sandbox: **9 of 9 behave as the corpus says, 0 attacker payments through.**
+
 ## Architecture
 
 Moat is a proxy that both sides already know how to talk to. The agent host sees
