@@ -3,192 +3,309 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>moat — try to get a payment past it</title>
+<title>moat, try to get a payment past it</title>
 <meta name="description" content="A live risk layer for agent payments. Run the attacks, or compose your own, against a real gateway.">
+<meta name="color-scheme" content="dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
 <style>
 :root{
-  --bg:#FFFFFF; --ink:#111111; --ink-2:#6E6E73;
-  --surface:#F7F7F8; --sand:#E6E6E8; --sand-2:#C7C7CC;
+  --bg:#000000; --bg-2:#0A0A0A; --ink:#F4F4F6; --ink-2:#9C9CA6; --ink-3:#5E5E68;
+  --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16);
+  --glass:rgba(255,255,255,.045);
   --red:#EB001B; --orange:#FF5F00; --yellow:#F79E1B; --green:#00A650;
-  --red-tint:#FDE7E9; --yellow-tint:#FEF3E0; --red-ink:#C4001A;
-  --green-tint:#E3F4EA;
-  --max:1240px; --pad:clamp(20px,5vw,64px); --sec:clamp(72px,10vw,128px);
+  --red-l:#FF4D5E; --orange-l:#FF8A4C; --yellow-l:#FFB84D; --green-l:#2ED17A;
+  --max:1240px; --pad:clamp(20px,5vw,64px); --sec:clamp(72px,10vw,120px);
   --font:"Manrope","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --ease:cubic-bezier(.2,.7,.2,1);
 }
 *{box-sizing:border-box}
+html{scroll-behavior:smooth}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 .wrap{max-width:var(--max);margin:0 auto;padding-inline:var(--pad)}
 a{color:inherit}
 h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.03em;line-height:1.02;text-wrap:balance}
-h1{font-size:clamp(2.2rem,6vw,3.6rem)}
+h1{font-size:clamp(2.4rem,6.4vw,4rem)}
 h2{font-size:clamp(1.6rem,3.6vw,2.4rem)}
 h3{font-size:1.0625rem;letter-spacing:-.015em;line-height:1.25}
 p{margin:0}
 .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+::selection{background:rgba(255,95,0,.35)}
+
+.glass{background:var(--glass);border:1px solid var(--line);
+  -webkit-backdrop-filter:blur(22px) saturate(150%);backdrop-filter:blur(22px) saturate(150%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 50px -20px rgba(0,0,0,.7)}
 
 /* nav */
-nav{position:sticky;top:0;z-index:20;padding-top:16px;background:linear-gradient(var(--bg) 70%,transparent)}
-.navbar{display:flex;align-items:center;gap:20px;background:var(--surface);border-radius:18px;padding:12px 18px}
-.mark{width:30px;height:30px;flex:none;color:var(--ink)}
+nav{position:sticky;top:0;z-index:20;padding-top:14px}
+.navbar{display:flex;align-items:center;gap:20px;border-radius:18px;padding:11px 16px 11px 14px}
+.mark{width:32px;height:32px;flex:none;color:var(--ink)}
 .navlinks{display:flex;gap:22px;margin-left:auto;font-size:.875rem;color:var(--ink-2);font-weight:600}
-.navlinks a{text-decoration:none}
+.navlinks a{text-decoration:none;position:relative;transition:color .2s}
+.navlinks a:after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1.5px;background:var(--orange);transition:right .25s var(--ease)}
 .navlinks a:hover{color:var(--ink)}
-.when{font-size:.8125rem;color:var(--ink-2);font-weight:600;white-space:nowrap}
-@media(max-width:720px){.navlinks{display:none}}
+.navlinks a:hover:after{right:0}
+.live{display:inline-flex;align-items:center;gap:8px;font-size:.78rem;font-weight:700;color:var(--ink-2);white-space:nowrap;
+  padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.live b{width:7px;height:7px;border-radius:50%;background:var(--ink-3);position:relative}
+.live.on b{background:var(--green-l)}
+.live.on b:after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--green-l);animation:ping 1.8s ease-out infinite}
+@keyframes ping{0%{transform:scale(.4);opacity:.9}100%{transform:scale(1.6);opacity:0}}
+@media(max-width:760px){.navlinks{display:none}}
+
+/* logo motion */
+.mark .arc{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.3s var(--ease) forwards}
+.mark .arc.two{animation-delay:.18s}
+.mark .dot{opacity:0;animation:pop .5s var(--ease) 1.05s forwards}
+.mark .dot.two{animation-delay:1.2s}
+.mark .body{opacity:0;animation:fade .6s var(--ease) .5s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes pop{from{opacity:0;r:2}to{opacity:1;r:11}}
+@keyframes fade{to{opacity:1}}
 
 /* hero */
-header.hero{padding-block:clamp(48px,9vw,104px) clamp(36px,6vw,64px)}
-.hero .lede{color:var(--ink-2);max-width:48ch;margin-top:20px;font-size:1.0625rem}
-.hero .row{display:flex;gap:28px;flex-wrap:wrap;align-items:center;margin-top:32px}
-.btn{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border:0;
-  border-radius:999px;padding:14px 26px;font:700 .9375rem var(--font);cursor:pointer;letter-spacing:-.01em}
-.btn:hover{background:#000}
-.btn[disabled]{opacity:.4;cursor:not-allowed}
-.btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--sand);padding:12.5px 24px}
-.btn.ghost:hover{border-color:var(--ink);background:transparent}
-.tally{display:flex;gap:26px;flex-wrap:wrap;margin-top:34px;padding-top:26px;border-top:1px solid var(--sand)}
-.tally div span{display:block}
-.tally .n{font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
-.tally .l{font-size:.8125rem;color:var(--ink-2);font-weight:600}
+header.hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:clamp(24px,5vw,72px);align-items:center;
+  padding-block:clamp(48px,8vw,96px) clamp(36px,6vw,64px)}
+@media(max-width:900px){header.hero{grid-template-columns:1fr}.hero-art{order:-1;max-width:260px;margin:0 auto}}
+.kicker{display:inline-flex;align-items:center;gap:10px;font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:22px}
+.kicker i{width:22px;height:2px;background:linear-gradient(90deg,var(--red),var(--orange),var(--yellow))}
+h1 .g{background:linear-gradient(92deg,var(--red-l) 0%,var(--orange-l) 45%,var(--yellow-l) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero .lede{color:var(--ink-2);max-width:48ch;margin-top:22px;font-size:1.0625rem}
+.hero .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:32px}
+.btn{position:relative;display:inline-flex;align-items:center;gap:10px;color:#fff;border:0;border-radius:999px;padding:14px 26px;
+  font:700 .9375rem var(--font);cursor:pointer;letter-spacing:-.01em;isolation:isolate;overflow:hidden;
+  background:linear-gradient(100deg,var(--red) 0%,var(--orange) 100%);box-shadow:0 10px 30px -10px rgba(255,95,0,.6);
+  transition:transform .2s var(--ease),box-shadow .2s var(--ease),filter .2s}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.08);box-shadow:0 14px 34px -10px rgba(255,95,0,.75)}
+.btn:active{transform:translateY(0)}
+.btn:before{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+  transform:translateX(-120%);transition:transform .7s var(--ease);z-index:-1}
+.btn:hover:before{transform:translateX(120%)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none;filter:none}
+.btn.ghost{background:rgba(255,255,255,.05);color:var(--ink);border:1px solid var(--line-2);box-shadow:none;
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.btn.ghost:hover{background:rgba(255,255,255,.09);border-color:rgba(255,255,255,.28)}
+.btn.ghost:before{display:none}
+.tally{display:grid;grid-template-columns:repeat(4,auto);gap:12px;margin-top:38px}
+@media(max-width:560px){.tally{grid-template-columns:1fr 1fr}}
+.tally div{border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
+.tally div:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c,var(--orange))}
+.tally .n{display:block;font-size:1.45rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.tally .l{display:block;font-size:.75rem;color:var(--ink-2);font-weight:600;margin-top:6px}
+.hero-art{position:relative;aspect-ratio:1;display:grid;place-items:center}
+.hero-art svg{position:relative;width:100%;height:100%;filter:drop-shadow(0 12px 28px rgba(0,0,0,.9))}
+.hero-art .ring{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.6s var(--ease) forwards}
+.hero-art .ring.two{animation-delay:.25s}
+.hero-art .spin{animation:turn 60s linear infinite}
+.hero-art .d{opacity:0;animation:fade .6s var(--ease) 1.4s forwards}
+.hero-art .d.two{animation-delay:1.6s}
+.hero-art .beat{animation:beat 3.2s var(--ease) infinite}
+@keyframes turn{to{transform:rotate(360deg)}}
+@keyframes beat{0%,100%{opacity:1}50%{opacity:.55}}
+.hero-art .tag{position:absolute;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border-radius:999px;
+  border:1px solid var(--line);color:var(--ink-2);opacity:0;animation:rise .6s var(--ease) forwards}
+.hero-art .tag b{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.hero-art .t1{left:-2%;top:16%;animation-delay:1.8s}
+.hero-art .t2{right:-4%;top:34%;animation-delay:2s}
+.hero-art .t3{left:6%;bottom:12%;animation-delay:2.2s}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
 section{padding-block:var(--sec);scroll-margin-top:96px}
 section.tight{padding-block:clamp(48px,7vw,80px)}
-.head{max-width:58ch;margin-bottom:36px}
+.head{max-width:58ch;margin-bottom:34px}
 .head p{color:var(--ink-2);margin-top:14px}
-.eyebrow{font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin-bottom:14px}
+.eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:.75rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin-bottom:14px}
+.eyebrow .num{display:grid;place-items:center;width:22px;height:22px;border-radius:7px;font-size:.7rem;color:#fff;background:var(--c,var(--orange))}
 
 /* tests */
-.tests{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr))}
-.test{background:var(--bg);border:1.5px solid var(--sand);border-radius:16px;padding:20px;
-  display:flex;flex-direction:column;gap:12px;transition:border-color .15s}
-.test:hover{border-color:var(--sand-2)}
-.test.done{border-color:var(--ink)}
-.test .icon{width:36px;height:36px;border-radius:10px;background:var(--surface);
-  display:grid;place-items:center;color:var(--ink);flex:none}
+.tests{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(19.5rem,1fr))}
+.test{border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;position:relative;
+  opacity:0;animation:rise .55s var(--ease) forwards;animation-delay:calc(var(--i,0)*55ms);
+  transition:transform .25s var(--ease),border-color .25s,box-shadow .25s}
+.test:hover{transform:translateY(-2px);border-color:var(--line-2)}
+.test.running{border-color:transparent}
+.test.running:before{content:"";position:absolute;inset:-1px;border-radius:19px;padding:1px;
+  background:conic-gradient(from var(--ang,0deg),transparent 0 70%,var(--c) 85%,transparent 100%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+  animation:orbit 1.4s linear infinite;pointer-events:none}
+@property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes orbit{to{--ang:360deg}}
+.test.done{border-color:color-mix(in srgb,var(--v) 45%,transparent);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 18px 50px -24px color-mix(in srgb,var(--v) 55%,transparent)}
+.test .icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
+  background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);
+  transition:transform .3s var(--ease)}
+.test:hover .icon{transform:rotate(-6deg) scale(1.05)}
 .test .icon svg{width:19px;height:19px}
 .test .top{display:flex;gap:14px;align-items:flex-start}
 .test .sum{color:var(--ink-2);font-size:.9rem;margin-top:5px}
-.test .fam{font-size:.6875rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--sand-2)}
-.test footer{margin-top:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 12px;
-  font-size:.8125rem;font-weight:700;letter-spacing:-.01em}
-.pill.allow{background:var(--green-tint);color:var(--green)}
-.pill.deny{background:var(--red-tint);color:var(--red-ink)}
-.pill.step_up{background:var(--yellow-tint);color:#92600a}
-.pill.idle{background:var(--surface);color:var(--ink-2)}
-.pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
-.why{font-size:.85rem;color:var(--ink-2);border-top:1px solid var(--sand);padding-top:11px;margin-top:2px}
-.why code{font-size:.8125rem;font-weight:700;color:var(--red-ink);font-family:var(--font)}
-.why .ok{color:var(--green)}
-.why .held{color:#92600a}
-.test .ms{font-size:.75rem;color:var(--sand-2);font-weight:600;margin-left:auto}
-.test .link{font-size:.8125rem;color:var(--ink-2);font-weight:600;text-decoration:underline;
-  text-underline-offset:3px;background:none;border:0;cursor:pointer;padding:0;font-family:var(--font)}
+.test .fam{font-size:.6875rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c)}
+.test footer{margin-top:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:4px}
+.f-red{--c:var(--red-l)} .f-orange{--c:var(--orange-l)} .f-yellow{--c:var(--yellow-l)} .f-green{--c:var(--green-l)}
+.v-allow{--v:var(--green-l)} .v-deny{--v:var(--red-l)} .v-step_up{--v:var(--yellow-l)}
+.pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 12px;font-size:.8125rem;font-weight:700;letter-spacing:-.01em;
+  border:1px solid transparent;animation:fade .3s var(--ease)}
+.pill.allow{background:rgba(0,166,80,.16);color:var(--green-l);border-color:rgba(46,209,122,.35)}
+.pill.deny{background:rgba(235,0,27,.16);color:var(--red-l);border-color:rgba(255,77,94,.35)}
+.pill.step_up{background:rgba(247,158,27,.16);color:var(--yellow-l);border-color:rgba(255,184,77,.35)}
+.pill.idle,.pill.busy{background:rgba(255,255,255,.05);color:var(--ink-2);border-color:var(--line)}
+.pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.why{font-size:.85rem;color:var(--ink-2);border-top:1px solid var(--line);padding-top:11px;margin-top:2px;animation:rise .4s var(--ease)}
+.why code{font-size:.8rem;font-weight:700;color:var(--red-l);font-family:var(--font)}
+.why .ok{color:var(--green-l)} .why .held{color:var(--yellow-l)}
+.test .ms{font-size:.75rem;color:var(--ink-3);font-weight:600;margin-left:auto}
+.test .link{font-size:.8125rem;color:var(--ink-2);font-weight:700;text-decoration:none;background:none;border:0;cursor:pointer;padding:0;font-family:var(--font);
+  border-bottom:1.5px solid var(--line-2);transition:color .2s,border-color .2s}
+.test .link:hover{color:var(--ink);border-color:var(--c)}
+.test .link[disabled]{opacity:.4;cursor:default}
+details.sc{font-size:.82rem;color:var(--ink-2)}
+details.sc summary{cursor:pointer;list-style:none;font-weight:700;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+details.sc summary::-webkit-details-marker{display:none}
+details.sc summary:after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-2px,-2px);transition:transform .2s}
+details.sc[open] summary:after{transform:rotate(-135deg)}
+details.sc summary:hover{color:var(--ink-2)}
+details.sc dl{margin:10px 0 0;display:grid;grid-template-columns:auto 1fr;gap:6px 12px}
+details.sc dt{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding-top:2px}
+details.sc dd{margin:0;overflow-wrap:anywhere}
+details.sc dd.q{font-style:italic}
+details.sc .note{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);color:var(--ink-2)}
 
-.summary{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:26px;
-  background:var(--surface);border-radius:14px;padding:16px 20px}
-.summary strong{font-weight:800;letter-spacing:-.02em}
+.summary{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:22px;border-radius:16px;padding:14px 18px;position:relative;overflow:hidden}
+.summary .bar{position:absolute;left:0;bottom:0;height:2px;width:var(--p,0%);background:linear-gradient(90deg,var(--red),var(--orange),var(--yellow),var(--green));transition:width .5s var(--ease)}
+.summary .big{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.summary .big small{font-size:.75rem;color:var(--ink-2);font-weight:600;letter-spacing:0;display:block;margin-top:4px}
+.summary .sep{width:1px;height:30px;background:var(--line)}
+.summary .through{color:var(--green-l)} .summary .through.bad{color:var(--red-l)}
 
 /* composer */
 .grid2{display:grid;gap:18px;grid-template-columns:1fr 1fr}
 @media(max-width:860px){.grid2{grid-template-columns:1fr}}
-.panel{border:1.5px solid var(--sand);border-radius:16px;overflow:hidden}
-.panel > .ph{padding:14px 20px;border-bottom:1.5px solid var(--sand);background:var(--surface);
+.col{display:grid;gap:18px;align-content:start}
+.panel{border-radius:18px;overflow:hidden}
+.panel > .ph{display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.03);
   font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
-.panel .pb{padding:20px;display:grid;gap:14px}
-label{display:block;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--ink-2);margin-bottom:7px}
+.panel > .ph .num{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;font-size:.68rem;color:#fff;background:var(--c,var(--orange))}
+.panel .pb{padding:18px;display:grid;gap:14px}
+label{display:block;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:7px}
 input,textarea{width:100%;padding:11px 13px;font:600 .9375rem var(--font);color:var(--ink);
-  background:var(--bg);border:1.5px solid var(--sand);border-radius:10px}
-input:focus,textarea:focus{outline:0;border-color:var(--ink)}
+  background:rgba(0,0,0,.45);border:1px solid var(--line-2);border-radius:11px;transition:border-color .2s,box-shadow .2s}
+input:focus,textarea:focus{outline:0;border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,95,0,.18)}
 textarea{resize:vertical;min-height:88px;line-height:1.5;font-weight:500}
 .three{display:grid;grid-template-columns:1fr 6.5rem 5.5rem;gap:10px}
 @media(max-width:520px){.three{grid-template-columns:1fr}}
 .hint{font-size:.8125rem;color:var(--ink-2)}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{font:600 .8125rem var(--font);padding:7px 13px;border:1.5px solid var(--sand);border-radius:999px;
-  background:var(--bg);color:var(--ink-2);cursor:pointer}
-.chip:hover{border-color:var(--ink);color:var(--ink)}
-.out{display:grid;gap:10px;max-height:24rem;overflow:auto}
-.rec{border:1.5px solid var(--sand);border-radius:12px;padding:14px 16px;display:grid;gap:8px}
+.chip{font:600 .8125rem var(--font);padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.04);color:var(--ink-2);cursor:pointer;transition:all .2s}
+.chip:hover{border-color:var(--orange);color:var(--ink);background:rgba(255,95,0,.1)}
+.out{display:grid;gap:10px;max-height:26rem;overflow:auto}
+.rec{border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:8px;background:rgba(255,255,255,.025);animation:rise .4s var(--ease)}
 .rec .call{font-size:.85rem;color:var(--ink-2);overflow-wrap:anywhere}
 .rec ul{margin:0;padding-left:18px;font-size:.85rem;color:var(--ink-2)}
+.rec ul strong{color:var(--ink)}
 
-pre{background:var(--ink);color:#F2F2F3;border-radius:16px;padding:22px;overflow-x:auto;
-  font-size:.8125rem;line-height:1.65;margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-pre .c{color:#8A8A90}
+pre{border-radius:18px;padding:22px;overflow-x:auto;font-size:.8125rem;line-height:1.7;margin:0;color:#E6E6EA;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:rgba(255,255,255,.03)}
+pre .c{color:var(--ink-3)} pre .k{color:var(--yellow-l)} pre .u{color:var(--green-l)} pre .s{color:var(--orange-l)}
 
-footer.foot{border-top:1px solid var(--sand);padding-block:36px 56px;color:var(--ink-2);font-size:.875rem}
-footer.foot p{max-width:70ch}
-.spin{display:inline-block;width:.8em;height:.8em;border:2px solid currentColor;border-right-color:transparent;
-  border-radius:50%;animation:s .7s linear infinite;vertical-align:-1px}
-@keyframes s{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.spin{animation:none}}
+footer.foot{border-top:1px solid var(--line);padding-block:36px 56px;color:var(--ink-2);font-size:.875rem}
+footer.foot .wrap{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;justify-content:space-between}
+footer.foot p{max-width:64ch}
+.rails{display:flex;gap:6px;padding-top:8px}
+.rails span{width:26px;height:6px;border-radius:3px}
+.spinner{display:inline-block;width:.8em;height:.8em;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:turn .7s linear infinite;vertical-align:-1px}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .test,.hero-art .tag,.mark .dot,.mark .body,.hero-art .d{opacity:1}
+  .mark .arc,.hero-art .ring{stroke-dashoffset:0}
+}
 </style>
 </head>
 <body>
 
-<nav><div class="wrap"><div class="navbar">
+<nav><div class="wrap"><div class="navbar glass">
   <svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg" aria-label="moat">
     <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
-      <path d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
-      <path d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+      <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+      <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
     </g>
-    <g fill="currentColor"><circle cx="99.7" cy="62.2" r="11"></circle><circle cx="192.3" cy="158.1" r="11"></circle></g>
-    <path fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+    <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
+    <path class="body" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
   </svg>
   <div class="navlinks">
-    <a href="#suite">The tests</a><a href="#compose">Compose one</a><a href="#chain">On a real chain</a><a href="#api">API</a>
+    <a href="#suite">The tests</a><a href="#compose">Compose one</a><a href="#chain" id="nav-chain" hidden>On a real chain</a><a href="#api">API</a>
   </div>
-  <span class="when">Thirduni, autumn 2026</span>
+  <span class="live" id="live"><b></b><span>connecting</span></span>
 </div></div></nav>
 
 <div class="wrap">
 
 <header class="hero">
-  <h1>Try to get a payment<br>past it.</h1>
-  <p class="lede">
-    This is a live gateway, not a recording. Run the attacks we measure against,
-    or write your own, and watch the decision. Nine tests, a real chain, and a
-    signed record of every verdict.
-  </p>
-  <div class="row">
-    <button class="btn" id="run-all">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3" fill="currentColor"/></svg>
-      Run all nine tests
-    </button>
-    <a class="btn ghost" href="#compose">Write your own</a>
+  <div>
+    <p class="kicker"><i></i>Live sandbox, Thirduni 2026</p>
+    <h1>Try to get a payment<br><span class="g">past it.</span></h1>
+    <p class="lede">
+      This is a running gateway, not a recording. Fire the attacks we measure
+      against, or write your own, and watch the decision come back. Nine tests,
+      a real test chain, and a signed record of every verdict.
+    </p>
+    <div class="row">
+      <button class="btn" id="run-all">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+        Run all nine tests
+      </button>
+      <a class="btn ghost" href="#compose">Write your own</a>
+    </div>
+    <div class="tally">
+      <div class="glass" style="--c:var(--red)"><span class="n mono"><span data-n="0">0</span> / 380</span><span class="l">attacks paid through moat</span></div>
+      <div class="glass" style="--c:var(--orange)"><span class="n mono"><span data-n="380">0</span> / 380</span><span class="l">paid without it</span></div>
+      <div class="glass" style="--c:var(--yellow)"><span class="n mono" data-n="4">0</span><span class="l">payment rails</span></div>
+      <div class="glass" style="--c:var(--green)"><span class="n mono" data-n="2060">0</span><span class="l">measured runs</span></div>
+    </div>
   </div>
-  <div class="tally">
-    <div><span class="n mono">0 / 380</span><span class="l">attacks paid through moat</span></div>
-    <div><span class="n mono">380 / 380</span><span class="l">paid without it</span></div>
-    <div><span class="n mono">4</span><span class="l">payment rails</span></div>
-    <div><span class="n mono">2,060</span><span class="l">measured runs</span></div>
+  <div class="hero-art" aria-hidden="true">
+    <svg viewBox="0 0 144 144" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#EB001B"/><stop offset="1" stop-color="#FF5F00"/></linearGradient>
+        <linearGradient id="g2" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#F79E1B"/><stop offset="1" stop-color="#00A650"/></linearGradient>
+      </defs>
+      <g transform="translate(-69 -43)">
+        <g class="spin">
+          <animateTransform attributeName="transform" type="rotate" from="0 141 115" to="360 141 115" dur="60s" repeatCount="indefinite"/>
+          <g fill="none" stroke-width="9" stroke-linecap="round">
+            <path class="ring" pathLength="1" stroke="url(#g1)" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+            <path class="ring two" pathLength="1" stroke="url(#g2)" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+          </g>
+          <circle class="d beat" cx="99.7" cy="62.2" r="10" fill="#EB001B"></circle>
+          <circle class="d two beat" cx="192.3" cy="158.1" r="10" fill="#00A650"></circle>
+        </g>
+        <path fill="#F4F4F6" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+      </g>
+    </svg>
+    <span class="tag glass t1"><b style="background:var(--red-l)"></b>deny</span>
+    <span class="tag glass t2"><b style="background:var(--yellow-l)"></b>step up</span>
+    <span class="tag glass t3"><b style="background:var(--green-l)"></b>allow</span>
   </div>
 </header>
 
 <section id="suite" class="tight">
   <div class="head">
-    <p class="eyebrow">The tests</p>
+    <p class="eyebrow" style="--c:var(--red)"><span class="num">1</span>The tests</p>
     <h2>Nine attacks, each isolating one thing.</h2>
     <p>
-      Every test gets its own gateway process and its own mandate, because a
-      mandate spent by one test is a duplicate for the next and the verdicts
-      would come back right for the wrong reasons. Drawn from the measured
-      corpus, not written for this page.
+      Every test gets its own gateway process and its own mandate. Share one and
+      a mandate spent by the first test is a duplicate for the next, so the
+      verdicts come back right for the wrong reasons. All nine are rows from the
+      measured corpus, not written for this page.
     </p>
   </div>
-  <div class="summary" id="summary" hidden></div>
+  <div class="summary glass" id="summary" hidden><span class="bar"></span></div>
   <div class="tests" id="tests"></div>
 </section>
 
 <section id="compose" class="tight">
   <div class="head">
-    <p class="eyebrow">Compose one</p>
+    <p class="eyebrow" style="--c:var(--orange)"><span class="num">2</span>Compose one</p>
     <h2>Now try to beat it yourself.</h2>
     <p>
       Say what the user asked for, say what an approver signed off, then attempt
@@ -196,25 +313,25 @@ footer.foot p{max-width:70ch}
     </p>
   </div>
   <div class="grid2">
-    <div style="display:grid;gap:18px;align-content:start">
-      <div class="panel"><div class="ph">1 — What the user asked for</div><div class="pb">
+    <div class="col">
+      <div class="panel glass"><div class="ph" style="--c:var(--red)"><span class="num">1</span>What the user asked for</div><div class="pb">
         <div>
           <label for="intent">Their own words</label>
           <textarea id="intent">Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD.</textarea>
           <p class="hint" style="margin-top:8px">The only channel that confers authority. A page the agent reads has none.</p>
         </div>
       </div></div>
-      <div class="panel"><div class="ph">2 — What an approver signed off</div><div class="pb">
+      <div class="panel glass"><div class="ph" style="--c:var(--yellow)"><span class="num">2</span>What an approver signed off</div><div class="pb">
         <div class="three">
           <div><label for="a-payee">Payee</label><input id="a-payee" value="Acme Cloud Ltd"></div>
           <div><label for="a-amount">Amount</label><input id="a-amount" value="480" class="mono"></div>
           <div><label for="a-currency">Currency</label><input id="a-currency" value="USD"></div>
         </div>
-        <p class="hint">Leave it and Moat has only the user's words to go on — it will ask rather than decide.</p>
+        <p class="hint">Clear the payee and Moat has only the user's words to go on. It will ask rather than decide.</p>
       </div></div>
     </div>
-    <div style="display:grid;gap:18px;align-content:start">
-      <div class="panel"><div class="ph">3 — What the agent tries to pay</div><div class="pb">
+    <div class="col">
+      <div class="panel glass"><div class="ph" style="--c:var(--green)"><span class="num">3</span>What the agent tries to pay</div><div class="pb">
         <div class="three">
           <div><label for="p-payee">Payee</label><input id="p-payee" value="Nordwind Handels GmbH"></div>
           <div><label for="p-amount">Amount</label><input id="p-amount" value="480" class="mono"></div>
@@ -226,7 +343,7 @@ footer.foot p{max-width:70ch}
           <span class="hint" id="attempt-status"></span>
         </div>
       </div></div>
-      <div class="panel"><div class="ph">Verdicts</div><div class="pb">
+      <div class="panel glass"><div class="ph">Verdicts</div><div class="pb">
         <div class="out" id="out"><p class="hint">Nothing attempted yet.</p></div>
       </div></div>
     </div>
@@ -235,7 +352,7 @@ footer.foot p{max-width:70ch}
 
 <section id="chain" class="tight" hidden>
   <div class="head">
-    <p class="eyebrow">On a real chain</p>
+    <p class="eyebrow" style="--c:var(--yellow)"><span class="num">3</span>On a real chain</p>
     <h2>The refusal that leaves no transaction.</h2>
     <p>
       The same decision in front of a wallet on Base Sepolia. The approved
@@ -254,11 +371,11 @@ footer.foot p{max-width:70ch}
 
 <section id="api" class="tight">
   <div class="head">
-    <p class="eyebrow">API</p>
+    <p class="eyebrow" style="--c:var(--green)"><span class="num">4</span>API</p>
     <h2>Point your own agent at it.</h2>
     <p>Four calls. No key, no account. Sandboxes expire after ten idle minutes.</p>
   </div>
-  <pre id="curl">loading…</pre>
+  <pre class="glass" id="curl">loading</pre>
 </section>
 
 </div>
@@ -267,13 +384,15 @@ footer.foot p{max-width:70ch}
   <p>
     Test networks and a mock provider throughout; nothing here can move money
     that matters. Every verdict is written to a signed, hash-chained evidence
-    record — the same one an auditor reads. moat is the risk layer for AI agent
+    record, the same one an auditor reads. moat is the risk layer for AI agent
     payments.
   </p>
+  <div class="rails" title="card, bank, evm, solana"><span style="background:var(--red)"></span><span style="background:var(--orange)"></span><span style="background:var(--yellow)"></span><span style="background:var(--green)"></span></div>
 </div></footer>
 
 <script>
 const $=s=>document.querySelector(s);
+const NL=String.fromCharCode(10);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const ICONS={
   inject:'<path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 14l4 4m0-4l-4 4"/>',
@@ -285,67 +404,104 @@ const ICONS={
   none:'<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>',
   check:'<path d="M20 6L9 17l-5-5"/>'
 };
+const FAM={provenance:"red",mandate:"yellow",replay:"orange",control:"green"};
 const icon=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.none}</svg>`;
-let TESTS=[],results={};
+let TESTS=[],results={},busy=new Set();
 
 async function api(p,o){const r=await fetch(p,o);const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||r.status);return j}
 
-function testCard(t){
-  const r=results[t.id];
-  const pill=r?`<span class="pill ${r.decision}"><span class="dot"></span>${r.decision}</span>`
-               :`<span class="pill idle">not run</span>`;
+/* numbers in the hero count up once */
+function count(el){
+  const to=+el.dataset.n,t0=performance.now(),dur=1100+Math.min(to,600);
+  const step=now=>{const k=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-k,3);
+    el.textContent=Math.round(to*e).toLocaleString("en-US");if(k<1)requestAnimationFrame(step)};
+  requestAnimationFrame(step);
+}
+document.querySelectorAll("[data-n]").forEach(count);
+
+function scenario(t){
+  const m=t.mandate;
+  return `<details class="sc"><summary>What happens in this test</summary><dl>
+    <dt>User said</dt><dd class="q">${esc(t.task)}</dd>
+    ${t.page?`<dt>Page said</dt><dd class="q">${esc(t.page).split(NL).join("<br>")}</dd>`:""}
+    <dt>Approved</dt><dd>${m?`${esc(m.payee)}, ${esc(m.amount)} ${esc(m.currency)}`:"nothing"}</dd>
+    <dt>Agent tries</dt><dd class="mono">${t.calls.map(c=>`${esc(c.payee)}, ${esc(c.amount)} ${esc(c.currency)}`).join("<br>then again: ")}</dd>
+    <dt>Expected</dt><dd>${esc(t.expect.replace("_"," "))}</dd>
+  </dl><p class="note">${esc(t.note)}</p></details>`;
+}
+
+function testCard(t,i){
+  const r=results[t.id],run=busy.has(t.id);
+  const pill=run?`<span class="pill busy"><span class="spinner"></span>running</span>`
+    :r?`<span class="pill ${r.decision}"><span class="dot"></span>${r.decision.replace("_"," ")}</span>`
+    :`<span class="pill idle">not run</span>`;
   // Branch on the decision, never on whether there are reasons. A step-up
   // often carries none, and showing it as "allowed" because the list was
   // empty is the page lying about the one thing it exists to show.
   let body="";
-  if(r){
+  if(r&&!run){
     if(r.error) body=esc(r.error);
     else if(r.reasons.length) body=r.reasons.map(x=>`<code>${esc(x.id)}</code> ${esc(x.message)}`).join("<br>");
-    else if(r.decision==="allow") body=`<span class="ok">allowed — the provider ${r.paid?"was paid":"was called"}</span>`;
-    else if(r.decision==="step_up") body=`<span class="held">held — a person has to approve this before it moves</span>`;
+    else if(r.decision==="allow") body=`<span class="ok">allowed, the provider ${r.paid?"was paid":"was called"}</span>`;
+    else if(r.decision==="step_up") body=`<span class="held">held, a person has to approve this before it moves</span>`;
     else body="refused";
   }
-  const why=r?`<div class="why">${body}</div>`:"";
-  return `<article class="test${r?" done":""}">
+  const why=body?`<div class="why">${body}</div>`:"";
+  const cls=["test","glass","f-"+(FAM[t.family]||"orange"),run?"running":"",r&&!run?"done v-"+r.decision:""].join(" ");
+  return `<article class="${cls}" style="--i:${i}" data-id="${esc(t.id)}">
     <div class="top">
       <div class="icon">${icon(t.icon)}</div>
       <div><span class="fam">${esc(t.family)}</span><h3>${esc(t.title)}</h3><p class="sum">${esc(t.summary)}</p></div>
     </div>
+    ${scenario(t)}
     ${why}
     <footer>${pill}
-      <button class="link" data-run="${esc(t.id)}">${r?"run again":"run"}</button>
-      ${r?`<span class="ms mono">${r.ms} ms</span>`:""}</footer>
+      <button class="link" data-run="${esc(t.id)}" ${run?"disabled":""}>${r?"run again":"run"}</button>
+      ${r&&!run?`<span class="ms mono">${r.ms} ms</span>`:""}</footer>
   </article>`;
 }
 
+const openState=()=>new Set([...document.querySelectorAll("details.sc[open]")].map(d=>d.closest("[data-id]").dataset.id));
 function draw(){
+  const open=openState();
   $("#tests").innerHTML=TESTS.map(testCard).join("");
-  for(const b of document.querySelectorAll("[data-run]"))
-    b.addEventListener("click",()=>runTests(b.dataset.run));
+  for(const d of document.querySelectorAll("[data-id]")) if(open.has(d.dataset.id)) d.querySelector("details").open=true;
+  for(const b of document.querySelectorAll("[data-run]")) b.addEventListener("click",()=>runTests([b.dataset.run]));
   const done=Object.values(results);
-  if(done.length){
+  if(done.length||busy.size){
     const met=done.filter(r=>r.met).length;
-    const paid=done.filter(r=>r.paid&&r.expected!=="allow").length;
+    const through=done.filter(r=>r.paid&&r.expected!=="allow").length;
+    const total=done.length+busy.size;
     $("#summary").hidden=false;
-    $("#summary").innerHTML=`<strong>${met} of ${done.length}</strong> behaved as the corpus says
-      · <strong>${paid}</strong> attacker payments got through
-      · <span class="hint">every verdict signed and recorded</span>`;
+    $("#summary").innerHTML=`<span class="bar" style="--p:${Math.round(100*done.length/Math.max(total,1))}%"></span>
+      <div class="big mono">${met} / ${done.length}<small>behaved as the corpus says</small></div><span class="sep"></span>
+      <div class="big mono through${through?" bad":""}">${through}<small>attacker payments through</small></div><span class="sep"></span>
+      <div class="big mono">${done.reduce((a,r)=>a+r.ms,0).toLocaleString("en-US")} ms<small>gateway time, in total</small></div>
+      ${busy.size?`<span class="hint" style="margin-left:auto"><span class="spinner"></span> ${busy.size} running</span>`:`<span class="hint" style="margin-left:auto">every verdict signed and recorded</span>`}`;
   }
 }
 
-async function runTests(only){
-  const btn=$("#run-all");
-  btn.disabled=true;
-  const label=btn.innerHTML;
-  btn.innerHTML='<span class="spin"></span> running…';
-  try{
-    const j=await api("/v1/suite"+(only?"?test="+encodeURIComponent(only):""),{method:"POST"});
-    for(const r of j.results) results[r.id]=r;
-    draw();
-  }catch(e){ $("#summary").hidden=false; $("#summary").textContent=String(e.message||e); }
-  btn.disabled=false; btn.innerHTML=label;
+/* three at a time, each its own call, so cards fill in as they finish */
+async function runTests(ids){
+  ids=ids.filter(id=>!busy.has(id)); if(!ids.length)return;
+  const btn=$("#run-all"); btn.disabled=true;
+  for(const id of ids){busy.add(id);delete results[id];}
+  draw();
+  const queue=[...ids];
+  const worker=async()=>{
+    while(queue.length){
+      const id=queue.shift();
+      try{
+        const j=await api("/v1/suite?test="+encodeURIComponent(id),{method:"POST"});
+        for(const r of j.results) results[r.id]=r;
+      }catch(e){ results[id]={id,decision:"deny",expected:"deny",met:false,reasons:[],paid:false,ms:0,error:String(e.message||e)}; }
+      busy.delete(id); draw();
+    }
+  };
+  await Promise.all([worker(),worker(),worker()]);
+  btn.disabled=false;
 }
-$("#run-all").addEventListener("click",()=>runTests());
+$("#run-all").addEventListener("click",()=>runTests(TESTS.map(t=>t.id)));
 
 /* composer */
 const PRESETS=[["A payee nobody named",["Nordwind Handels GmbH","480","USD"]],
@@ -375,7 +531,7 @@ for(const id of ["intent","a-payee","a-amount","a-currency"])
   $("#"+id).addEventListener("change",()=>{sandbox=null;mandate=null;});
 
 $("#attempt").addEventListener("click",async()=>{
-  const s=$("#attempt-status"); s.innerHTML='<span class="spin"></span> evaluating…';
+  const s=$("#attempt-status"); s.innerHTML='<span class="spinner"></span> evaluating';
   $("#attempt").disabled=true;
   const call={payee:$("#p-payee").value,amount:Number($("#p-amount").value),currency:$("#p-currency").value};
   try{
@@ -385,11 +541,11 @@ $("#attempt").addEventListener("click",async()=>{
     if(first){$("#out").innerHTML="";first=false;}
     const el=document.createElement("div"); el.className="rec";
     el.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <span class="pill ${esc(v.decision)}"><span class="dot"></span>${esc(v.decision)}</span>
+        <span class="pill ${esc(v.decision)}"><span class="dot"></span>${esc(v.decision).replace("_"," ")}</span>
         <span class="hint">${v.paid?"the provider was paid":"the provider was never called"}</span>
-        <span class="ms mono" style="margin-left:auto">${v.ms} ms</span></div>
+        <span class="mono" style="margin-left:auto;color:var(--ink-3);font-size:.75rem;font-weight:600">${v.ms} ms</span></div>
       <div class="call mono">${esc(JSON.stringify(call))}</div>
-      ${v.reasons.length?`<ul>${v.reasons.map(r=>`<li><strong>${esc(r.id)}</strong> — ${esc(r.message)}</li>`).join("")}</ul>`:""}
+      ${v.reasons.length?`<ul>${v.reasons.map(r=>`<li><strong>${esc(r.id)}</strong>: ${esc(r.message)}</li>`).join("")}</ul>`:""}
       ${v.evidence_id?`<div class="call mono">evidence ${esc(v.evidence_id)}</div>`:""}`;
     $("#out").prepend(el); s.textContent="";
   }catch(e){ s.textContent=String(e.message||e); }
@@ -398,15 +554,15 @@ $("#attempt").addEventListener("click",async()=>{
 
 /* chain */
 async function chain(mode){
-  const s=$("#chain-status"); s.innerHTML='<span class="spin"></span> talking to Base Sepolia…';
+  const s=$("#chain-status"); s.innerHTML='<span class="spinner"></span> talking to Base Sepolia';
   $("#chain-ok").disabled=true;$("#chain-bad").disabled=true;
   try{
     const j=await api("/v1/chain?mode="+mode,{method:"POST"});
-    $("#chain-out").innerHTML=`<div class="rec">
+    $("#chain-out").innerHTML=`<div class="rec glass">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <span class="pill ${esc(j.decision)}"><span class="dot"></span>${esc(j.decision)}</span>
+        <span class="pill ${esc(j.decision)}"><span class="dot"></span>${esc(j.decision).replace("_"," ")}</span>
         <span class="hint mono">to ${esc(j.to)}</span></div>
-      ${j.reasons&&j.reasons.length?`<ul>${j.reasons.map(r=>`<li><strong>${esc(r.id)}</strong> — ${esc(r.message)}</li>`).join("")}</ul>`:""}
+      ${j.reasons&&j.reasons.length?`<ul>${j.reasons.map(r=>`<li><strong>${esc(r.id)}</strong>: ${esc(r.message)}</li>`).join("")}</ul>`:""}
       <div class="call mono">${j.tx?`<a href="${esc(j.explorer)}" target="_blank" rel="noopener">${esc(j.tx)}</a>`
         :(j.wallet_refused?"the wallet refused: "+esc(j.wallet_refused):"no transaction exists")}</div></div>`;
     s.textContent=typeof j.remaining==="number"?`${j.remaining} payments left`:"";
@@ -418,26 +574,24 @@ $("#chain-bad").addEventListener("click",()=>chain("forged"));
 
 (async()=>{
   const b=location.origin;
+  const H=`-H '<span class="s">content-type: application/json</span>'`;
   $("#curl").innerHTML=[
     '<span class="c"># a sandbox of your own</span>',
-    `S=$(curl -s -XPOST ${b}/v1/sandbox | jq -r .id)`,'',
-    '<span class="c"># what the user asked for — the only channel that confers authority</span>',
-    `curl -s -XPOST ${b}/v1/sandbox/$S/intent \\`,
-    `  -H 'content-type: application/json' \\`,
-    `  -d '{"text":"Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD."}'`,'',
+    `S=$(<span class="k">curl</span> -s -XPOST <span class="u">${b}/v1/sandbox</span> | jq -r .id)`,'',
+    '<span class="c"># what the user asked for: the only channel that confers authority</span>',
+    `<span class="k">curl</span> -s -XPOST <span class="u">${b}/v1/sandbox/$S/intent</span> ${H} -d '{"text":"Pay the Acme Cloud Ltd invoice INV-4471 for 480 USD."}'`,'',
     '<span class="c"># what an approver signed off</span>',
-    `curl -s -XPOST ${b}/v1/sandbox/$S/authorization \\`,
-    `  -H 'content-type: application/json' \\`,
-    `  -d '{"payee":"Acme Cloud Ltd","amount":"480","currency":"USD"}'`,'',
+    `<span class="k">curl</span> -s -XPOST <span class="u">${b}/v1/sandbox/$S/authorization</span> ${H} -d '{"payee":"Acme Cloud Ltd","amount":"480","currency":"USD"}'`,'',
     '<span class="c"># now try to pay someone else</span>',
-    `curl -s -XPOST ${b}/v1/sandbox/$S/pay \\`,
-    `  -H 'content-type: application/json' \\`,
-    `  -d '{"payee":"Nordwind Handels GmbH","amount":480,"currency":"USD"}'`,'',
+    `<span class="k">curl</span> -s -XPOST <span class="u">${b}/v1/sandbox/$S/pay</span> ${H} -d '{"payee":"Nordwind Handels GmbH","amount":480,"currency":"USD"}'`,'',
     '<span class="c"># the signed record of every verdict</span>',
-    `curl -s ${b}/v1/sandbox/$S/evidence`,
-  ].join("\n");
-  TESTS=(await api("/v1/tests")).tests; draw();
-  try{ const l=await api("/v1/limits"); if(l.chain&&l.chain.enabled) $("#chain").hidden=false; }catch{}
+    `<span class="k">curl</span> -s <span class="u">${b}/v1/sandbox/$S/evidence</span>`,
+  ].join(NL);
+  try{
+    TESTS=(await api("/v1/tests")).tests; draw();
+    $("#live").classList.add("on"); $("#live").lastElementChild.textContent="gateway live";
+  }catch(e){ $("#live").lastElementChild.textContent="gateway unreachable"; }
+  try{ const l=await api("/v1/limits"); if(l.chain&&l.chain.enabled){$("#chain").hidden=false;$("#nav-chain").hidden=false;} }catch{}
 })();
 </script>
 </body>

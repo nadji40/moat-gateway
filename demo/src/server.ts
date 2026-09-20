@@ -45,8 +45,13 @@ const PORT = Number(process.env["MOAT_DEMO_PORT"] ?? "8787");
 const WINDOW_MS = 60_000;
 const PER_WINDOW = 90;
 const seen = new Map<string, { n: number; from: number }>();
-/** Addresses with a suite in flight, so nobody can start nine more. */
-const running = new Set<string>();
+/**
+ * Gateways in flight per address. The page runs the suite three tests at a
+ * time so results land as they happen; a whole suite in one call takes all
+ * three slots, so nobody can start nine and then nine more.
+ */
+const running = new Map<string, number>();
+const SLOTS = 3;
 
 function caller(h: Record<string, string | string[] | undefined>): string {
   const fwd = h["cf-connecting-ip"] ?? h["x-forwarded-for"];
@@ -130,15 +135,18 @@ const server = createServer(async (req, res) => {
 
     if (path === "/v1/suite" && method === "POST") {
       const only = url.searchParams.get("test") ?? undefined;
-      // A suite run is nine gateway processes; one per address at a time.
-      if (running.has(caller(req.headers))) {
-        return json(res, 429, { error: "a suite is already running for you" });
+      const who = caller(req.headers);
+      const cost = only ? 1 : SLOTS;
+      if ((running.get(who) ?? 0) + cost > SLOTS) {
+        return json(res, 429, { error: "you already have tests running; wait for them" });
       }
-      running.add(caller(req.headers));
+      running.set(who, (running.get(who) ?? 0) + cost);
       try {
         return json(res, 200, { results: await runSuite(CFG, only) });
       } finally {
-        running.delete(caller(req.headers));
+        const left = (running.get(who) ?? cost) - cost;
+        if (left <= 0) running.delete(who);
+        else running.set(who, left);
       }
     }
 

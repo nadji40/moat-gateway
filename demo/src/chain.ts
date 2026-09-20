@@ -155,7 +155,7 @@ export interface ChainOutcome {
  *
  * `approved` sends to the address the authorization names and produces a
  * real transaction. `forged` sends to an address the user never approved,
- * which Moat refuses before the wallet is asked — so it costs nothing and
+ * which Moat refuses before the wallet is asked, so it costs nothing and
  * leaves no transaction, which is exactly what the page is claiming.
  */
 export async function chainDemo(who: string, mode: string): Promise<ChainOutcome> {
