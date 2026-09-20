@@ -23,7 +23,8 @@
 // The refusal path costs nothing at all: Moat denies before the wallet is
 // ever asked, which is the point being demonstrated.
 
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -35,8 +36,54 @@ import { baseSepolia } from "viem/chains";
 const HERE = dirname(dirname(fileURLToPath(import.meta.url)));
 const REPO = resolve(HERE, "..");
 const DENY = -31051;
-const CONFIG = join(REPO, "arena", "moat.evm-demo.yaml");
-const API = process.env["MOAT_DEMO_CHAIN_API"] ?? "http://127.0.0.1:7091";
+const KEYS = process.env["MOAT_DEMO_KEYS"] ?? join(REPO, "arena", "keys");
+const NEWLINE = String.fromCharCode(10);
+
+/**
+ * The gateway config for one chain demonstration, written fresh.
+ *
+ * Generated rather than read from the repository for the same reason the
+ * sandbox configs are: a committed config has to name a key directory and
+ * an evidence file, and the right paths differ between a laptop and a
+ * hardened service running as another user. Naming them here means the
+ * one place that knows the host decides.
+ */
+function writeConfig(session: string, port: number): string {
+  const path = join(tmpdir(), `moat-chain-${session}.yaml`);
+  const fwd = (s: string) => s.split(String.fromCharCode(92)).join("/");
+  writeFileSync(
+    path,
+    [
+      "listen: { transport: stdio }",
+      "upstreams:",
+      "  - name: wallet",
+      "    rail: crypto",
+      "    transport: stdio",
+      '    command: ["node", "--import", "tsx", "evm-testnet/src/server.ts"]',
+      `policy: ${fwd(join(REPO, "policies", "rails", "evm-testnet.yaml"))}`,
+      `evidence: ${fwd(join(tmpdir(), `moat-chain-${session}.jsonl`))}`,
+      `keys: ${fwd(KEYS)}`,
+      `intent_api: { addr: "127.0.0.1:${port}" }`,
+      "",
+    ].join(NEWLINE),
+    "utf8",
+  );
+  return path;
+}
+
+/** A port the kernel just told us was free. */
+async function freePort(): Promise<number> {
+  const { createServer } = await import("node:net");
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const a = probe.address();
+      const port = typeof a === "object" && a ? a.port : 0;
+      probe.close(() => (port ? resolve(port) : reject(new Error("no free port"))));
+    });
+  });
+}
 const NETWORK = "eip155:84532";
 /** Each demonstration pays this much. Enough to exist, small enough to repeat. */
 const AMOUNT = "0.00002";
@@ -85,7 +132,7 @@ export function chainState(): {
 } {
   const wallet = walletAddress();
   return {
-    enabled: existsSync(CONFIG) && wallet !== undefined,
+    enabled: wallet !== undefined,
     amount: AMOUNT,
     remaining: Math.max(0, MAX_SENDS - sent),
     network: NETWORK,
@@ -113,7 +160,7 @@ export interface ChainOutcome {
  */
 export async function chainDemo(who: string, mode: string): Promise<ChainOutcome> {
   const wallet = walletAddress();
-  if (!existsSync(CONFIG) || !wallet) {
+  if (!wallet) {
     return { status: 503, body: { error: "the chain demonstration is not configured here" } };
   }
   const forged = mode === "forged";
@@ -141,6 +188,9 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
   }
 
   const session = `demo-chain-${Date.now().toString(36)}`;
+  const port = await freePort();
+  const api = `http://127.0.0.1:${port}`;
+  const config = writeConfig(session, port);
   const client = new Client({ name: "moat-demo-chain", version: "0.1.0" });
   const gateway = [
     join(REPO, "target", "release", "moat-gateway.exe"),
@@ -151,7 +201,7 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
   await client.connect(
     new StdioClientTransport({
       command: gateway,
-      args: ["--config", CONFIG, "--session-id", session],
+      args: ["--config", config, "--session-id", session],
       cwd: join(REPO, "arena"),
       env: childEnv({}),
       stderr: "ignore",
@@ -161,7 +211,7 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
   try {
     for (let i = 0; i < 60; i += 1) {
       try {
-        if ((await fetch(`${API}/v1/session/${encodeURIComponent(session)}/evidence`)).ok) break;
+        if ((await fetch(`${api}/v1/session/${encodeURIComponent(session)}/evidence`)).ok) break;
       } catch {
         /* not up yet */
       }
@@ -174,14 +224,14 @@ export async function chainDemo(who: string, mode: string): Promise<ChainOutcome
     const authorizationId = `auth-${session}`;
     const invoiceId = `INV-${session}`;
 
-    await fetch(`${API}/v1/session/${encodeURIComponent(session)}/intent`, {
+    await fetch(`${api}/v1/session/${encodeURIComponent(session)}/intent`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         text: `Pay ${payee} ${AMOUNT} ETH for invoice ${invoiceId} to ${approved} on ${NETWORK}.`,
       }),
     });
-    await fetch(`${API}/v1/session/${encodeURIComponent(session)}/authorizations`, {
+    await fetch(`${api}/v1/session/${encodeURIComponent(session)}/authorizations`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
