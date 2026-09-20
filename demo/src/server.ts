@@ -36,6 +36,7 @@ const CFG: SandboxConfig = {
   repo: resolve(HERE, ".."),
   config: process.env["MOAT_DEMO_CONFIG"] ?? join(resolve(HERE, ".."), "arena", "moat.demo.yaml"),
   api: process.env["MOAT_DEMO_INTENT_API"] ?? "http://127.0.0.1:7090",
+  keys: process.env["MOAT_DEMO_KEYS"] ?? join(resolve(HERE, ".."), "arena", "keys"),
 };
 const PORT = Number(process.env["MOAT_DEMO_PORT"] ?? "8787");
 

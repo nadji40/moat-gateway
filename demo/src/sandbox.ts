@@ -161,6 +161,8 @@ export interface SandboxConfig {
   readonly repo: string;
   readonly config: string;
   readonly api: string;
+  /** A writable directory for the per-sandbox evidence signing key. */
+  readonly keys: string;
 }
 
 /** Start a gateway and wait for its intent API to answer. */
@@ -199,7 +201,13 @@ export async function create(cfg: SandboxConfig): Promise<{ id: string; expires_
       '    command: ["node", "--import", "tsx", "mock-stripe/src/server.ts"]',
       `policy: ${join(cfg.repo, "policies", "default.yaml").split("\\").join("/")}`,
       `evidence: ${evidencePath.split("\\").join("/")}`,
-      `keys: ${join(cfg.repo, "arena", "keys").split("\\").join("/")}`,
+      // Its own key directory, not the arena's. The arena's evidence key is
+      // readable only by whoever created it, and a service running as
+      // another user gets "Permission denied" the moment it starts -- which
+      // surfaces to the caller as an MCP connection closing and nothing
+      // else. A sandbox is ephemeral, so a key generated for it is right
+      // anyway: its evidence chain is its own and dies with it.
+      `keys: ${cfg.keys.split("\\").join("/")}`,
       `intent_api: { addr: "127.0.0.1:${port}" }`,
       "",
     ].join(NEWLINE),
