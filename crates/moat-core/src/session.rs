@@ -63,6 +63,17 @@ pub struct PaymentAuthorization {
     /// which is every authorization written before this field existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<String>,
+    /// The contract or mint the asset must be, where the asset is a token.
+    ///
+    /// A ticker is a label anyone may adopt: deploying a contract that calls
+    /// itself USDC costs a few cents, and a payment in it satisfies an
+    /// authorization that names only the ticker. Where the authorization
+    /// names the contract, the payment has to be in that one. Absent
+    /// wherever the asset identifies itself without a contract -- every
+    /// fiat authorization, and every authorization written before this
+    /// field existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asset_contract: Option<String>,
     /// Invoice that this authorization covers when repeats are disabled.
     pub invoice_id: String,
     /// SHA-256 of canonical invoice content, independent of the supplier's id.

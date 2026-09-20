@@ -598,6 +598,15 @@ person makes by eye still passes. An authorization may bind a network and
 `authorization-network` enforces it. This is the one attack an approved
 address book cannot see at all, because the address is on the list.
 
+**The ticker is not the asset.** `symbol()` returns whatever the contract
+was written to return, and a contract returning "USDC" costs the gas to
+deploy. A payment in it passes every check that reads the ticker — right
+payee, right address, right chain, exact amount — and credits the supplier
+in a token nobody will buy. An authorization may bind a contract or mint
+and `authorization-asset-contract` enforces it, comparing addresses as
+addresses rather than as text. A cap cannot see this one either: any
+amount of a worthless token is under any cap.
+
 **An allowance is a payment that has not happened yet.** `approve` grants
 a spender the right to move funds later, without the agent or any policy
 being asked again. It is listed under `payment_tools` and evaluated as a

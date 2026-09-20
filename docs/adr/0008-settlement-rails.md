@@ -151,7 +151,54 @@ What this still does not claim. There is no on-chain enforcement: Moat
 decides and the customer's wallet executes, and a wallet that ignores the
 verdict is not stopped by anything here. That is the co-signer design, and
 it is not built. Nothing in the arena touches a real network; the testnet
-adapters are the next piece of work. The replay key is still the invoice
-id rather than a reference or a memo. And the token contract is not
-checked, so a fake USDC deployed at another address would pass the asset
-lookup — the network check bounds which chain, not which contract on it.
+adapters are the next piece of work. And the replay key is still the
+invoice id rather than a reference or a memo.
+
+## Addendum, 20 September 2026: binding the contract, not the ticker
+
+The previous addendum closed by naming a gap: the network check bounds
+which chain, not which contract on it, so a fake USDC deployed at another
+address would pass the asset lookup. `PaymentAuthorization` now takes an
+optional `asset_contract`, and `authorization-asset-contract` denies a
+call that names another one.
+
+A ticker is a label, not an identity. `symbol()` returns whatever the
+contract was written to return, and a contract that returns "USDC" costs
+the gas to deploy. A payment in it satisfies every check that reads the
+ticker: the payee is right, the address is the supplier's own, the chain
+is the approved one, the amount is exact to the minor unit. The supplier
+is even credited -- in a token nobody will buy. A cap cannot see it,
+because any amount of a worthless token is under any cap, and an
+allowlist cannot see it, because the destination is on the list. It is
+the lookalike payee one layer down, and a wallet that displays symbols
+shows the user nothing wrong.
+
+Three decisions worth recording.
+
+It is compared through `Destination`, so an address is matched as an
+address rather than as text: hex casing is a checksum and not an
+identity, while a Solana mint's base58 is case-sensitive and is compared
+as written. That is the same canonicalisation the destination uses, which
+is the point -- a contract address is an address.
+
+It fails closed on silence. Where the authorization binds a contract and
+the call names none, the check denies. This is the opposite of the
+network check's tolerance for an unbound authorization, and the
+difference is deliberate: an authorization that binds nothing is an old
+authorization, while a call that says nothing about which contract it is
+spending is a call whose asset is unknown.
+
+It is absent by default, so every fiat authorization and every
+authorization written before the field existed passes and says so. The
+golden evidence bytes did not move.
+
+What this still does not claim. The field has to be filled to bind
+anything: an authorization that names only a ticker is as weak as it was,
+and nothing yet requires the approver to name a contract. The registry's
+own per-asset contract is not consulted -- the binding is to what the
+authorization says, not to what the policy believes USDC to be. And on
+the testnet adapter the contract comes from configuration rather than
+from the call, so there the agent cannot choose one; making that
+demonstrable end to end means letting the wallet be asked for a contract
+and letting Moat be the thing that refuses, which is the adapter's stated
+philosophy and is not yet done.

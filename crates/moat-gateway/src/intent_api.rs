@@ -54,6 +54,11 @@ struct AuthorizationBody {
     /// than one. Omitted on card and bank, which have exactly one each.
     #[serde(default)]
     network: Option<String>,
+    /// The token contract or mint the payment must be in, where the asset
+    /// is a token. Omitted for fiat, and for a token the approver is
+    /// content to identify by ticker alone.
+    #[serde(default)]
+    asset_contract: Option<String>,
     #[serde(default)]
     invoice_fingerprint: Option<String>,
     #[serde(default)]
@@ -267,6 +272,12 @@ async fn post_authorization(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_owned);
+    let asset_contract = body
+        .asset_contract
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
     if authorization_id.is_empty() || invoice_id.is_empty() || payee.is_empty() {
         return Err(err(
             StatusCode::BAD_REQUEST,
@@ -340,6 +351,13 @@ async fn post_authorization(
         .as_deref()
         .map(|network| format!(" on {network}"))
         .unwrap_or_default();
+    // Same reasoning for the contract: it is what makes the ticker mean
+    // one asset rather than any asset wearing the name, so the approver
+    // should see it in the sentence they approved.
+    let contract_note = asset_contract
+        .as_deref()
+        .map(|contract| format!(" in the contract at {contract}"))
+        .unwrap_or_default();
     let authorization = PaymentAuthorization {
         id: authorization_id.to_owned(),
         payee: payee.to_owned(),
@@ -348,6 +366,7 @@ async fn post_authorization(
         tolerance_minor,
         currency: currency.clone(),
         network: network.clone(),
+        asset_contract: asset_contract.clone(),
         invoice_id: invoice_id.to_owned(),
         invoice_fingerprint,
         require_invoice_fingerprint: body.require_invoice_fingerprint,
@@ -365,8 +384,15 @@ async fn post_authorization(
             .map_err(|message| message.to_owned())?;
         // Feed the same user-approved values into the existing provenance engine.
         session.register_intent(&format!(
-            "Authorize invoice {} to {}{}{} for {} {} until {}",
-            invoice_id, payee, account_note, network_note, body.amount, currency, body.expires_at
+            "Authorize invoice {} to {}{}{}{} for {} {} until {}",
+            invoice_id,
+            payee,
+            account_note,
+            network_note,
+            contract_note,
+            body.amount,
+            currency,
+            body.expires_at
         ));
         Ok(())
     })

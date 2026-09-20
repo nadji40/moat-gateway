@@ -646,6 +646,47 @@ fn structured_authorization_checks(
         },
     ));
 
+    // A ticker is a label, not an identity. Anyone can deploy a contract
+    // that reports its symbol as USDC for the price of the gas, and a
+    // payment in it satisfies an authorization that names only the ticker
+    // while the real USDC never moves -- the same trick as the lookalike
+    // payee, one layer down, and invisible in a wallet that shows symbols.
+    // Where the authorization names the contract, the payment has to be in
+    // that contract.
+    //
+    // Compared through Destination, so an address is matched as an address:
+    // hex casing is a checksum rather than an identity, while a Solana
+    // mint's base58 is case-sensitive and is compared as written. Nothing
+    // is inferred when the authorization names no contract, which is every
+    // fiat authorization and every one written before the field existed.
+    let asset_contract = mapped
+        .get("asset_contract")
+        .and_then(|(_, value)| value.as_str())
+        .unwrap_or("")
+        .trim();
+    let contract_matches = authorization
+        .asset_contract
+        .as_deref()
+        .is_none_or(|expected| {
+            !asset_contract.is_empty()
+                && Destination::parse(asset_contract).same_as(&Destination::parse(expected))
+        });
+    outcomes.push(structured_outcome(
+        "authorization-asset-contract",
+        contract_matches,
+        Decision::Deny,
+        match authorization.asset_contract.as_deref() {
+            Some(_) if contract_matches => "ok: asset contract matches authorization".to_owned(),
+            Some(expected) if asset_contract.is_empty() => {
+                format!("payment names no asset contract; authorization is for {expected}")
+            }
+            Some(expected) => format!(
+                "payment is in the contract at {asset_contract}; authorization is for {expected}"
+            ),
+            None => "ok: authorization does not bind an asset contract".to_owned(),
+        },
+    ));
+
     let invoice_matches = authorization.repeat_payments || invoice_id == authorization.invoice_id;
     outcomes.push(structured_outcome(
         "authorization-invoice",
@@ -1136,6 +1177,7 @@ mod tests {
                 tolerance_minor: Minor(500),
                 currency: "USD".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-100".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1505,6 +1547,7 @@ mod tests {
                 tolerance_minor: Minor(500),
                 currency: "USD".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-PRICE".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1549,6 +1592,7 @@ fields:
   currency: { args: ["currency"] }
   destination: { kind: destination, args: ["recipient_account_id", "to_address", "iban"] }
   network: { args: ["network"] }
+  asset_contract: { args: ["token_address", "mint"] }
 allowlist:
   payees: ["Monitoring Pro Inc"]
   accounts: ["DE89 3704 0044 0532 0130 00"]
@@ -1734,6 +1778,7 @@ rules:
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-IBAN".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1846,6 +1891,7 @@ rules: []
                 tolerance_minor: Minor(0),
                 currency: "USDC".into(),
                 network: Some("eip155:84532".into()),
+                asset_contract: None,
                 invoice_id: "INV-CHAIN".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1905,6 +1951,170 @@ rules: []
             .any(|r| r.id == "authorization-network"));
     }
 
+    /// A ticker is not an identity. The real USDC on Base Sepolia lives at
+    /// one address; deploying a contract that answers `symbol()` with
+    /// "USDC" costs a few cents, and a payment in it is a payment in
+    /// nothing. Every check that reads the ticker passes: the payee is
+    /// right, the address is the supplier's own, the chain is the approved
+    /// one, the amount is exact. The supplier is even credited -- with a
+    /// token nobody will buy.
+    ///
+    /// A cap cannot see it, because 250 of a worthless token is under any
+    /// cap. An allowlist cannot see it, because the destination is on the
+    /// list. Only an authorization that recorded which contract the user
+    /// agreed to can refuse it.
+    #[test]
+    fn the_right_ticker_in_the_wrong_contract_is_denied() {
+        const REAL_USDC: &str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+        const COUNTERFEIT: &str = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent(concat!(
+            "Pay invoice INV-TOKEN to Monitoring Pro Inc ",
+            "at 0x864cc95dcD3a5d88401CB951b670874a17092302",
+        ));
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-token".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("0x864cc95dcD3a5d88401CB951b670874a17092302".into()),
+                amount_minor: Minor(250_000_000),
+                tolerance_minor: Minor(0),
+                currency: "USDC".into(),
+                network: Some("eip155:84532".into()),
+                asset_contract: Some(REAL_USDC.into()),
+                invoice_id: "INV-TOKEN".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let proposal = |contract: Option<&str>| {
+            let mut args = json!({
+                "authorization_id": "auth-token", "invoice_id": "INV-TOKEN",
+                "payee": "Monitoring Pro Inc", "amount": 250, "currency": "USDC",
+                "network": "eip155:84532",
+                "to_address": "0x864cc95dcD3a5d88401CB951b670874a17092302"
+            });
+            if let Some(contract) = contract {
+                args["token_address"] = json!(contract);
+            }
+            call(args)
+        };
+
+        let right = evaluate(&p, &session, proposal(Some(REAL_USDC)), 10_000);
+        assert!(
+            right
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-asset-contract" && r.passed),
+            "the approved contract must pass: {:?}",
+            right.verdict.failures().collect::<Vec<_>>()
+        );
+
+        let wrong = evaluate(&p, &session, proposal(Some(COUNTERFEIT)), 10_000);
+        assert!(wrong
+            .verdict
+            .failures()
+            .any(|r| r.id == "authorization-asset-contract"));
+        // Everything a person or a wallet would look at is correct. That is
+        // what makes this worth a check of its own.
+        for id in [
+            "authorization-payee",
+            "authorization-recipient-account",
+            "authorization-network",
+            "authorization-currency",
+            "authorization-amount",
+        ] {
+            assert!(
+                wrong.verdict.reasons.iter().any(|r| r.id == id && r.passed),
+                "{id} should still pass: {:?}",
+                wrong.verdict.failures().collect::<Vec<_>>()
+            );
+        }
+
+        // Hex casing is a checksum, not an identity: the same contract in
+        // lower case is the same contract.
+        let lowercased = evaluate(
+            &p,
+            &session,
+            proposal(Some(&REAL_USDC.to_ascii_lowercase())),
+            10_000,
+        );
+        assert!(
+            lowercased
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "authorization-asset-contract" && r.passed),
+            "the same address in lower case is the same address"
+        );
+
+        // Saying nothing about the contract is not the same as saying the
+        // right thing about it, and a bound contract fails closed.
+        let silent = evaluate(&p, &session, proposal(None), 10_000);
+        assert!(silent
+            .verdict
+            .failures()
+            .any(|r| r.id == "authorization-asset-contract"));
+    }
+
+    /// Every authorization written before tokens existed binds no contract,
+    /// and must go on evaluating exactly as it did. This is the check that
+    /// adding the rule moved nothing on the card and bank rails.
+    #[test]
+    fn an_authorization_that_binds_no_contract_passes_whatever_the_call_says() {
+        let p = destination_policy();
+        let mut session = Session::new("s");
+        session.register_intent(
+            "Pay invoice INV-CARD to Monitoring Pro Inc at DE89 3704 0044 0532 0130 00",
+        );
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-card".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("DE89 3704 0044 0532 0130 00".into()),
+                amount_minor: Minor(25_000),
+                tolerance_minor: Minor(0),
+                currency: "EUR".into(),
+                network: None,
+                asset_contract: None,
+                invoice_id: "INV-CARD".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        for contract in [None, Some("0x036CbD53842c5426634e7929541eC2318f3dCF7e")] {
+            let mut args = json!({
+                "authorization_id": "auth-card", "invoice_id": "INV-CARD",
+                "payee": "Monitoring Pro Inc", "amount": 250, "currency": "EUR",
+                "iban": "DE89 3704 0044 0532 0130 00"
+            });
+            if let Some(contract) = contract {
+                args["token_address"] = json!(contract);
+            }
+            let out = evaluate(&p, &session, call(args), 10_000);
+            assert!(
+                out.verdict
+                    .reasons
+                    .iter()
+                    .any(|r| r.id == "authorization-asset-contract" && r.passed),
+                "an unbound contract must pass for {contract:?}: {:?}",
+                out.verdict.failures().collect::<Vec<_>>()
+            );
+        }
+    }
+
     /// Every authorization written before chains existed binds no network,
     /// and must go on evaluating exactly as it did. This is the check that
     /// adding the rule moved nothing on the card and bank rails.
@@ -1924,6 +2134,7 @@ rules: []
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-CARD".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -1976,6 +2187,7 @@ rules: []
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-BANK".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -2059,6 +2271,7 @@ rules: []
                 tolerance_minor: Minor(500_000),
                 currency: "USDC".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-USDC".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -2111,6 +2324,7 @@ rules: []
                 tolerance_minor: Minor(0),
                 currency: "USDC".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-PRECISION".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -2161,6 +2375,7 @@ rules: []
                 tolerance_minor: Minor(0),
                 currency: "ETH".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-ETH".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
@@ -2283,6 +2498,7 @@ rules: []
                 tolerance_minor: Minor(0),
                 currency: "USD".into(),
                 network: None,
+                asset_contract: None,
                 invoice_id: "INV-BASE".into(),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: true,
