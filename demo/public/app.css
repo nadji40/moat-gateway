@@ -351,6 +351,25 @@ footer.foot p{max-width:64ch;margin:0 auto}
 .cmp.us .cmp-score{color:var(--green-l);border-top-color:color-mix(in srgb,var(--green-l) 30%,transparent)}
 .cmp-note{max-width:70ch;margin:22px auto 0;line-height:1.6}
 
+/* the two protocol probes, under the comparison grid */
+.probes{margin-top:30px;display:grid;gap:14px}
+.probes > .lbl{margin-bottom:2px}
+.probe{border-radius:18px;padding:20px;box-shadow:var(--pane);display:grid;gap:12px}
+.probe-h{display:flex;align-items:baseline;justify-content:center;gap:12px;flex-wrap:wrap}
+.probe-h h3{font-size:1.125rem}
+.probe-v{font-size:.72rem;color:var(--ink-3);font-weight:600}
+.probe-q{font-size:.875rem;color:var(--ink-2)}
+.probe-r{display:grid;gap:7px;margin:0;font-size:.875rem}
+.probe-r dt{color:var(--ink-2)}
+.probe-r dd{margin:0 0 6px;font-weight:700}
+.probe-r dd.bad{color:var(--red-l)}
+.probe-r dd.good{color:var(--green-l)}
+.probe-n{font-size:.82rem;color:var(--ink-3);line-height:1.6;border-top:1px solid var(--line);padding-top:12px;max-width:68ch;margin:0 auto}
+@media(min-width:820px){
+  .probe-r{grid-template-columns:1fr auto;align-items:baseline;text-align:left;gap:9px 20px}
+  .probe-r dd{margin:0;text-align:right}
+}
+
 /* the bar above the curl block */
 .codewrap{display:grid;gap:12px}
 .codebar{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}

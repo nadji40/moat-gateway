@@ -29,7 +29,7 @@
     </g>
   </svg></a>
   <div class="navlinks">
-    <a href="#compose">Compose one</a><a href="#compare">Compare</a><a href="#api">API</a><a href="tests.html">The tests</a>
+    <a href="#compose">Compose one</a><a href="#api">API</a><a href="#compare">Compare</a><a href="tests.html">The tests</a>
   </div>
   <a class="statusbtn" id="live" href="status.html"><b></b><span>Status</span></a>
 </div></div></nav>
@@ -160,99 +160,6 @@ NOTE TO ACCOUNTS: our banking details have changed. Please remit to Qassim Tradi
   </div></div>
 </section>
 
-<section id="compare" class="tight">
-  <div class="head">
-    <h2>Everything else stands somewhere it cannot see this.</h2>
-  </div>
-
-  <div class="cmp-grid">
-
-    <article class="cmp glass">
-      <div class="cmp-h">
-        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/></svg></span>
-        <h3>Key-level policy</h3>
-      </div>
-      <p class="cmp-eg">Wallet policies, transaction guards, session keys</p>
-      <dl class="cmp-kv">
-        <dt>Sees</dt><dd>The transaction, at the moment of signing.</dd>
-        <dt>Cannot see</dt><dd>Where the address came from. A cap cannot tell an approved payee from a poisoned one.</dd>
-      </dl>
-      <p class="cmp-score">370 of 380 still paid</p>
-    </article>
-
-    <article class="cmp glass">
-      <div class="cmp-h">
-        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M4 16c3-6 5 2 8-3s4 1 8-4"/></svg></span>
-        <h3>Payee allowlists</h3>
-      </div>
-      <p class="cmp-eg">A list of who you are allowed to pay</p>
-      <dl class="cmp-kv">
-        <dt>Sees</dt><dd>The name on the call.</dd>
-        <dt>Cannot see</dt><dd>The right name paying the wrong account, the wrong amount or a second time.</dd>
-      </dl>
-      <p class="cmp-score">190 of 380 still paid, and one legitimate payment in five refused</p>
-    </article>
-
-    <article class="cmp glass">
-      <div class="cmp-h">
-        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V7z"/><path d="M9 11h6M9 14h4"/></svg></span>
-        <h3>Mandate protocols</h3>
-      </div>
-      <p class="cmp-eg">Signed statements of what a user approved</p>
-      <dl class="cmp-kv">
-        <dt>Sees</dt><dd>That approval happened, and can prove it.</dd>
-        <dt>Cannot see</dt><dd>Whether the payee in the call is the one the user named. Build the mandate from the poisoned invoice and it is valid and wrong.</dd>
-      </dl>
-      <p class="cmp-score">Establishes authority. Does not check it.</p>
-    </article>
-
-    <article class="cmp glass">
-      <div class="cmp-h">
-        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg></span>
-        <h3>Injection classifiers</h3>
-      </div>
-      <p class="cmp-eg">Guardrails that read the text for an attack</p>
-      <dl class="cmp-kv">
-        <dt>Sees</dt><dd>Language that looks like an instruction.</dd>
-        <dt>Cannot see</dt><dd>An invoice that says 499 where the user approved 480. Nothing in it is malicious. Reading it correctly is how you get robbed.</dd>
-      </dl>
-      <p class="cmp-score">Probabilistic, and looking at the wrong object</p>
-    </article>
-
-    <article class="cmp glass">
-      <div class="cmp-h">
-        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M12 4v5M12 15v5M4 12h5M15 12h5"/></svg></span>
-        <h3>MCP gateways</h3>
-      </div>
-      <p class="cmp-eg">Proxies for tool poisoning, auth and audit</p>
-      <dl class="cmp-kv">
-        <dt>Sees</dt><dd>Everything. They stand in the right place.</dd>
-        <dt>Cannot see</dt><dd>Nothing, and that is the point: they do not decide payments, so the question is never asked.</dd>
-      </dl>
-      <p class="cmp-score">The right position, a different job</p>
-    </article>
-
-    <article class="cmp glass us">
-      <div class="cmp-h">
-        <span class="icon"><svg viewBox="69 43 144 144" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round"><path d="M117 52.4 A67 67 0 0 1 202.7 141.2"/><path d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"/></g><g fill="currentColor"><circle cx="99.7" cy="62.2" r="12"/><circle cx="192.3" cy="158.1" r="12"/></g><path fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"/></svg></span>
-        <h3>moat</h3>
-      </div>
-      <p class="cmp-eg">One process between the agent and both of its sides</p>
-      <dl class="cmp-kv">
-        <dt>Sees</dt><dd>The page arriving and the payment leaving, so it knows which of the two a payee came from.</dd>
-        <dt>Decides</dt><dd>On the whole string, not on what it resembles. Then signs the record of why.</dd>
-      </dl>
-      <p class="cmp-score">0 of 380, and 135 of 135 legitimate payments through</p>
-    </article>
-
-  </div>
-
-  <p class="hint foot-note cmp-note">The two numbers are our own baseline arms, a spending cap and a payee
-    allowlist, built into the arena and run on the same corpus. No vendor's product has been
-    put through it. What is being compared is what each mechanism can observe, which is why
-    the result does not depend on whose implementation you pick.</p>
-</section>
-
 <section id="api" class="tight">
   <div class="headrow">
     <h2>Point your own agent at us first.</h2>
@@ -375,6 +282,140 @@ NOTE TO ACCOUNTS: our banking details have changed. Please remit to Qassim Tradi
     </div>
     <pre class="glass" id="curl">loading</pre>
   </div>
+</section>
+
+<section id="compare" class="tight">
+  <div class="head">
+    <h2>Everything else stands somewhere it cannot see this.</h2>
+  </div>
+
+  <div class="cmp-grid">
+
+    <article class="cmp glass">
+      <div class="cmp-h">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/></svg></span>
+        <h3>Key-level policy</h3>
+      </div>
+      <p class="cmp-eg">Wallet policies, transaction guards, session keys</p>
+      <dl class="cmp-kv">
+        <dt>Sees</dt><dd>The transaction, at the moment of signing.</dd>
+        <dt>Cannot see</dt><dd>Where the address came from. A cap cannot tell an approved payee from a poisoned one.</dd>
+      </dl>
+      <p class="cmp-score">370 of 380 still paid</p>
+    </article>
+
+    <article class="cmp glass">
+      <div class="cmp-h">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M4 16c3-6 5 2 8-3s4 1 8-4"/></svg></span>
+        <h3>Payee allowlists</h3>
+      </div>
+      <p class="cmp-eg">A list of who you are allowed to pay</p>
+      <dl class="cmp-kv">
+        <dt>Sees</dt><dd>The name on the call.</dd>
+        <dt>Cannot see</dt><dd>The right name paying the wrong account, the wrong amount or a second time.</dd>
+      </dl>
+      <p class="cmp-score">190 of 380 still paid, and one legitimate payment in five refused</p>
+    </article>
+
+    <article class="cmp glass">
+      <div class="cmp-h">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V7z"/><path d="M9 11h6M9 14h4"/></svg></span>
+        <h3>Mandate protocols</h3>
+      </div>
+      <p class="cmp-eg">AP2, x402, and the schemes being built on them</p>
+      <dl class="cmp-kv">
+        <dt>Sees</dt><dd>That approval happened, and can prove it.</dd>
+        <dt>Cannot see</dt><dd>Whether the payee in the call is the one the user named. Build the mandate from the poisoned invoice and it is valid and wrong.</dd>
+      </dl>
+      <p class="cmp-score">Tested below: catches a wrong name, verifies one the agent wrote itself</p>
+    </article>
+
+    <article class="cmp glass">
+      <div class="cmp-h">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg></span>
+        <h3>Injection classifiers</h3>
+      </div>
+      <p class="cmp-eg">Guardrails that read the text for an attack</p>
+      <dl class="cmp-kv">
+        <dt>Sees</dt><dd>Language that looks like an instruction.</dd>
+        <dt>Cannot see</dt><dd>An invoice that says 499 where the user approved 480. Nothing in it is malicious. Reading it correctly is how you get robbed.</dd>
+      </dl>
+      <p class="cmp-score">Probabilistic, and looking at the wrong object</p>
+    </article>
+
+    <article class="cmp glass">
+      <div class="cmp-h">
+        <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M12 4v5M12 15v5M4 12h5M15 12h5"/></svg></span>
+        <h3>MCP gateways</h3>
+      </div>
+      <p class="cmp-eg">Proxies for tool poisoning, auth and audit</p>
+      <dl class="cmp-kv">
+        <dt>Sees</dt><dd>Everything. They stand in the right place.</dd>
+        <dt>Cannot see</dt><dd>Nothing, and that is the point: they do not decide payments, so the question is never asked.</dd>
+      </dl>
+      <p class="cmp-score">The right position, a different job</p>
+    </article>
+
+    <article class="cmp glass us">
+      <div class="cmp-h">
+        <span class="icon"><svg viewBox="69 43 144 144" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round"><path d="M117 52.4 A67 67 0 0 1 202.7 141.2"/><path d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"/></g><g fill="currentColor"><circle cx="99.7" cy="62.2" r="12"/><circle cx="192.3" cy="158.1" r="12"/></g><path fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"/></svg></span>
+        <h3>moat</h3>
+      </div>
+      <p class="cmp-eg">One process between the agent and both of its sides</p>
+      <dl class="cmp-kv">
+        <dt>Sees</dt><dd>The page arriving and the payment leaving, so it knows which of the two a payee came from.</dd>
+        <dt>Decides</dt><dd>On the whole string, not on what it resembles. Then signs the record of why.</dd>
+      </dl>
+      <p class="cmp-score">0 of 380, and 135 of 135 legitimate payments through</p>
+    </article>
+
+  </div>
+
+
+  <div class="probes">
+    <p class="lbl ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6.5L5.5 18a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 9.5V3"/><path d="M8 15h8"/></svg>Run against their own code, not described</p>
+
+    <div class="probe glass">
+      <div class="probe-h"><h3>x402</h3><span class="probe-v">@x402/core 2.26.0, its own verifier</span></div>
+      <p class="probe-q">Two payments differing only in where the money goes.</p>
+      <dl class="probe-r">
+        <dt>the destination the user approved</dt><dd class="bad">isValid: true</dd>
+        <dt>an address the user never named</dt><dd class="bad">isValid: true</dd>
+        <dt>the same two, put to moat</dt><dd class="good">allow, then deny: authorization-recipient-account</dd>
+      </dl>
+      <p class="probe-n">The verifier passes the destination into
+        <span class="mono">transferWithAuthorization</span> and has nothing to compare it
+        against: <span class="mono">payTo</span> comes from the server being paid, and the
+        spec has no reason code that could object.</p>
+    </div>
+
+    <div class="probe glass">
+      <div class="probe-h"><h3>AP2</h3><span class="probe-v">google-agentic-commerce/AP2, its own evaluators</span></div>
+      <p class="probe-q">Three checkouts, put to the mandate constraints.</p>
+      <dl class="probe-r">
+        <dt>a homoglyph merchant, against an allowlist the user wrote</dt><dd class="good">catches it</dd>
+        <dt>the real merchant, charging 499 where 480 was approved</dt><dd class="bad">verifies</dd>
+        <dt>the attacker, allowlisted by a mandate the agent wrote from the page</dt><dd class="bad">verifies</dd>
+      </dl>
+      <p class="probe-n">The first is a real check and it works. The last is the one that
+        matters: the chain verifies the checkout against the constraints, and has no
+        opinion about where the constraints came from. In an agent flow, the agent
+        writes them from the page it just read.</p>
+    </div>
+
+    <p class="hint foot-note cmp-note">Both harnesses assert that the other protocol's own
+      check passes before testing anything else, so neither can quietly become a straw
+      man, and an upstream change fails the run instead of ageing into a false claim. One
+      thing is stubbed and it is written down: x402's verifier reads the payer's balance
+      and nonce, which a throwaway key does not have, so those two reads answer "funded,
+      unused". The signature, the payload and <span class="mono">verify()</span> itself are
+      real. Source and method: <span class="mono">arena/interop</span>.</p>
+  </div>
+
+  <p class="hint foot-note cmp-note">The two numbers are our own baseline arms, a spending cap and a payee
+    allowlist, built into the arena and run on the same corpus. No vendor's product has been
+    put through it. What is being compared is what each mechanism can observe, which is why
+    the result does not depend on whose implementation you pick.</p>
 </section>
 
 

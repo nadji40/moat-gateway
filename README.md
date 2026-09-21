@@ -85,6 +85,69 @@ The last call is refused: the payee appears nowhere the user put it. `GET
 /v1/sandbox/$S` hands the sandbox back. Running the nine attacks against that
 sandbox: **9 of 9 behave as the corpus says, 0 attacker payments through.**
 
+## What the other protocols decide
+
+The agent-payment protocols are not competitors doing this badly. They answer a
+different question, and the difference is testable rather than arguable. These
+probes call each project's own code, at the versions in
+[`arena/interop/package.json`](arena/interop/package.json), and both assert
+that the other protocol's own check passes before testing anything else, so
+neither can quietly become a straw man and an upstream change fails the run
+instead of ageing into a false claim.
+
+```bash
+pnpm --filter @moat/interop x402
+cd arena/interop && .venv/Scripts/python.exe src/ap2_probe.py
+```
+
+### x402
+
+Two payments built by x402's own client and verified by its own
+`ExactEvmScheme`, differing only in where the money goes:
+
+| | `isValid` |
+|---|---|
+| the destination the user approved | `true` |
+| an address the user never named | `true` |
+| the same two, put to `moat-gateway` | allow, then **deny** `authorization-recipient-account` |
+
+The run prints every read the verifier makes of the chain, and the destination
+is in them: it is passed into `transferWithAuthorization`. The verifier sees it
+and has nothing to compare it against. `payTo` is supplied by the resource
+server being paid, the protocol carries no record of what the user asked for,
+and the spec's `invalidReason` list contains no code that could express the
+objection.
+
+One thing is stubbed and it is worth stating: `verify()` reads the payer's USDC
+balance and whether the authorization nonce has been used, which a throwaway
+key on a public testnet does not have. Those two reads answer "funded, unused".
+The payload construction, the EIP-3009 signature, the signature recovery and
+`verify()` itself are real and unmodified. Letting the funding check fail first
+would have hidden the answer rather than tested it.
+
+### AP2
+
+Three checkouts put to AP2's own constraint evaluators:
+
+| | AP2 |
+|---|---|
+| a homoglyph merchant, against an allowlist the user authored | **catches it** |
+| the real merchant, charging 499 where 480 was approved | verifies |
+| the attacker, allowlisted by a mandate the agent wrote from the page | verifies |
+
+The first result is a real check working and is reported as such:
+`merchant_matches` compares by `id`, or by `name` and `website`, exactly, so a
+lookalike name is a different merchant.
+
+The third is the one that matters. The chain verifies that the checkout
+satisfies the constraints; it has no opinion about where the constraints came
+from, and in an agent flow the agent authors them from the page it just read.
+
+Which puts AP2 where the `allowlist` arm sits in the four-rail table below: it
+catches a wrong name, and it does not catch a right name doing the wrong thing.
+Provenance is outside what it is for, and that is the gap Moat fills rather
+than competes with.
+
 ## Architecture
 
 Moat is a proxy that both sides already know how to talk to. The agent host sees
@@ -210,6 +273,8 @@ Early. Follow the work order below for what is actually built.
 - [x] 22. `demo/`: a public sandbox. A gateway process per visitor, the
       nine attacks runnable from a page, and an HTTP API with no key and no
       account.
+- [x] 23. `arena/interop`: what x402 and AP2 decide about the same two
+      payments, run against their own code rather than described.
 
 What is measured, what is on a public testnet and what is designed but not
 built are kept apart deliberately; the Arena section below says which is
