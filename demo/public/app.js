@@ -26,6 +26,10 @@ const CARD_PATH = "M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A
  * would be invisible, and it needed a gradient the rest of the page does
  * not use. Left out rather than shipped unseen.
  */
+const PLAY =
+  '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+  '<polygon points="6 3 20 12 6 21 6 3"/></svg>';
+
 const SPINNER =
   '<svg class="spin-mark" viewBox="69 43 144 144" aria-hidden="true">' +
   '<g class="s-arcs" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round">' +

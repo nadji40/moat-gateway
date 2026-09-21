@@ -99,8 +99,7 @@ function scenario(t){
 
 function testCard(t,i){
   const r=results[t.id],run=busy.has(t.id);
-  const pill=r&&!run?`<span class="pill ${r.decision}">${r.decision.replace("_"," ")}</span>`
-    :`<span class="pill idle">not run</span>`;
+  const pill=r&&!run?`<span class="pill ${r.decision}">${r.decision.replace("_"," ")}</span>`:"";
   // Branch on the decision, never on whether there are reasons. A step-up
   // often carries none, and showing it as "allowed" because the list was
   // empty is the page lying about the one thing it exists to show.
@@ -122,8 +121,8 @@ function testCard(t,i){
     ${scenario(t)}
     ${why}
     <footer>${pill}
-      <button class="link" data-run="${esc(t.id)}" ${run?'disabled aria-busy="true"':""}>${
-        run?SPINNER+'running':(r?"run again":"run")}</button>
+      <button class="link play" data-run="${esc(t.id)}" ${run?'disabled aria-busy="true"':""
+        } aria-label="${r?"Run this test again":"Run this test"}">${run?SPINNER:PLAY}</button>
       ${r&&!run?`<span class="ms mono">${r.ms} ms</span>`:""}</footer>
   </article>`;
 }
