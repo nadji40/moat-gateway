@@ -81,9 +81,9 @@
       <div class="row-t">
         <h3>Injection classifiers</h3>
         <p class="row-s">Sees language that looks like an instruction.</p>
-        <p class="row-b">An invoice that says 499 contains none.</p>
+        <p class="row-b">Twelve of these attacks contain none.</p>
       </div>
-      <span class="row-r warn">wrong <i>object</i></span>
+      <a class="row-r warn" href="#tested">12 <i>/ 21 invisible</i></a>
     </article>
 
     <article class="row">
@@ -115,7 +115,7 @@
 
 <section id="tested" class="tight">
   <div class="headrow">
-    <h2>Two of them, run.</h2>
+    <h2>Three of them, run.</h2>
   </div>
 
   <div class="probes">
@@ -140,12 +140,25 @@
       <p class="probe-n">The first is a real check and it works. The chain verifies the
         checkout against the constraints, not where the constraints came from.</p>
     </div>
+    <div class="probe glass">
+      <div class="probe-h"><h3>Injection classifiers</h3><span class="probe-v">a detector that never misses, over all 21</span></div>
+      <dl class="probe-r">
+        <dt>attacks that put an instruction on the page</dt><dd class="good">9 of 21</dd>
+        <dt>of those nine, matched only a line an honest invoice carries too</dt><dd class="bad">3</dd>
+        <dt>attacks with nothing on the page to object to</dt><dd class="bad">12 of 21</dd>
+      </dl>
+      <p class="probe-n">No model was downloaded and none is needed for the number. Every page
+        is scanned for an instruction aimed at the reader and each match is printed. A detector
+        that never misses one still cannot reach an invoice reading 499 where 480 was approved.</p>
+    </div>
   </div>
 
   <p class="hint foot-note">Each harness asserts the other protocol's own check passes
     before testing anything else, so neither can become a straw man. x402's balance and
     nonce reads are stubbed, because a throwaway key has neither; the signature and
-    <span class="mono">verify()</span> are real. Source: <span class="mono">arena/interop</span>.</p>
+    <span class="mono">verify()</span> are real. The third is an upper bound on a category
+    rather than a score for any product, and it is generous: three of the nine are counted
+    on a payment line an ordinary invoice also has. Source: <span class="mono">arena/interop</span>.</p>
 </section>
 
 </div>

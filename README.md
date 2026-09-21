@@ -93,11 +93,13 @@ probes call each project's own code, at the versions in
 [`arena/interop/package.json`](arena/interop/package.json), and both assert
 that the other protocol's own check passes before testing anything else, so
 neither can quietly become a straw man and an upstream change fails the run
-instead of ageing into a false claim.
+instead of ageing into a false claim. A third probe asks what the classifier
+approach can reach at all, without naming a product.
 
 ```bash
 pnpm --filter @moat/interop x402
-cd arena/interop && .venv/Scripts/python.exe src/ap2_probe.py
+pnpm --filter @moat/interop ap2
+pnpm --filter @moat/interop classifier
 ```
 
 ### x402
@@ -147,6 +149,41 @@ Which puts AP2 where the `allowlist` arm sits in the four-rail table below: it
 catches a wrong name, and it does not catch a right name doing the wrong thing.
 Provenance is outside what it is for, and that is the gap Moat fills rather
 than competes with.
+
+### Injection classifiers
+
+Not a product comparison. The question is what the approach can reach, so the
+detector here is a deliberately generous one: it never misses an instruction,
+because the instructions were written into this corpus and it is given the
+patterns for them. Hidden channels count, so HTML comments and `alt` text are
+read before the tags are stripped, which is where three of these attacks put
+their payload.
+
+| over all 21 attacks | |
+|---|---|
+| put an instruction on the page | **9** |
+| of those nine, matched only a payment line an honest invoice carries too | 3 |
+| put nothing on the page to object to | **12** |
+
+The twelve are the point. An invoice quoting 499 where the user approved 480
+is not lying about anything a reader could check. Neither is a second invoice
+with a fresh id for work already paid for, nor an address that differs by one
+character, nor a payment split into four under a threshold. There is no
+sentence to flag, because the attack is the relationship between the page and
+what the user actually said, and that relationship is not on the page.
+
+The nine are counted generously and the run says so: three of them matched
+only text of the form "pay Supplier Ltd", which every real invoice contains.
+The arena's controls are too terse to price that, a heading and a total with
+no prose, so the false-positive cost of reaching nine is untested here rather
+than proven to be zero.
+
+The harness prints the matching sentence for every page it flags and lists
+every page it does not, with its class, so the judgement can be checked. It
+takes `--model <hf-id>` to run a real classifier over the same pages; nothing
+is downloaded by default, and a real model can only score below a detector
+that never misses.
+
 
 ## Architecture
 

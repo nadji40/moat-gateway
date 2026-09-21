@@ -6,7 +6,8 @@
   "scripts": {
     "x402": "node --import tsx src/x402.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "ap2": "node -e \"const{execFileSync}=require(\"node:child_process\");execFileSync(\".venv/Scripts/python.exe\",[\"src/ap2_probe.py\"],{stdio:\"inherit\"})\""
+    "ap2": "node scripts/py.mjs src/ap2_probe.py",
+    "classifier": "node scripts/py.mjs src/classifier_probe.py"
   },
   "dependencies": {
     "@x402/core": "^2.26.0",

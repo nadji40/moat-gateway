@@ -66,3 +66,24 @@ from, and in an agent flow they are authored from content the agent read.
 That is the shape of the allowlist arm in the arena's own table: it catches a
 wrong name and it does not catch a right name doing the wrong thing. AP2 is
 not doing this badly. Provenance is outside what it is for.
+
+## Injection classifiers
+
+`pnpm --filter @moat/interop classifier`
+
+Not a product comparison, and no model is downloaded. The detector here is a
+deliberately generous one: it never misses an instruction, because the
+instructions were written into this corpus and it is handed the patterns for
+them. HTML comments and `alt` text are extracted before tags are stripped,
+since that is where three of these attacks hide their payload.
+
+Over all 21 attacks, 9 put an instruction on the page and 12 put nothing there
+to object to. Three of the nine matched only a line of the form "pay Supplier
+Ltd", which every real invoice carries, and are counted anyway; the arena's
+controls are too terse to price that, so the cost of reaching nine is untested
+rather than zero.
+
+The twelve are the argument. An invoice quoting 499 where the user approved
+480 is not lying about anything a reader could check, so there is no sentence
+to flag. Every match is printed and every unflagged page is listed with its
+class. `--model <hf-id>` runs a real classifier over the same pages.
