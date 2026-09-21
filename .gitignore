@@ -30,3 +30,4 @@ moat.local.yaml
 # Python (arena/analysis)
 __pycache__/
 *.pyc
+arena/interop/.venv/

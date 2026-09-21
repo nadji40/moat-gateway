@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "x402": "node --import tsx src/x402.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "ap2": "node -e \"const{execFileSync}=require(\"node:child_process\");execFileSync(\".venv/Scripts/python.exe\",[\"src/ap2_probe.py\"],{stdio:\"inherit\"})\""
   },
   "dependencies": {
     "@x402/core": "^2.26.0",
