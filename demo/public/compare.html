@@ -43,65 +43,96 @@
   </div>
 </header>
 
-  <svg class="flowart" viewBox="0 0 760 236" xmlns:xlink="http://www.w3.org/1999/xlink"
-       role="img" aria-label="Two payment requests reach the gateway. The one the user named is paid. The one that came from the page is refused at the gate.">
-    <defs>
-      <path id="laneA" d="M190 66 C 300 66 330 115 376 115 L 600 115"/>
-      <path id="laneB" d="M190 170 C 300 170 330 115 362 115"/>
-    </defs>
+  <div class="flowart" aria-hidden="true">
+    <svg viewBox="0 0 460 136" xmlns="http://www.w3.org/2000/svg">
+      <style>
+      .c-line{fill:none;stroke:var(--ink-3);stroke-width:2}
+      .c-ink{fill:none;stroke:var(--ink-2);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+      .c-wire{stroke-dasharray:4 7;animation:c-flow 1.3s linear infinite}
+      .c-lbl{fill:var(--ink-3);font-family:var(--font);font-size:11.5px;font-weight:700;letter-spacing:1.6px;text-anchor:middle}
+      .c-leg{opacity:0;animation:c-leg 12s cubic-bezier(.55,0,.45,1) infinite}
+      .c-gate{transform-box:fill-box;transform-origin:center;animation:c-gate 12s ease-out infinite}
+      .c-paid,.c-no{opacity:0;transform-box:fill-box;transform-origin:center}
+      .c-paid{animation:c-paid 12s ease-out infinite}
+      .c-no{animation:c-no 12s ease-out infinite}
+      @keyframes c-flow{to{stroke-dashoffset:-11}}
+      @keyframes c-leg{
+        0%{opacity:0;transform:translate(0,0)}
+        1%{opacity:1}
+        7.5%{opacity:1;transform:translate(var(--dx),var(--dy))}
+        8.7%,100%{opacity:0;transform:translate(var(--dx),var(--dy))}
+      }
+      @keyframes c-gate{
+        0%,8%{transform:scale(1)} 9.4%{transform:scale(1.08)}
+        12%,56%{transform:scale(1)} 57.4%{transform:scale(1.08)}
+        60%,100%{transform:scale(1)}
+      }
+      @keyframes c-paid{
+        0%,17.5%{opacity:0;transform:scale(.7)} 19%{opacity:1;transform:scale(1)}
+        30%{opacity:1} 34%,100%{opacity:0}
+      }
+      @keyframes c-no{
+        0%,57%{opacity:0;transform:scale(.7)} 58.5%{opacity:1;transform:scale(1)}
+        70%{opacity:1} 74%,100%{opacity:0}
+      }
+      @media(prefers-reduced-motion:reduce){.flowart *{animation:none}}
+      </style>
 
-    <use class="lane" xlink:href="#laneA" href="#laneA"/>
-    <use class="lane" xlink:href="#laneB" href="#laneB"/>
+      <line class="c-line c-wire" x1="70" y1="34" x2="198" y2="62"/>
+      <line class="c-line c-wire" x1="70" y1="92" x2="198" y2="64"/>
+      <line class="c-line c-wire" x1="262" y1="63" x2="348" y2="63"/>
 
-    <rect class="box" x="14" y="40" width="172" height="52" rx="14"/>
-    <text x="100" y="73" text-anchor="middle">User said</text>
+      <!-- what the user named -->
+      <rect class="c-line" x="10" y="16" width="54" height="34" rx="11"/>
+      <circle cx="37" cy="27" r="5.4" fill="none" stroke="var(--ink-2)" stroke-width="2.4"/>
+      <path class="c-ink" d="M28 43 a9 9 0 0 1 18 0"/>
+      <text class="c-lbl" x="37" y="10">USER</text>
 
-    <rect class="box" x="14" y="144" width="172" height="52" rx="14"/>
-    <text x="100" y="177" text-anchor="middle">Page said</text>
+      <!-- what a page it read said -->
+      <rect class="c-line" x="10" y="76" width="54" height="34" rx="11"/>
+      <rect x="28" y="82" width="18" height="22" rx="3" fill="none" stroke="var(--ink-2)" stroke-width="2.2"/>
+      <path class="c-ink" d="M32 89 H42 M32 95 H39"/>
+      <text class="c-lbl" x="37" y="124">PAGE</text>
 
-    <g class="gate">
-      <path class="ring" d="M462.5 126.4 A44 44 0 0 1 377.5 126.4"/>
-      <path class="ring" d="M377.5 103.6 A44 44 0 0 1 462.5 103.6"/>
-      <circle class="rdot" cx="462.5" cy="126.4" r="7"/>
-      <circle class="rdot" cx="377.5" cy="103.6" r="7"/>
-      <circle class="flash" cx="420" cy="115" r="44" fill="none">
-        <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
-                 values="0;0;.9;0;0" keyTimes="0;.36;.44;.56;1"/>
-      </circle>
-    </g>
-    <text class="soft" x="420" y="196" text-anchor="middle">moat</text>
+      <text class="c-lbl" x="230" y="106">MOAT</text>
 
-    <rect class="box" x="600" y="89" width="146" height="52" rx="14"/>
-    <rect class="box paid" x="600" y="89" width="146" height="52" rx="14" opacity="0">
-      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
-               values="0;0;1;1;0" keyTimes="0;.60;.68;.88;1"/>
-    </rect>
-    <text x="673" y="122" text-anchor="middle">Paid</text>
+      <!-- the payee -->
+      <rect class="c-line" x="354" y="41" width="54" height="44" rx="13"/>
+      <rect x="366" y="53" width="30" height="20" rx="4" fill="none" stroke="var(--ink-2)" stroke-width="2.2"/>
+      <path class="c-ink" d="M366 60 H396"/>
+      <text class="c-lbl" x="381" y="106">PAYEE</text>
 
-    <g class="xmark" opacity="0">
-      <path d="M352 105 L372 125 M372 105 L352 125"/>
-      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
-               values="0;0;1;1;0;0" keyTimes="0;.36;.43;.54;.60;1"/>
-    </g>
+      <!-- act one: the payee the user named, paid -->
+      <g class="c-leg" style="--dx:126px;--dy:28px;animation-delay:.2s"><rect x="64" y="30" width="16" height="8" rx="4" fill="var(--ink-2)"/></g>
+      <g class="c-leg" style="--dx:84px;--dy:0px;animation-delay:1.3s"><rect x="256" y="59" width="16" height="8" rx="4" fill="var(--green-l)"/></g>
 
-    <circle class="d ok" r="9" opacity="0">
-      <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
-                     keyPoints="0;0;1;1" keyTimes="0;.08;.64;1">
-        <mpath xlink:href="#laneA" href="#laneA"/>
-      </animateMotion>
-      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
-               values="0;1;1;0;0" keyTimes="0;.08;.64;.74;1"/>
-    </circle>
+      <!-- act two: the same payment, picked up off the page, refused at the gate -->
+      <g class="c-leg" style="--dx:126px;--dy:-28px;animation-delay:6s"><rect x="64" y="88" width="16" height="8" rx="4" fill="var(--ink-2)"/></g>
+      <g class="c-leg" style="--dx:-100px;--dy:23px;animation-delay:7s"><rect x="182" y="62" width="16" height="8" rx="4" fill="var(--red-l)"/></g>
 
-    <circle class="d bad" r="9" opacity="0">
-      <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
-                     keyPoints="0;0;1;1" keyTimes="0;.10;.40;1">
-        <mpath xlink:href="#laneB" href="#laneB"/>
-      </animateMotion>
-      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
-               values="0;1;1;0;0" keyTimes="0;.10;.40;.52;1"/>
-    </circle>
-  </svg>
+      <!-- the gate, placed by the attribute so the pulse cannot move it -->
+      <g transform="translate(175.28,18.37) scale(0.3881)">
+        <g class="c-gate">
+          <g fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round">
+            <path d="M117 52.4 A67 67 0 0 1 202.7 141.2"/>
+            <path d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"/>
+          </g>
+          <g fill="var(--ink)"><circle cx="99.7" cy="62.2" r="11"/><circle cx="192.3" cy="158.1" r="11"/></g>
+        </g>
+      </g>
+
+      <!-- refused, at the gate -->
+      <g class="c-no">
+        <circle cx="230" cy="63" r="9" fill="var(--red-l)"/>
+        <path d="M226.4 59.4 l7.2 7.2 M233.6 59.4 l-7.2 7.2" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/>
+      </g>
+      <!-- the payee actually paid -->
+      <g class="c-paid">
+        <circle cx="404" cy="45" r="8.5" fill="var(--green-l)"/>
+        <path d="M400.2 45 l2.6 2.6 4.4 -4.8" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>
+    </svg>
+  </div>
 
 <section class="tight">
   <p class="lbl">Put through the same 380 payments</p>
@@ -212,7 +243,6 @@
 
 <script src="app.js"></script>
 <script>
-if(matchMedia("(prefers-reduced-motion: reduce)").matches) $(".flowart").pauseAnimations();
 (async()=>{
   try{
     await api("/v1/limits");
