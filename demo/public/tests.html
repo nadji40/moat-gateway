@@ -40,16 +40,11 @@
   <div>
     <p class="kicker">The tests</p>
     <h1>Nine attacks, each isolating one thing.</h1>
-    <p class="lede">
-      Every test gets its own gateway process and its own mandate. Share one and
-      a mandate spent by the first test is a duplicate for the next, so the
-      verdicts come back right for the wrong reasons. All nine are rows from the
-      measured corpus, not written for this page.
-    </p>
+    <p class="lede">Rows from the measured corpus. Each runs in a gateway of its own.</p>
     <div class="row">
       <button class="btn" id="run-all">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-        Run all nine tests
+        Run all nine
       </button>
       <a class="btn ghost" href="index.html#compose">Compose your own</a>
     </div>
@@ -93,7 +88,7 @@ let TESTS=[],results={},busy=new Set(),firstDraw=true;
 
 function scenario(t){
   const m=t.mandate;
-  return `<details class="sc"><summary>What happens in this test</summary><dl>
+  return `<details class="sc"><summary>What happens</summary><dl>
     <dt>User said</dt><dd class="q">${esc(t.task)}</dd>
     ${t.page?`<dt>Page said</dt><dd class="q">${esc(t.page).split(NL).join("<br>")}</dd>`:""}
     <dt>Approved</dt><dd>${m?`${esc(m.payee)}, ${esc(m.amount)} ${esc(m.currency)}`:"nothing"}</dd>
@@ -114,7 +109,7 @@ function testCard(t,i){
     if(r.error) body=esc(r.error);
     else if(r.reasons.length) body=r.reasons.map(x=>`<code>${esc(x.id)}</code> ${esc(x.message)}`).join("<br>");
     else if(r.decision==="allow") body=`<span class="ok">allowed, the provider ${r.paid?"was paid":"was called"}</span>`;
-    else if(r.decision==="step_up") body=`<span class="held">held, a person has to approve this before it moves</span>`;
+    else if(r.decision==="step_up") body=`<span class="held">held for a person to approve</span>`;
     else body="refused";
   }
   const why=body?`<div class="why">${body}</div>`:"";
@@ -147,10 +142,10 @@ function draw(){
     const total=done.length+busy.size;
     $("#summary").hidden=false;
     $("#summary").innerHTML=`<span class="bar" style="--p:${Math.round(100*done.length/Math.max(total,1))}%"></span>
-      <div class="big mono">${met} / ${done.length}<small>behaved as the corpus says</small></div><span class="sep"></span>
-      <div class="big mono through${through?" bad":""}">${through}<small>attacker payments through</small></div><span class="sep"></span>
-      <div class="big mono">${done.reduce((a,r)=>a+r.ms,0).toLocaleString("en-US")} ms<small>gateway time, in total</small></div>
-      ${busy.size?`<span class="hint">${SPINNER} ${busy.size} running</span>`:`<span class="hint">every verdict signed and recorded</span>`}`;
+      <div class="big mono">${met} / ${done.length}<small>as the corpus says</small></div><span class="sep"></span>
+      <div class="big mono through${through?" bad":""}">${through}<small>attacker paid</small></div><span class="sep"></span>
+      <div class="big mono">${done.reduce((a,r)=>a+r.ms,0).toLocaleString("en-US")} ms<small>gateway time</small></div>
+      ${busy.size?`<span class="hint">${SPINNER} ${busy.size} running</span>`:`<span class="hint">signed and recorded</span>`}`;
   }
 }
 

@@ -43,6 +43,66 @@
   </div>
 </header>
 
+  <svg class="flowart" viewBox="0 0 760 236" xmlns:xlink="http://www.w3.org/1999/xlink"
+       role="img" aria-label="Two payment requests reach the gateway. The one the user named is paid. The one that came from the page is refused at the gate.">
+    <defs>
+      <path id="laneA" d="M190 66 C 300 66 330 115 376 115 L 600 115"/>
+      <path id="laneB" d="M190 170 C 300 170 330 115 362 115"/>
+    </defs>
+
+    <use class="lane" xlink:href="#laneA" href="#laneA"/>
+    <use class="lane" xlink:href="#laneB" href="#laneB"/>
+
+    <rect class="box" x="14" y="40" width="172" height="52" rx="14"/>
+    <text x="100" y="73" text-anchor="middle">User said</text>
+
+    <rect class="box" x="14" y="144" width="172" height="52" rx="14"/>
+    <text x="100" y="177" text-anchor="middle">Page said</text>
+
+    <g class="gate">
+      <path class="ring" d="M462.5 125.4 A44 44 0 0 0 377.5 125.4"/>
+      <path class="ring" d="M377.5 104.6 A44 44 0 0 1 462.5 104.6"/>
+      <circle class="rdot" cx="462.5" cy="125.4" r="7"/>
+      <circle class="rdot" cx="377.5" cy="104.6" r="7"/>
+      <circle class="flash" cx="420" cy="115" r="44" fill="none">
+        <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
+                 values="0;0;.9;0;0" keyTimes="0;.36;.44;.56;1"/>
+      </circle>
+    </g>
+    <text class="soft" x="420" y="196" text-anchor="middle">moat</text>
+
+    <rect class="box" x="600" y="89" width="146" height="52" rx="14"/>
+    <rect class="box paid" x="600" y="89" width="146" height="52" rx="14" opacity="0">
+      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
+               values="0;0;1;1;0" keyTimes="0;.60;.68;.88;1"/>
+    </rect>
+    <text x="673" y="122" text-anchor="middle">Paid</text>
+
+    <g class="xmark" opacity="0">
+      <path d="M352 105 L372 125 M372 105 L352 125"/>
+      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;.36;.43;.54;.60;1"/>
+    </g>
+
+    <circle class="d ok" r="9" opacity="0">
+      <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;.08;.64;1">
+        <mpath xlink:href="#laneA" href="#laneA"/>
+      </animateMotion>
+      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
+               values="0;1;1;0;0" keyTimes="0;.08;.64;.74;1"/>
+    </circle>
+
+    <circle class="d bad" r="9" opacity="0">
+      <animateMotion dur="5s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;.10;.40;1">
+        <mpath xlink:href="#laneB" href="#laneB"/>
+      </animateMotion>
+      <animate attributeName="opacity" dur="5s" repeatCount="indefinite"
+               values="0;1;1;0;0" keyTimes="0;.10;.40;.52;1"/>
+    </circle>
+  </svg>
+
 <section class="tight">
   <p class="lbl">Put through the same 380 payments</p>
   <div class="rows">
@@ -109,7 +169,7 @@
 
   <div class="probes">
     <div class="probe glass">
-      <div class="probe-h"><h3>x402</h3><span class="probe-v">@x402/core 2.26.0</span></div>
+      <div class="probe-h"><h3>x402</h3><span class="probe-v">@x402/core 2.26.0, balance and nonce stubbed</span></div>
       <dl class="probe-r">
         <dt>the destination the user approved</dt><dd class="bad">isValid: true</dd>
         <dt>an address the user never named</dt><dd class="bad">isValid: true</dd>
@@ -119,7 +179,7 @@
     </div>
 
     <div class="probe glass">
-      <div class="probe-h"><h3>AP2</h3><span class="probe-v">google-agentic-commerce/AP2</span></div>
+      <div class="probe-h"><h3>AP2</h3><span class="probe-v">google-agentic-commerce/AP2, unmodified</span></div>
       <dl class="probe-r">
         <dt>a homoglyph merchant, against the user's allowlist</dt><dd class="good">catches it</dd>
         <dt>499 where 480 was approved</dt><dd class="bad">verifies</dd>
@@ -129,7 +189,7 @@
     </div>
 
     <div class="probe glass">
-      <div class="probe-h"><h3>Injection classifiers</h3><span class="probe-v">a detector that never misses</span></div>
+      <div class="probe-h"><h3>Injection classifiers</h3><span class="probe-v">a detector that never misses, counted generously</span></div>
       <dl class="probe-r">
         <dt>attacks that put an instruction on the page</dt><dd class="good">9 of 21</dd>
         <dt>attacks that put nothing there to object to</dt><dd class="bad">12 of 21</dd>
@@ -137,11 +197,6 @@
       <p class="probe-n">An invoice reading 499 is not lying about anything a reader could check.</p>
     </div>
   </div>
-
-  <p class="hint foot-note">Each probe asserts the other project's own check passes before testing
-    anything else, so neither becomes a straw man. x402's balance and nonce reads are stubbed; its
-    signature and <span class="mono">verify()</span> are real. The nine is an upper bound on the
-    approach, counted generously. Source: <span class="mono">arena/interop</span>.</p>
 </section>
 </div>
 
@@ -157,6 +212,7 @@
 
 <script src="app.js"></script>
 <script>
+if(matchMedia("(prefers-reduced-motion: reduce)").matches) $(".flowart").pauseAnimations();
 (async()=>{
   try{
     await api("/v1/limits");

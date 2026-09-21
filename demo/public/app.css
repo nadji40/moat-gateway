@@ -353,6 +353,20 @@ footer.foot p{max-width:64ch;margin:0 auto}
 
 .lbl.gap{margin-top:34px}
 
+/* the thesis, drawn: two payments that look alike, one of which the user named */
+.flowart{display:block;width:min(100%,760px);margin:8px auto 42px}
+.flowart text{font:700 21px Manrope,system-ui,sans-serif;fill:var(--ink-2);letter-spacing:.01em}
+.flowart text.soft{font-size:18px;fill:var(--ink-3);letter-spacing:.1em;text-transform:uppercase}
+.flowart .box{fill:rgba(255,255,255,.035);stroke:var(--line);stroke-width:1.5}
+.flowart .box.paid{fill:color-mix(in srgb,var(--green-l) 10%,transparent);stroke:var(--green-l);stroke-width:2}
+.flowart .lane{fill:none;stroke:var(--line);stroke-width:2;stroke-dasharray:6 8}
+.flowart .ring{fill:none;stroke:var(--ink-2);stroke-width:8;stroke-linecap:round}
+.flowart .rdot{fill:var(--ink-2)}
+.flowart .flash{stroke:var(--red-l);stroke-width:8}
+.flowart .xmark{fill:none;stroke:var(--red-l);stroke-width:4;stroke-linecap:round}
+.flowart .d.ok{fill:var(--green-l)}
+.flowart .d.bad{fill:var(--red-l)}
+
 /* one row per mechanism: mark, what it sees, what it comes to */
 .rows{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;text-align:left;
