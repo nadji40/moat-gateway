@@ -333,6 +333,24 @@ footer.foot p{max-width:64ch;margin:0 auto}
 @keyframes d-spin{to{transform:rotate(360deg)}}
 @keyframes d-breathe{0%{stroke-dasharray:6 94;stroke-dashoffset:0}50%{stroke-dasharray:70 30;stroke-dashoffset:-20}100%{stroke-dasharray:6 94;stroke-dashoffset:-100}}
 
+/* the comparison: one card per mechanism, ours last */
+.cmp-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(17.5rem,1fr))}
+.cmp{border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--pane);--c:var(--ink-2)}
+.cmp-h{display:flex;flex-direction:column;align-items:center;gap:11px}
+.cmp-h h3{color:var(--ink)}
+.cmp .icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
+  background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.cmp .icon svg{width:19px;height:19px}
+.cmp-eg{font-size:.76rem;color:var(--ink-3);line-height:1.5}
+.cmp-kv{display:grid;gap:3px;margin:0;font-size:.86rem}
+.cmp-kv dt{font-size:.65rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin-top:8px}
+.cmp-kv dd{margin:0;color:var(--ink-2)}
+.cmp-score{margin-top:auto;padding-top:13px;border-top:1px solid var(--line);font-size:.875rem;font-weight:700;color:var(--red-l)}
+.cmp.us{border-color:color-mix(in srgb,var(--green-l) 50%,transparent);--c:var(--green-l)}
+.cmp.us .icon{background:color-mix(in srgb,var(--green-l) 12%,transparent);border-color:color-mix(in srgb,var(--green-l) 32%,transparent)}
+.cmp.us .cmp-score{color:var(--green-l);border-top-color:color-mix(in srgb,var(--green-l) 30%,transparent)}
+.cmp-note{max-width:70ch;margin:22px auto 0;line-height:1.6}
+
 /* the bar above the curl block */
 .codewrap{display:grid;gap:12px}
 .codebar{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
