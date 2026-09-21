@@ -258,7 +258,7 @@ details.sc .note{margin-top:10px;padding-top:8px;border-top:1px dashed var(--lin
   .pair{grid-template-columns:1fr;gap:16px}
   .pair > div + div{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:16px}
 }
-.foot-note{color:var(--ink-3);font-size:.78rem}
+.foot-note{color:var(--ink-3);font-size:.78rem;max-width:72ch;margin-left:auto;margin-right:auto}
 .rule{height:1px;background:var(--line)}
 .panel > .ph{display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.03);
   font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
