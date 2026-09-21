@@ -44,7 +44,7 @@
 </header>
 
   <div class="flowart" aria-hidden="true">
-    <svg viewBox="0 0 460 136" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 460 142" xmlns="http://www.w3.org/2000/svg">
       <style>
       .c-line{fill:none;stroke:var(--ink-3);stroke-width:2}
       .c-ink{fill:none;stroke:var(--ink-2);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
@@ -88,11 +88,10 @@
       <path class="c-ink" d="M28 43 a9 9 0 0 1 18 0"/>
       <text class="c-lbl" x="37" y="10">USER</text>
 
-      <!-- what a page it read said -->
+      <!-- whatever the agent read back: an invoice, an email, another server -->
       <rect class="c-line" x="10" y="76" width="54" height="34" rx="11"/>
-      <rect x="28" y="82" width="18" height="22" rx="3" fill="none" stroke="var(--ink-2)" stroke-width="2.2"/>
-      <path class="c-ink" d="M32 89 H42 M32 95 H39"/>
-      <text class="c-lbl" x="37" y="124">PAGE</text>
+      <path class="c-ink" d="M26 86 H48 M26 93 H42 M26 100 H46"/>
+      <text class="c-lbl" x="37" y="124">TOOL<tspan x="37" dy="13">RESULT</tspan></text>
 
       <text class="c-lbl" x="230" y="106">MOAT</text>
 
@@ -106,7 +105,7 @@
       <g class="c-leg" style="--dx:126px;--dy:28px;animation-delay:.2s"><rect x="64" y="30" width="16" height="8" rx="4" fill="var(--ink-2)"/></g>
       <g class="c-leg" style="--dx:84px;--dy:0px;animation-delay:1.3s"><rect x="256" y="59" width="16" height="8" rx="4" fill="var(--green-l)"/></g>
 
-      <!-- act two: the same payment, picked up off the page, refused at the gate -->
+      <!-- act two: the same payment, picked up from what the agent read, refused -->
       <g class="c-leg" style="--dx:126px;--dy:-28px;animation-delay:6s"><rect x="64" y="88" width="16" height="8" rx="4" fill="var(--ink-2)"/></g>
       <g class="c-leg" style="--dx:-100px;--dy:23px;animation-delay:7s"><rect x="182" y="62" width="16" height="8" rx="4" fill="var(--red-l)"/></g>
 
@@ -157,7 +156,7 @@
       <span class="row-i"><svg viewBox="69 43 144 144" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round"><path d="M117 52.4 A67 67 0 0 1 202.7 141.2"/><path d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"/></g><g fill="currentColor"><circle cx="99.7" cy="62.2" r="12"/><circle cx="192.3" cy="158.1" r="12"/></g><path fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"/></svg></span>
       <div class="row-t">
         <h3>moat</h3>
-        <p class="row-s">The page arriving, and the payment leaving.</p>
+        <p class="row-s">Everything the agent reads, and the payment it then makes.</p>
       </div>
       <span class="row-r good">0<i>paid</i></span>
     </article>
@@ -178,7 +177,7 @@
       <span class="row-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg></span>
       <div class="row-t">
         <h3>Injection classifiers</h3>
-        <p class="row-s">An instruction, when the page contains one.</p>
+        <p class="row-s">An instruction, when the content carries one.</p>
       </div>
       <a class="row-r warn" href="#tested">12<i>of 21 blind</i></a>
     </article>
@@ -222,8 +221,8 @@
     <div class="probe glass">
       <div class="probe-h"><h3>Injection classifiers</h3><span class="probe-v">a detector that never misses, counted generously</span></div>
       <dl class="probe-r">
-        <dt>attacks that put an instruction on the page</dt><dd class="good">9 of 21</dd>
-        <dt>attacks that put nothing there to object to</dt><dd class="bad">12 of 21</dd>
+        <dt>attacks that carry an instruction to find</dt><dd class="good">9 of 21</dd>
+        <dt>attacks with nothing in them to object to</dt><dd class="bad">12 of 21</dd>
       </dl>
       <p class="probe-n">An invoice reading 499 is not lying about anything a reader could check.</p>
     </div>
