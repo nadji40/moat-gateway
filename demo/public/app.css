@@ -351,6 +351,8 @@ footer.foot p{max-width:64ch;margin:0 auto}
 .cmp.us .cmp-score{color:var(--green-l);border-top-color:color-mix(in srgb,var(--green-l) 30%,transparent)}
 .cmp-note{max-width:70ch;margin:22px auto 0;line-height:1.6}
 
+.lbl.gap{margin-top:34px}
+
 /* one row per mechanism: mark, what it sees, what it comes to */
 .rows{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;text-align:left;
