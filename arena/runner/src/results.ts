@@ -1,19 +1,30 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { AgentTrace } from "./backends/types.js";
+import { DEFENSES, isDefense, type Defense } from "./defenses.js";
 import type { Rail } from "./rails.js";
 
 export type Mode = "gateway" | "direct";
 
+/** The arms that put the gateway in the path, each with a different policy. */
+export type GatewayArm = "cap" | "allowlist" | "moat";
+
 /**
  * The control layer a run went through. `none` is the mocks directly; the
- * others run through the gateway with a different policy (see context.ts).
+ * gateway arms run through the gateway with a different policy each (see
+ * context.ts); the defense arms run direct with a published prompt-injection
+ * defense in front of the agent instead (see defenses.ts).
  */
-export type Arm = "none" | "cap" | "allowlist" | "moat";
-export const ARMS: readonly Arm[] = ["none", "cap", "allowlist", "moat"];
+export type Arm = "none" | GatewayArm | Defense;
+export const ARMS: readonly Arm[] = ["none", "cap", "allowlist", "moat", ...DEFENSES];
 
 export function modeForArm(arm: Arm): Mode {
-  return arm === "none" ? "direct" : "gateway";
+  return arm === "none" || isDefense(arm) ? "direct" : "gateway";
+}
+
+/** A defense arm has no gateway, so it has no verdicts to report either. */
+export function isGatewayArm(arm: Arm): arm is GatewayArm {
+  return arm !== "none" && !isDefense(arm);
 }
 
 /** Rows written before arms existed only carry a mode: direct was none, gateway was moat. */

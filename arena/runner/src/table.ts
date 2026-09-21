@@ -1,5 +1,5 @@
 import type { Rail } from "./rails.js";
-import { ARMS, armForMode, percentile, type Arm, type ResultRow } from "./results.js";
+import { ARMS, armForMode, isGatewayArm, percentile, type Arm, type ResultRow } from "./results.js";
 
 export interface SummaryLine {
   attack: string;
@@ -220,7 +220,11 @@ function renderArmTable(rows: ResultRow[], arms: Arm[]): string {
       ...arms.map((arm) => {
         const cell = line.byArm[arm];
         if (!cell) return "-";
-        return arm === "none" ? `${cell.hit}/${cell.runs}` : `${cell.hit}/${cell.runs} ${cell.verdicts}`;
+        // Verdicts come from the gateway, so the arms without one print the
+        // count alone rather than an empty verdict string.
+        return isGatewayArm(arm)
+          ? `${cell.hit}/${cell.runs} ${cell.verdicts}`
+          : `${cell.hit}/${cell.runs}`;
       }),
     ]);
     if (out.length > 0) out.push("");
@@ -235,15 +239,22 @@ function renderArmTable(rows: ResultRow[], arms: Arm[]): string {
   // Only calls that reached the provider count: a deny returns in a millisecond
   // because nothing was forwarded. verdicts[] and pay_ms[] are aligned.
   const forwarded = (row: ResultRow): number[] =>
-    armOfRow(row) === "none" ? row.pay_ms : row.pay_ms.filter((_, i) => row.verdicts[i] === "paid");
+    // Without a gateway there are no verdicts to filter on, and every pay the
+    // agent made reached the provider by definition.
+    !isGatewayArm(armOfRow(row))
+      ? row.pay_ms
+      : row.pay_ms.filter((_, i) => row.verdicts[i] === "paid");
   const base = rows.filter((row) => armOfRow(row) === "none").flatMap(forwarded);
   const latency = arms.map((arm) => {
     const values = rows.filter((row) => armOfRow(row) === arm).flatMap(forwarded);
     if (values.length === 0) return `${arm} n/a`;
     const p50 = percentile(values, 50) ?? 0;
     const p95 = percentile(values, 95) ?? 0;
+    const delta = p50 - (percentile(base, 50) ?? 0);
     const added =
-      base.length && arm !== "none" ? ` (+${(p50 - (percentile(base, 50) ?? 0)).toFixed(1)} p50)` : "";
+      base.length && arm !== "none"
+        ? ` (${delta >= 0 ? "+" : ""}${delta.toFixed(1)} p50)`
+        : "";
     return `${arm} p50 ${p50.toFixed(1)} p95 ${p95.toFixed(1)}${added} n=${values.length}`;
   });
   out.push("", `forwarded pay latency (ms): ${latency.join(" | ")}`);

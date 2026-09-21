@@ -23,6 +23,13 @@ import {
   STEP_UP_CODE,
   STEP_UP_MESSAGE,
 } from "../mcp.js";
+import {
+  guardText,
+  parseToolFilter,
+  SPOTLIGHT_PREAMBLE,
+  toolFilterPrompt,
+  type Defense,
+} from "../defenses.js";
 import { railSpec } from "../rails.js";
 import type {
   AgentBackend,
@@ -88,19 +95,29 @@ export class OpenAIBackend implements AgentBackend {
     await ctx.registerIntent(scenario.task);
     const registeredMetadata = await ctx.registerAuthorization(scenario);
     const paymentMetadata = metadataForScenario(scenario, registeredMetadata);
+    const input = inputFor(scenario, paymentMetadata);
+
+    // A defense arm puts a published prompt-injection defense in front of the
+    // agent and nothing else. The tool filter has to run before the servers
+    // are wrapped, because what it decides is which tools they advertise.
+    let instructions = INSTRUCTIONS;
+    if (ctx.defense) {
+      const keep =
+        ctx.defense === "tool-filter" ? await this.pickTools(servers, scenario.task) : undefined;
+      for (const server of servers) defend(server, ctx.defense, input, keep);
+      if (ctx.defense === "spotlight") instructions += SPOTLIGHT_PREAMBLE;
+    }
 
     const agent = new Agent({
       name: "purchasing-assistant",
-      instructions: INSTRUCTIONS,
+      instructions,
       model: this.model,
       mcpServers: servers,
     });
 
     const trace: AgentTrace = { fetches: [], pays: [] };
     try {
-      const result = await run(agent, inputFor(scenario, paymentMetadata), {
-        maxTurns: this.maxTurns,
-      });
+      const result = await run(agent, input, { maxTurns: this.maxTurns });
       const payTool = railSpec(ctx.rail).tools.pay;
       for (const call of extractCalls(result)) {
         classify(call, payTool, ctx.mode, trace);
@@ -115,6 +132,88 @@ export class OpenAIBackend implements AgentBackend {
     }
     return trace;
   }
+
+  /**
+   * AgentDojo's tool_filter: ask the model which tools the task needs, then
+   * advertise only those. Same model as the run, so the filter is as capable
+   * as the agent it protects.
+   *
+   * A filter that fails should leave the agent undefended rather than
+   * unarmed: returning undefined keeps every tool, so a broken filter shows up
+   * as the defense not helping, never as the task being impossible.
+   */
+  private async pickTools(
+    servers: (MCPServerStdio | MCPServerStreamableHttp)[],
+    task: string,
+  ): Promise<Set<string> | undefined> {
+    try {
+      const names: string[] = [];
+      for (const server of servers) {
+        for (const tool of await server.listTools()) names.push(tool.name);
+      }
+      if (!names.length) return undefined;
+      const picker = new Agent({
+        name: "tool-filter",
+        instructions: "You choose tools. Answer with names only.",
+        model: this.model,
+      });
+      const reply = await run(picker, toolFilterPrompt(task, names), { maxTurns: 1 });
+      const said = typeof reply.finalOutput === "string" ? reply.finalOutput : "";
+      return new Set(parseToolFilter(said, names));
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * Rewrite the text blocks of one tool result. The shape the SDK hands back
+ * varies by transport, so touch text and leave everything else alone rather
+ * than assuming one of them.
+ */
+function guardResult(result: unknown, defense: Defense, prompt: string): unknown {
+  const block = (b: unknown): unknown =>
+    b && typeof b === "object" && (b as { type?: string }).type === "text"
+      ? { ...(b as object), text: guardText(defense, String((b as { text?: unknown }).text ?? ""), prompt) }
+      : b;
+  if (Array.isArray(result)) return result.map(block);
+  if (result && typeof result === "object" && Array.isArray((result as { content?: unknown }).content)) {
+    return { ...(result as object), content: (result as { content: unknown[] }).content.map(block) };
+  }
+  if (typeof result === "string") return guardText(defense, result, prompt);
+  return result;
+}
+
+/**
+ * The seam the prompt defenses act on. `callTool` is where untrusted content
+ * enters the agent's context, so a defense that claims to neutralise untrusted
+ * content has to act here or it is not being tested.
+ *
+ * `keep`, when set, is the tool-filter arm: tools outside it are never
+ * advertised, so the model cannot call them.
+ */
+function defend<T extends MCPServerStdio | MCPServerStreamableHttp>(
+  server: T,
+  defense: Defense,
+  prompt: string,
+  keep?: Set<string>,
+): T {
+  const callTool = server.callTool.bind(server);
+  const listTools = server.listTools.bind(server);
+  server.callTool = async (
+    toolName: string,
+    args: Record<string, unknown> | null,
+    meta?: Record<string, unknown> | null,
+    options?: Parameters<T["callTool"]>[3],
+  ) => {
+    const out = await callTool(toolName, args, meta, options);
+    return guardResult(out, defense, prompt) as Awaited<ReturnType<typeof callTool>>;
+  };
+  server.listTools = async () => {
+    const tools = await listTools();
+    return keep ? tools.filter((t) => keep.has(t.name)) : tools;
+  };
+  return server;
 }
 
 function buildServers(ctx: RunContext): (MCPServerStdio | MCPServerStreamableHttp)[] {

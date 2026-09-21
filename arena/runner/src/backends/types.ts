@@ -1,6 +1,7 @@
 import type { ArenaScenario, PayCall } from "../attacks.js";
 import type { Connected, Endpoints } from "../mcp.js";
 import type { Rail } from "../rails.js";
+import type { Defense } from "../defenses.js";
 import type { Arm } from "../results.js";
 
 /** What a `pay` call came back as. */
@@ -54,6 +55,12 @@ export interface RunContext {
   readonly mode: "gateway" | "direct";
   /** Which evaluation arm this run is; `mode` is derived from it. */
   readonly arm: Arm;
+  /**
+   * The published prompt-injection defense in front of the agent, on the arms
+   * that have one. Absent everywhere else, including `moat`: Moat is not a
+   * prompt defense and running it as one would be the wrong comparison.
+   */
+  readonly defense?: Defense;
   /** Which settlement rail the money would leave on. */
   readonly rail: Rail;
   readonly session: string;

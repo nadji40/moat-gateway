@@ -44,7 +44,7 @@ import {
   sameNetwork,
   type Rail,
 } from "./rails.js";
-import { ARMS, modeForArm, writeRow, type Arm, type ResultRow } from "./results.js";
+import { ARMS, isGatewayArm, modeForArm, writeRow, type Arm, type ResultRow } from "./results.js";
 import { renderTable } from "./table.js";
 
 /** What sits next to a results file so the rows can be reproduced. */
@@ -293,7 +293,9 @@ async function main(): Promise<void> {
   const policies: RunManifest["policies"] = {};
   for (const rail of rails) {
     for (const arm of arms) {
-      if (arm === "none") continue;
+      // Only the gateway arms have a policy file to pin. `none` has no
+      // gateway and a defense arm's control is a prompt, not a policy.
+      if (!isGatewayArm(arm)) continue;
       const file = policyFor(arm, rail);
       policies[`${rail}/${arm}`] = {
         file: relative(ARENA_ROOT, file).split("\\").join("/"),

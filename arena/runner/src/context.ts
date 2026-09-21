@@ -14,6 +14,13 @@
 //   allowlist  the gateway with policies/arm-allowlist.yaml: a payee allowlist, nothing else
 //   moat       the gateway with policies/default.yaml plus user intent and structured authorization
 //
+// and three published prompt-injection defenses, which run direct with no
+// gateway at all and defend the agent's context instead (see defenses.ts):
+//
+//   spotlight      tool output delimited, the model told not to obey what is inside
+//   repeat-prompt  the user's request repeated after every tool result
+//   tool-filter    the model picks its tools before the run, the rest removed
+//
 // The baseline arms never register intent or an authorization. The core only
 // enforces mandates once one exists in the session (moat-core policy.rs,
 // `structured_authorization_required`), so registering it would hand those
@@ -34,7 +41,8 @@ import {
   railSpec,
   type Rail,
 } from "./rails.js";
-import { armForMode, modeForArm, type Arm, type Mode } from "./results.js";
+import { isDefense } from "./defenses.js";
+import { armForMode, modeForArm, type Arm, type GatewayArm, type Mode } from "./results.js";
 
 export { ARENA_ROOT };
 
@@ -44,12 +52,12 @@ export function armOf(value: Arm | Mode): Arm {
 }
 
 /** The gateway config a rail uses for an arm, relative to the arena root. */
-export function configFor(arm: Exclude<Arm, "none">, rail: Rail = DEFAULT_RAIL): string {
+export function configFor(arm: GatewayArm, rail: Rail = DEFAULT_RAIL): string {
   return railSpec(rail).configs[arm];
 }
 
 /** The policy file an arm's gateway config points at, resolved the way the gateway resolves it. */
-export function policyFor(arm: Exclude<Arm, "none">, rail: Rail = DEFAULT_RAIL): string {
+export function policyFor(arm: GatewayArm, rail: Rail = DEFAULT_RAIL): string {
   const config = join(ARENA_ROOT, configFor(arm, rail));
   const doc = parse(readFileSync(config, "utf8")) as { policy?: string };
   if (!doc.policy) throw new Error(`${config} has no policy`);
@@ -88,7 +96,8 @@ export function endpointsFor(
     ...mockEnv,
     [spec.mock.ledgerEnv]: ledger,
   };
-  if (arm === "none") {
+  // A defense arm is direct: the defense sits in the agent, not in the path.
+  if (arm === "none" || isDefense(arm)) {
     return {
       stdio: {
         command: process.execPath,
@@ -132,6 +141,7 @@ export function contextFor(
   return {
     mode,
     arm,
+    ...(isDefense(arm) ? { defense: arm } : {}),
     rail,
     session,
     endpoints,

@@ -40,7 +40,7 @@ import {
 } from "@moat/arena-rails";
 import { toMinor } from "@moat/mock-ledger";
 import { sameDestination } from "@moat/mock-ledger/destination";
-import type { Arm } from "./results.js";
+import type { GatewayArm } from "./results.js";
 
 export type { DestinationFixture, Rail, RailFixtures } from "@moat/arena-rails";
 
@@ -102,7 +102,7 @@ export interface RailSpec {
    */
   readonly networkRequired: boolean;
   /** Gateway config per gateway arm, relative to the arena root. */
-  readonly configs: Readonly<Record<Exclude<Arm, "none">, string>>;
+  readonly configs: Readonly<Record<GatewayArm, string>>;
   /** Values the scenarios are rendered with. */
   readonly fixtures: RailFixtures;
 }
