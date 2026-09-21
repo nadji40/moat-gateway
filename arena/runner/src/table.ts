@@ -248,6 +248,10 @@ function renderArmTable(rows: ResultRow[], arms: Arm[]): string {
   const latency = arms.map((arm) => {
     const values = rows.filter((row) => armOfRow(row) === arm).flatMap(forwarded);
     if (values.length === 0) return `${arm} n/a`;
+    // The OpenAI backend cannot time a tool call: the SDK owns the call and
+    // hands back no duration, so every sample is a hardcoded zero. Printing
+    // "p50 0.0" would read as a measured zero rather than as not measured.
+    if (values.every((v) => v === 0)) return `${arm} not measured (n=${values.length})`;
     const p50 = percentile(values, 50) ?? 0;
     const p95 = percentile(values, 95) ?? 0;
     const delta = p50 - (percentile(base, 50) ?? 0);
