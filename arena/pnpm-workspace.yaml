@@ -1,6 +1,7 @@
 packages:
   - bank-adapter
   - evm-testnet
+  - interop
   - mock-bank
   - mock-chain
   - mock-ledger

@@ -1,0 +1,20 @@
+{
+  "name": "@moat/interop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "x402": "node --import tsx src/x402.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@x402/core": "^2.26.0",
+    "@x402/evm": "^2.26.0",
+    "viem": "^2.21.54",
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
