@@ -145,7 +145,10 @@ const why=rs=>rs.length?`<ul>${rs.map(([id,m])=>`<li><strong>${esc(id)}</strong>
 /* ---------------------------------------------------------------------
    The swiper: two rails, one card each.
    --------------------------------------------------------------------- */
-const SLIDES=[...document.querySelectorAll(".slide")];
+// Scoped to this deck. The dashboard's sign-in gate is a deck of .slide too,
+// and an unscoped selector found its hidden first slide, so sizeDeck measured
+// zero and refused to set a height: the swiper rendered over empty space.
+const SLIDES=[...document.querySelectorAll("#deck .slide")];
 const TABS=[...document.querySelectorAll("#swiper [role=tab]")];
 let active=0;
 
