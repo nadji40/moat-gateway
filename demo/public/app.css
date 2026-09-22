@@ -428,10 +428,7 @@ footer.foot p{max-width:64ch;margin:0 auto}
 .legend .dot{width:9px;height:9px;border-radius:3px;flex:none}
 
 .cards{display:grid;gap:14px}
-@media(min-width:820px){
-  .cards{grid-template-columns:1fr 1fr;align-items:start}
-  .cards.three{grid-template-columns:repeat(3,1fr)}
-}
+@media(min-width:820px){.cards{grid-template-columns:1fr 1fr;align-items:start}}
 
 select{text-align:center;width:auto;padding:11px 13px;font:600 .9375rem var(--font);
   color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--line);
