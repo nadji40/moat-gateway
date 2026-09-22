@@ -17,19 +17,6 @@
 
 <div class="wrap">
 
-<header class="hero">
-  <div>
-    <p class="kicker">API status</p>
-    <h1>Every endpoint,<br><span class="g">timed from here.</span></h1>
-    <p class="lede">
-      This page does not read a dashboard. It calls the sandbox itself, in the
-      order an agent would, and reports what came back and how long it took.
-    </p>
-    <div class="row">
-      <button class="btn" id="recheck">Run the checks</button>
-    </div>
-  </div>
-</header>
 
 <section class="tight">
   <div class="headrow"><h2>Thirty days</h2></div>
@@ -49,7 +36,10 @@
 </section>
 
 <section class="tight">
-  <div class="headrow"><h2>Right now</h2></div>
+  <div class="headrow">
+    <h2>Right now</h2>
+    <button class="btn" id="recheck">Run the checks</button>
+  </div>
   <div class="summary glass" id="summary" hidden><span class="bar"></span></div>
   <div class="panel glass"><div class="ph">Endpoints</div><div class="pb">
     <div class="checks" id="checks"></div>
