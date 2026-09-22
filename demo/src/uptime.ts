@@ -29,7 +29,15 @@ const TARGET = (process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081") + "/
 /** date (YYYY-MM-DD) -> samples that answered */
 type Tally = Record<string, number>;
 
+interface Store {
+  /** The first day this recorder ran. Days before it were never measured. */
+  since?: string;
+  days: Tally;
+}
+
 let tally: Tally = {};
+/** Undefined only between construction and the first load. */
+let since: string | undefined;
 let timer: NodeJS.Timeout | undefined;
 
 function today(): string {
@@ -38,18 +46,31 @@ function today(): string {
 
 function load(): void {
   try {
-    if (existsSync(FILE)) tally = JSON.parse(readFileSync(FILE, "utf8")) as Tally;
+    if (existsSync(FILE)) {
+      const raw = JSON.parse(readFileSync(FILE, "utf8")) as Store | Tally;
+      // The first version of this file was a bare tally with no start date.
+      if (raw && typeof raw === "object" && "days" in raw) {
+        tally = (raw as Store).days ?? {};
+        since = (raw as Store).since;
+      } else {
+        tally = raw as Tally;
+        since = Object.keys(tally).sort()[0];
+      }
+    }
   } catch {
     // A corrupt file is not worth refusing to start over. Losing history is
     // better than a status page that cannot serve.
     tally = {};
   }
+  // A recorder that started today has not been failing since last month.
+  since ??= today();
 }
 
 function save(): void {
   try {
     mkdirSync(dirname(FILE), { recursive: true });
-    writeFileSync(FILE, JSON.stringify(tally), "utf8");
+    const store: Store = { days: tally, ...(since ? { since } : {}) };
+    writeFileSync(FILE, JSON.stringify(store), "utf8");
   } catch {
     /* a read-only disk should not take the process down */
   }
@@ -109,6 +130,11 @@ export function uptime(): { days: Day[]; window: number; note: string } {
 
   const days = lastDays(DAYS).map((date) => {
     const partial = date === stamp;
+    // A day before this recorder existed was never measured, and drawing it
+    // as an outage would claim a month of downtime that never happened.
+    if (since && date < since) {
+      return { date, ok: 0, expected: 0, ratio: null, partial: false };
+    }
     const expected = partial ? minutesToday : PER_DAY;
     const ok = Math.min(tally[date] ?? 0, expected);
     return { date, ok, expected, ratio: expected ? ok / expected : null, partial };
@@ -120,6 +146,7 @@ export function uptime(): { days: Day[]; window: number; note: string } {
     note:
       "One sample a minute against the gateway's readiness endpoint. A day is " +
       "scored out of 1440 whether or not this process was alive to take the " +
-      "samples, so a gap counts against it.",
+      "samples, so a gap counts against it. Days before the recorder existed " +
+      "are shown blank rather than scored.",
   };
 }
