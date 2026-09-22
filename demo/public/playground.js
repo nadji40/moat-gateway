@@ -15,6 +15,14 @@
 // this browser, and listed in the Keys tab like any other. Revoke them there
 // and the playground mints a new pair.
 
+// Everything below runs in its own scope. This file shares a page with the
+// dashboard's inline script, which has a `show` of its own -- one takes a
+// selector and a boolean, this one takes a slide index -- and at global scope
+// the second declaration is a SyntaxError that kills the whole file. The
+// helpers it borrows ($, esc, control, working, idle) are globals and reading
+// them from in here is unaffected.
+(() => {
+
 /* ---------------------------------------------------------------------
    The two keys this page works with.
 
@@ -436,3 +444,5 @@ drawChains(); drawChain(); show(0);
 // Everything above measured itself inside a hidden pane, where every height
 // is zero. The deck gets its real height the first time the tab is opened.
 addEventListener("moat:pane", (e) => { if (e.detail === "pane-playground") show(active); });
+
+})();
