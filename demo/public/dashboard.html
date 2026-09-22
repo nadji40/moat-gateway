@@ -17,13 +17,6 @@
 
 <div class="wrap">
 
-<header class="hero" id="hero">
-  <div>
-    <p class="kicker">Your workspace</p>
-    <h1>Keys, and what<br><span class="g">they decided.</span></h1>
-  </div>
-</header>
-
 <section class="tight" id="gate">
   <div class="swiper" id="gate-swiper" role="tablist" aria-label="How to start">
     <span class="thumb" aria-hidden="true"></span>
@@ -129,6 +122,11 @@
           </select>
           <button class="btn" id="mint">Issue</button>
         </div>
+        <fieldset class="scopes" id="scopes">
+          <legend class="lbl">Scopes</legend>
+          <div class="scopelist" id="scopelist"></div>
+          <p class="hint" id="scope-hint"></p>
+        </fieldset>
         <p class="hint">An agent key cannot manage keys. An admin key cannot pay
           or approve. The three roles do not overlap.</p>
         <!-- Whatever the Issue button has to say belongs beside the Issue
@@ -157,7 +155,7 @@
 
 </div>
 
-<footer class="foot"><div class="wrap">
+<footer class="foot" id="foot" hidden><div class="wrap">
   <p class="rails-lead">One authorization core, four rails.</p>
   <div class="rails" aria-label="Rails">
     <span class="rail" style="--c:var(--red-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="3"/><path d="M2.6 9.6h18.8"/><path d="M6 14.5h3.5"/></svg>Cards</span>
@@ -287,6 +285,51 @@ const OK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 const HOLD_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6v12M15 6v12"/></svg>`;
 const NO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
+/* ---- scopes -------------------------------------------------------------
+   A role decides which door a key opens. A scope decides how much of the room
+   behind it, and the gateway refuses anything the key was not given.
+
+   These lists mirror scopes_for_role in the gateway. Only scopes the gateway
+   actually checks are offered: an approver has none, because releasing a held
+   payment goes through the intent API on its own listener, and a scope nothing
+   enforces would read on the key as a restriction that is not being applied.
+
+   Nothing ticked means the whole role, which is what every key issued before
+   scopes existed carries. That is a deliberate default rather than an empty
+   one: a key with no capability at all is not a key. */
+const SCOPES = {
+  admin: [
+    ["keys:read", "See the keys"],
+    ["keys:write", "Issue and revoke keys"],
+    ["usage:read", "Read usage"],
+    ["verdicts:read", "Read the verdict feed"],
+  ],
+  agent: [
+    ["rail:card", "Pay on cards"],
+    ["rail:bank", "Pay by bank transfer"],
+    ["rail:crypto", "Pay on chain"],
+  ],
+  approver: [],
+};
+
+function drawScopes(){
+  const role = $("#role").value;
+  const list = SCOPES[role] || [];
+  $("#scopelist").innerHTML = list.map(([id, label]) =>
+    `<label class="scope"><input type="checkbox" value="${esc(id)}"><span>${esc(label)}</span>`
+    + `<code class="mono">${esc(id)}</code></label>`).join("");
+  $("#scopes").hidden = !list.length;
+  note("#scope-hint", list.length
+    ? "Leave them all unticked for a key that carries the whole role."
+    : "");
+}
+$("#role").addEventListener("change", drawScopes);
+
+/** The ticked scopes, or none, which the gateway reads as the whole role. */
+function pickedScopes(){
+  return [...document.querySelectorAll("#scopelist input:checked")].map((b) => b.value);
+}
+
 /* ---- keys ---- */
 const KEY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/></svg>`;
 const GONE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>`;
@@ -304,6 +347,9 @@ function keyRow(k){
       <h3>${esc(k.label)} ${roleChip(k.access_role)}</h3>
       <p class="row-s mono">${esc(k.id)}</p>
       <p class="row-b">created ${esc(when(k.created_at))} · last used ${esc(when(k.last_used_at))}</p>
+      <p class="row-b">${k.scopes && k.scopes.length
+        ? k.scopes.map((sc) => `<code class="chip-sc mono">${esc(sc)}</code>`).join(" ")
+        : `<span style="color:var(--ink-3)">the whole ${esc(k.access_role)} role</span>`}</p>
     </div>
     ${!k.active
       ? `<span class="row-r" style="font-size:.8rem;color:var(--ink-3)">revoked</span>`
@@ -361,10 +407,11 @@ async function refresh(){
 }
 
 function openWorkspace(){
-  show("#gate", false); show("#hero", false); show("#workspace", true);
+  show("#gate", false); show("#workspace", true); show("#foot", true);
   $("#curl").textContent =
     `curl -s ${location.origin}/v1/keys \\\n  -H 'authorization: Bearer YOUR_KEY'`;
   openPane(location.hash.slice(1));
+  drawScopes();
   refresh();
 }
 
@@ -377,7 +424,7 @@ $("#create").addEventListener("click", async () => {
     const out = await control("/v1/signup", { method: "POST", body: JSON.stringify({ id, name }) });
     hold(out.secret);
     $("#secret").textContent = out.secret;
-    show("#gate", false); show("#hero", false); show("#minted", true);
+    show("#gate", false); show("#minted", true);
     note("#signup-note", "");
   } catch (e) { note("#signup-note", String(e.message || e), true);  resize(); }
   finally { idle(btn); }
@@ -404,11 +451,12 @@ $("#mint").addEventListener("click", async () => {
   try {
     const out = await control("/v1/keys", {
       method: "POST",
-      body: JSON.stringify({ label, access_role: $("#role").value }),
+      body: JSON.stringify({ label, access_role: $("#role").value, scopes: pickedScopes() }),
     });
     $("#secret").textContent = out.secret;
     show("#workspace", false); show("#minted", true);
     $("#lbl").value = "";
+    for (const b of document.querySelectorAll("#scopelist input")) b.checked = false;
     note("#mint-note", "");
   } catch (e) { note("#mint-note", String(e.message || e), true); }
   finally { idle(btn); }

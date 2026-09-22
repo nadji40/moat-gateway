@@ -161,16 +161,16 @@ fn unauthorized() -> Response {
         .into_response()
 }
 
-async fn authenticated_tenant(
+async fn authenticated_caller(
     listener: &Listener,
     headers: &HeaderMap,
-) -> Result<String, Box<Response>> {
+) -> Result<crate::storage::Caller, Box<Response>> {
     match listener
         .shared
         .authenticate_bearer(bearer(headers), "agent")
         .await
     {
-        Ok(Some(tenant)) => Ok(tenant),
+        Ok(Some(caller)) => Ok(caller),
         Ok(None) => Err(Box::new(unauthorized())),
         Err(error) => {
             tracing::error!(%error, "authentication storage unavailable");
@@ -183,6 +183,36 @@ async fn authenticated_tenant(
             ))
         }
     }
+}
+
+/// The scope a tool call needs, from the upstream its name is namespaced to.
+///
+/// `None` for anything that is not a `tools/call`, and for a name that resolves
+/// to no upstream: an unroutable tool is the proxy's refusal to make, and
+/// answering it here would report the wrong reason.
+fn required_rail_scope(cfg: &Config, frame: &Frame) -> Option<String> {
+    if frame.message.method() != Some(method::TOOLS_CALL) {
+        return None;
+    }
+    let Message::Request(request) = &frame.message else {
+        return None;
+    };
+    let name = request.params.as_ref()?.get("name")?.as_str()?;
+    let (prefix, _) = name.split_once(cfg.separator.as_str())?;
+    let upstream = cfg.upstreams.iter().find(|u| u.name == prefix)?;
+    Some(format!("rail:{}", upstream.rail.as_str()))
+}
+
+/// The message to refuse a tool call with, or `None` to let it through.
+fn rail_refusal(cfg: &Config, caller: &crate::storage::Caller, frame: &Frame) -> Option<String> {
+    let needed = required_rail_scope(cfg, frame)?;
+    if caller.may(&needed) {
+        return None;
+    }
+    Some(format!(
+        "this key is not scoped to {needed}. It carries: {}.",
+        caller.scopes.join(", ")
+    ))
 }
 
 fn jsonrpc_error(status: StatusCode, code: i64, message: &str) -> Response {
@@ -223,10 +253,11 @@ async fn post_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap, body: Byte
             "Origin not allowed",
         );
     }
-    let tenant_id = match authenticated_tenant(&l, &headers).await {
-        Ok(tenant) => tenant,
+    let caller = match authenticated_caller(&l, &headers).await {
+        Ok(caller) => caller,
         Err(response) => return *response,
     };
+    let tenant_id = caller.tenant_id.clone();
     let text = match std::str::from_utf8(&body) {
         Ok(t) => t.trim(),
         Err(_) => {
@@ -261,6 +292,14 @@ async fn post_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap, body: Byte
         raw: text.to_owned(),
         message,
     };
+
+    // Rail scopes, checked here rather than deeper in, because a session
+    // outlives the request that made it and may be reached by several of a
+    // tenant's keys. What a key may do has to travel with the request, not
+    // with the session it happens to be using.
+    if let Some(refusal) = rail_refusal(&l.cfg, &caller, &frame) {
+        return jsonrpc_error(StatusCode::FORBIDDEN, code::INVALID_REQUEST, &refusal);
+    }
 
     // Resolve the session: initialize mints one; otherwise the header names
     // one; otherwise the default.
@@ -346,10 +385,11 @@ async fn get_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap) -> Response
     if !origin_allowed(&headers) {
         return StatusCode::FORBIDDEN.into_response();
     }
-    let tenant_id = match authenticated_tenant(&l, &headers).await {
-        Ok(tenant) => tenant,
+    let caller = match authenticated_caller(&l, &headers).await {
+        Ok(caller) => caller,
         Err(response) => return *response,
     };
+    let tenant_id = caller.tenant_id.clone();
     let Some(id) = session_header(&headers) else {
         return (StatusCode::BAD_REQUEST, "Mcp-Session-Id required").into_response();
     };
@@ -377,10 +417,11 @@ async fn get_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap) -> Response
 }
 
 async fn delete_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap) -> Response {
-    let tenant_id = match authenticated_tenant(&l, &headers).await {
-        Ok(tenant) => tenant,
+    let caller = match authenticated_caller(&l, &headers).await {
+        Ok(caller) => caller,
         Err(response) => return *response,
     };
+    let tenant_id = caller.tenant_id.clone();
     let Some(id) = session_header(&headers) else {
         return (StatusCode::BAD_REQUEST, "Mcp-Session-Id required").into_response();
     };
@@ -431,14 +472,18 @@ pub fn router(cfg: Config, shared: Arc<Shared>) -> Router {
 
 /// How many verdicts this tenant's agents have produced, and how they went.
 async fn usage(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Response {
-    let (tenant, _) = match admin_caller(&listener, &headers).await {
+    let caller = match admin_caller(&listener, &headers).await {
         Ok(caller) => caller,
         Err(response) => return *response,
     };
+    if let Some(refusal) = needs(&caller, "usage:read") {
+        return refusal;
+    }
+    let tenant = caller.tenant_id.as_str();
     let Some(storage) = listener.shared.storage() else {
         return bad_request("this gateway has no durable storage, so it counts nothing");
     };
-    match storage.usage_for(&tenant).await {
+    match storage.usage_for(tenant).await {
         Ok(usage) => axum::Json(usage).into_response(),
         Err(error) => storage_unavailable(&error),
     }
@@ -450,14 +495,18 @@ async fn usage(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Res
 /// endpoint serves those, and a feed does not need a hundred of them to draw
 /// a list.
 async fn verdicts(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Response {
-    let (tenant, _) = match admin_caller(&listener, &headers).await {
+    let caller = match admin_caller(&listener, &headers).await {
         Ok(caller) => caller,
         Err(response) => return *response,
     };
+    if let Some(refusal) = needs(&caller, "verdicts:read") {
+        return refusal;
+    }
+    let tenant = caller.tenant_id.as_str();
     let Some(storage) = listener.shared.storage() else {
         return bad_request("this gateway has no durable storage, so it has no verdicts");
     };
-    match storage.recent_verdicts(&tenant, 50).await {
+    match storage.recent_verdicts(tenant, 50).await {
         Ok(rows) => axum::Json(rows).into_response(),
         Err(error) => storage_unavailable(&error),
     }
@@ -552,6 +601,9 @@ struct NewKey {
     label: String,
     /// `agent`, `approver` or `admin`.
     access_role: String,
+    /// What the key may do inside that role. Absent or empty means all of it.
+    #[serde(default)]
+    scopes: Vec<String>,
 }
 
 /// The one and only time the raw key is returned.
@@ -580,6 +632,22 @@ struct ListedKey {
 /// calling us.
 const ROLES: [&str; 3] = ["agent", "approver", "admin"];
 
+/// What a key of each role may be narrowed to.
+///
+/// Only scopes this gateway actually checks are listed. A name that is
+/// accepted at mint time and then never consulted is worse than no scope at
+/// all: it reads on the key as a restriction that is not being applied.
+/// `approver` has none for that reason. Releasing a held payment goes through
+/// the intent API, which is a separate listener on a separate port, so nothing
+/// here would enforce a scope written on an approver key.
+fn scopes_for_role(role: &str) -> &'static [&'static str] {
+    match role {
+        "admin" => &["keys:read", "keys:write", "usage:read", "verdicts:read"],
+        "agent" => &["rail:card", "rail:bank", "rail:crypto"],
+        _ => &[],
+    }
+}
+
 fn bad_request(message: &str) -> Response {
     (StatusCode::BAD_REQUEST, message.to_owned()).into_response()
 }
@@ -594,23 +662,38 @@ fn storage_unavailable(error: &anyhow::Error) -> Response {
 async fn admin_caller(
     listener: &Listener,
     headers: &HeaderMap,
-) -> Result<(String, Option<String>), Box<Response>> {
+) -> Result<crate::storage::Caller, Box<Response>> {
     match listener
         .shared
         .authenticate_bearer(bearer(headers), "admin")
         .await
     {
-        Ok(Some(tenant)) => {
-            let id = listener
-                .shared
-                .key_id_for_bearer(bearer(headers))
-                .await
-                .unwrap_or(None);
-            Ok((tenant, id))
-        }
+        // The key id used to need a second query of its own. Authentication
+        // already knows which key answered, so it says so.
+        Ok(Some(caller)) => Ok(caller),
         Ok(None) => Err(Box::new(unauthorized())),
         Err(error) => Err(Box::new(storage_unavailable(&error))),
     }
+}
+
+/// Refuse a caller whose key was narrowed away from this endpoint.
+///
+/// Separate from the role check and always after it: a scope can only take
+/// away. There is no scope that reaches a door the role does not open.
+fn needs(caller: &crate::storage::Caller, scope: &str) -> Option<Response> {
+    if caller.may(scope) {
+        return None;
+    }
+    Some(
+        (
+            StatusCode::FORBIDDEN,
+            format!(
+                "this key is not scoped to {scope}. It carries: {}.",
+                caller.scopes.join(", ")
+            ),
+        )
+            .into_response(),
+    )
 }
 
 async fn create_key(
@@ -618,12 +701,18 @@ async fn create_key(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let (tenant, by) = match admin_caller(&listener, &headers).await {
+    let caller = match admin_caller(&listener, &headers).await {
         Ok(caller) => caller,
         Err(response) => return *response,
     };
+    if let Some(refusal) = needs(&caller, "keys:write") {
+        return refusal;
+    }
+    let tenant = caller.tenant_id.as_str();
     let Ok(request) = serde_json::from_slice::<NewKey>(&body) else {
-        return bad_request("body must be {\"label\": string, \"access_role\": string}");
+        return bad_request(
+            "body must be {\"label\": string, \"access_role\": string, \"scopes\": [string]}",
+        );
     };
     let label = request.label.trim();
     if label.is_empty() || label.len() > 120 {
@@ -631,6 +720,42 @@ async fn create_key(
     }
     if !ROLES.contains(&request.access_role.as_str()) {
         return bad_request("access_role must be agent, approver or admin");
+    }
+
+    // Scopes are checked against the role now, because this is the only moment
+    // anyone is looking. A key minted with a scope its role can never reach
+    // would sit in the list looking restricted and behave as though it were
+    // not, and nothing later would ever say so.
+    let allowed = scopes_for_role(&request.access_role);
+    let mut scopes: Vec<String> = Vec::new();
+    for scope in &request.scopes {
+        let scope = scope.trim();
+        if scope.is_empty() {
+            continue;
+        }
+        if !allowed.contains(&scope) {
+            return bad_request(&if allowed.is_empty() {
+                format!(
+                    "an {} key takes no scopes, because this gateway checks none for that role",
+                    request.access_role
+                )
+            } else {
+                format!(
+                    "{scope:?} is not a scope an {} key can carry. Those are: {}.",
+                    request.access_role,
+                    allowed.join(", ")
+                )
+            });
+        }
+        if !scopes.iter().any(|held| held == scope) {
+            scopes.push(scope.to_owned());
+        }
+    }
+    // Naming every scope of a role is the same as naming none, and storing it
+    // as none means one representation of "everything" rather than two that
+    // have to be kept in step as the list of scopes grows.
+    if scopes.len() == allowed.len() {
+        scopes.clear();
     }
 
     // 32 bytes from the OS, rendered as hex. The database never sees this.
@@ -642,11 +767,18 @@ async fn create_key(
         return bad_request("this gateway has no durable storage, so it has no keys");
     };
     match storage
-        .create_api_key(&tenant, label, &request.access_role, &hash, by.as_deref())
+        .create_api_key(
+            tenant,
+            label,
+            &request.access_role,
+            &hash,
+            Some(caller.key_id.as_str()),
+            &scopes,
+        )
         .await
     {
         Ok(key) => {
-            tracing::info!(tenant = %tenant, key = %key.id, role = %key.access_role, "key minted");
+            tracing::info!(tenant = %tenant, key = %key.id, role = %key.access_role, scopes = %key.scopes.join(","), "key minted");
             (StatusCode::CREATED, axum::Json(MintedKey { key, secret })).into_response()
         }
         Err(error) => storage_unavailable(&error),
@@ -654,19 +786,23 @@ async fn create_key(
 }
 
 async fn list_keys(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Response {
-    let (tenant, by) = match admin_caller(&listener, &headers).await {
+    let caller = match admin_caller(&listener, &headers).await {
         Ok(caller) => caller,
         Err(response) => return *response,
     };
+    if let Some(refusal) = needs(&caller, "keys:read") {
+        return refusal;
+    }
+    let tenant = caller.tenant_id.as_str();
     let Some(storage) = listener.shared.storage() else {
         return bad_request("this gateway has no durable storage, so it has no keys");
     };
-    match storage.list_api_keys(&tenant).await {
+    match storage.list_api_keys(tenant).await {
         Ok(keys) => {
             let listed: Vec<ListedKey> = keys
                 .into_iter()
                 .map(|key| ListedKey {
-                    current: by.as_deref() == Some(key.id.as_str()),
+                    current: caller.key_id == key.id,
                     key,
                 })
                 .collect();
@@ -681,16 +817,20 @@ async fn revoke_key(
     axum::extract::Path(id): axum::extract::Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (tenant, by) = match admin_caller(&listener, &headers).await {
+    let caller = match admin_caller(&listener, &headers).await {
         Ok(caller) => caller,
         Err(response) => return *response,
     };
+    if let Some(refusal) = needs(&caller, "keys:write") {
+        return refusal;
+    }
+    let tenant = caller.tenant_id.as_str();
     // An admin key cannot withdraw itself. Revoking is an admin-only call, so
     // the caller would be destroying the one credential that reaches this
     // endpoint and would have no way to mint a replacement. Rotation still
     // works, in the order that leaves a way back: mint the new admin key
     // first, sign in with it, then revoke the old one.
-    if by.as_deref() == Some(id.as_str()) {
+    if caller.key_id == id {
         return (
             StatusCode::CONFLICT,
             "this is the key you are signed in with. Issue another admin key,              sign in with it, then revoke this one.",
@@ -700,7 +840,7 @@ async fn revoke_key(
     let Some(storage) = listener.shared.storage() else {
         return bad_request("this gateway has no durable storage, so it has no keys");
     };
-    match storage.revoke_api_key(&tenant, &id).await {
+    match storage.revoke_api_key(tenant, &id).await {
         Ok(Some(key)) => {
             tracing::info!(tenant = %tenant, key = %key.id, "key revoked");
             axum::Json(key).into_response()
@@ -725,4 +865,110 @@ pub async fn serve(addr: &str, cfg: Config, shared: Arc<Shared>) -> Result<()> {
     axum::serve(listener, router(cfg, shared))
         .await
         .context("MCP http server")
+}
+
+#[cfg(test)]
+mod scope_tests {
+    use super::*;
+    use crate::storage::Caller;
+
+    fn cfg() -> Config {
+        serde_norway::from_str(
+            r#"
+listen: { transport: http, addr: "127.0.0.1:0" }
+upstreams:
+  - { name: stripe, transport: http, url: "http://127.0.0.1:1/mcp", rail: card }
+  - { name: chain,  transport: http, url: "http://127.0.0.1:2/mcp", rail: crypto }
+policy: policies/default.yaml
+evidence: ./evidence.jsonl
+keys: ./keys
+"#,
+        )
+        .expect("test config parses")
+    }
+
+    fn frame(raw: &str) -> Frame {
+        Frame {
+            raw: raw.to_owned(),
+            message: Message::parse(raw).expect("test frame parses"),
+        }
+    }
+
+    fn call(tool: &str) -> Frame {
+        frame(&format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{{"name":"{tool}","arguments":{{}}}}}}"#
+        ))
+    }
+
+    fn key(scopes: &[&str]) -> Caller {
+        Caller {
+            tenant_id: "t".to_owned(),
+            key_id: "key_1".to_owned(),
+            scopes: scopes.iter().map(|s| (*s).to_owned()).collect(),
+        }
+    }
+
+    /// The scope comes from the upstream the tool is namespaced to, because
+    /// that is where the rail is declared. Nothing about the call itself says
+    /// which rail it settles on.
+    #[test]
+    fn the_rail_comes_from_the_upstream_the_tool_belongs_to() {
+        let cfg = cfg();
+        assert_eq!(
+            required_rail_scope(&cfg, &call("stripe__create_payment")).as_deref(),
+            Some("rail:card")
+        );
+        assert_eq!(
+            required_rail_scope(&cfg, &call("chain__transfer")).as_deref(),
+            Some("rail:crypto")
+        );
+    }
+
+    /// An unroutable name is the proxy's refusal to make. Answering it here
+    /// would tell the caller their key was wrong when the tool does not exist.
+    #[test]
+    fn a_tool_that_resolves_to_nothing_is_not_a_scope_failure() {
+        let cfg = cfg();
+        assert!(required_rail_scope(&cfg, &call("nosuch__tool")).is_none());
+        assert!(required_rail_scope(&cfg, &call("unnamespaced")).is_none());
+    }
+
+    /// Only tool calls settle anything. Listing, initializing and notifying
+    /// carry no rail and must not be gated by one.
+    #[test]
+    fn only_a_tool_call_needs_a_rail() {
+        let cfg = cfg();
+        for raw in [
+            r#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#,
+            r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}"#,
+            r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
+        ] {
+            assert!(
+                required_rail_scope(&cfg, &frame(raw)).is_none(),
+                "{raw} carries no rail"
+            );
+        }
+    }
+
+    /// A key with no scopes carries the whole of its role, which is what every
+    /// key minted before scopes existed has.
+    #[test]
+    fn no_scopes_means_the_whole_role() {
+        let cfg = cfg();
+        assert!(rail_refusal(&cfg, &key(&[]), &call("chain__transfer")).is_none());
+    }
+
+    #[test]
+    fn a_card_only_key_cannot_settle_on_chain() {
+        let cfg = cfg();
+        let k = key(&["rail:card"]);
+        assert!(rail_refusal(&cfg, &k, &call("stripe__create_payment")).is_none());
+        let refused = rail_refusal(&cfg, &k, &call("chain__transfer"))
+            .expect("a card-only key must be refused the crypto rail");
+        assert!(refused.contains("rail:crypto"), "{refused}");
+        assert!(
+            refused.contains("rail:card"),
+            "the refusal says what the key does carry: {refused}"
+        );
+    }
 }

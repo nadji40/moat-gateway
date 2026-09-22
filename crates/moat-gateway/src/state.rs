@@ -262,9 +262,15 @@ impl Shared {
         &self,
         token: Option<&str>,
         access_role: &str,
-    ) -> Result<Option<String>> {
+    ) -> Result<Option<crate::storage::Caller>> {
         if !self.auth_required {
-            return Ok(Some("local".to_owned()));
+            // No key, so no scopes to narrow: a gateway with authentication
+            // off is one trusted caller with the whole of every role.
+            return Ok(Some(crate::storage::Caller {
+                tenant_id: "local".to_owned(),
+                key_id: String::new(),
+                scopes: Vec::new(),
+            }));
         }
         let Some(token) = token.map(str::trim).filter(|token| !token.is_empty()) else {
             return Ok(None);
@@ -274,23 +280,6 @@ impl Shared {
         };
         let hash = moat_core::hash::sha256_hex(token.as_bytes());
         storage.authenticate(&hash, access_role).await
-    }
-
-    /// Which key a bearer token is, for recording who minted another key.
-    ///
-    /// Deliberately separate from [`Self::authenticate_bearer`]: that call
-    /// decides whether a request is allowed, and this one only labels an
-    /// audit field. A failure here must never turn into a refusal, so the
-    /// caller treats `None` as "unattributed" rather than as "denied".
-    pub async fn key_id_for_bearer(&self, token: Option<&str>) -> Result<Option<String>> {
-        let (Some(token), Some(storage)) = (
-            token.map(str::trim).filter(|token| !token.is_empty()),
-            &self.storage,
-        ) else {
-            return Ok(None);
-        };
-        let hash = moat_core::hash::sha256_hex(token.as_bytes());
-        storage.api_key_id(&hash).await
     }
 
     async fn session_gate(&self, tenant_id: &str, id: &str) -> std::sync::Arc<AsyncMutex<()>> {

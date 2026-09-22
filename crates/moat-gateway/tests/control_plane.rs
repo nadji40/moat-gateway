@@ -204,3 +204,77 @@ async fn signup_is_absent_unless_the_config_enables_it() {
     assert_eq!(status, 404, "{text}");
     assert!(text.contains("not enabled"), "{text}");
 }
+
+/// A scope is checked against the role it is being written on, at the only
+/// moment anyone is looking. A key that carried a scope its role can never
+/// reach would sit in the list reading as restricted and behave as though it
+/// were not, and nothing afterwards would ever say so.
+#[tokio::test]
+async fn refuses_a_scope_the_role_cannot_carry() {
+    let gw = Gateway::start("cp-scope-role").await;
+
+    let (status, text) = gw
+        .post_key(r#"{"label":"ci","access_role":"agent","scopes":["keys:write"]}"#)
+        .await;
+    assert_eq!(status, 400, "{text}");
+    assert!(
+        text.contains("rail:card"),
+        "it must list what is allowed: {text}"
+    );
+
+    let (status, text) = gw
+        .post_key(r#"{"label":"ci","access_role":"admin","scopes":["rail:card"]}"#)
+        .await;
+    assert_eq!(status, 400, "{text}");
+    assert!(
+        text.contains("keys:read"),
+        "it must list what is allowed: {text}"
+    );
+}
+
+/// This gateway checks no approver scope, because releasing a held payment
+/// goes through the intent API on its own listener. Accepting one here would
+/// write a restriction on a key that nothing applies.
+#[tokio::test]
+async fn an_approver_key_takes_no_scopes() {
+    let gw = Gateway::start("cp-scope-approver").await;
+    let (status, text) = gw
+        .post_key(r#"{"label":"ci","access_role":"approver","scopes":["holds:release"]}"#)
+        .await;
+    assert_eq!(status, 400, "{text}");
+    assert!(text.contains("takes no scopes"), "{text}");
+}
+
+/// Scopes are validated before storage, like everything else in this handler.
+/// A request that names a scope its role cannot carry must not reach the
+/// database to find that out.
+#[tokio::test]
+async fn validates_scopes_before_consulting_storage() {
+    let gw = Gateway::start("cp-scope-order").await;
+    let (_, text) = gw
+        .post_key(r#"{"label":"ci","access_role":"agent","scopes":["keys:write"]}"#)
+        .await;
+    assert!(
+        !text.contains("durable storage"),
+        "the scope is checked before storage: {text}"
+    );
+}
+
+/// Omitting scopes is how every caller before this feature asked for a key,
+/// and it still means the whole role rather than nothing at all. The proof
+/// that it is accepted is that the request gets as far as storage.
+#[tokio::test]
+async fn a_key_with_no_scopes_named_is_still_a_key() {
+    let gw = Gateway::start("cp-scope-none").await;
+    for body in [
+        r#"{"label":"ci","access_role":"agent"}"#,
+        r#"{"label":"ci","access_role":"agent","scopes":[]}"#,
+    ] {
+        let (status, text) = gw.post_key(body).await;
+        assert_eq!(status, 400, "{body}: {text}");
+        assert!(
+            text.contains("durable storage"),
+            "{body} must pass validation and stop at storage: {text}"
+        );
+    }
+}

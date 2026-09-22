@@ -109,7 +109,9 @@ async fn authenticated_tenant(shared: &Shared, headers: &HeaderMap) -> ApiResult
         .authenticate_bearer(bearer(headers), "approver")
         .await
     {
-        Ok(Some(tenant)) => Ok(tenant),
+        // Scopes narrow a key inside its role, and this listener checks none:
+        // there is nothing here to narrow, so only the tenant is taken.
+        Ok(Some(caller)) => Ok(caller.tenant_id),
         Ok(None) => Err(err(
             StatusCode::UNAUTHORIZED,
             "valid Moat bearer token required",

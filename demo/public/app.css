@@ -184,7 +184,7 @@ body.has-trail footer.foot{position:relative;z-index:1}
    of a hard edge underneath, and it presses by scaling rather than by moving
    down the page. The old one shifted 5px on :active, which nudged whatever
    sat beside it. */
-.btn{display:inline-flex;align-items:center;gap:10px;color:#000;border:0;border-radius:10px;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;color:#000;border:0;border-radius:10px;
   padding:13px 26px;text-decoration:none;font:700 .9375rem var(--font);cursor:pointer;
   letter-spacing:-.01em;
   background-image:linear-gradient(180deg,#FF7A2B 0%,var(--orange) 100%);
@@ -455,14 +455,37 @@ footer.foot p{max-width:64ch;margin:0 auto}
 .strip-ends{display:flex;justify-content:space-between;margin-top:8px;
   font-size:.72rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
+/* Scopes on the issue form. One row per scope, the plain-English name on the
+   left and the name the gateway actually checks on the right, because the
+   second is what an error message will quote back. */
+.scopes{border:0;margin:0;padding:0;display:grid;gap:8px;text-align:left}
+.scopes legend{padding:0;float:left;width:100%}
+.scopelist{display:grid;gap:6px}
+.scope{display:flex;align-items:center;gap:10px;cursor:pointer;
+  border:1px solid var(--line);border-radius:11px;padding:9px 12px;
+  background:rgba(255,255,255,.03);font-size:.875rem;font-weight:600;
+  transition:border-color .15s,background .15s}
+.scope:hover{border-color:var(--line-2);background:rgba(255,255,255,.055)}
+.scope input{accent-color:var(--orange);width:15px;height:15px;flex:none;margin:0}
+.scope span{flex:1}
+.scope code{font-size:.72rem;color:var(--ink-3)}
+.scope:has(input:checked){border-color:var(--orange);background:rgba(255,95,0,.08)}
+.scope:has(input:checked) code{color:var(--orange)}
+/* what a key carries, on its row in the list */
+.chip-sc{font-size:.68rem;color:var(--ink-2);border:1px solid var(--line);
+  border-radius:999px;padding:2px 8px;white-space:nowrap}
+
 /* the way in, in the navbar: primary, compact, and never hidden */
 .btn.tiny{padding:9px 18px;font-size:.82rem;flex:none}
 
-/* the auth forms are a single column of short fields, so they read better
-   narrow than stretched across a desktop */
+/* The auth forms are a single column of short fields, so they read better
+   narrow than stretched across a desktop, and centred rather than ranged left:
+   there is nothing beside them for a left edge to line up with. */
 #gate .panel{max-width:440px;margin:0 auto}
-#gate .pb{gap:11px;padding:16px}
-#gate input{padding:10px 12px;font-size:.9rem}
+#gate .pb{gap:11px;padding:16px;text-align:center;justify-items:center}
+#gate input{padding:10px 12px;font-size:.9rem;width:100%;text-align:center}
+#gate .lbl{margin-bottom:0}
+#gate .btn{width:100%;max-width:260px;margin-top:4px}
 #gate .hint{font-size:.82rem}
 @media(max-width:520px){
   #gate .pb{padding:14px}

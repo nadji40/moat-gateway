@@ -18,6 +18,14 @@ pub struct DurableStore {
     pool: Pool,
 }
 
+/// The lowest schema version this build can run against.
+///
+/// Raised by the migration that made it necessary, never separately: a gateway
+/// that starts against a schema it predates fails at the first query instead
+/// of at startup, and the error is about a missing column rather than about a
+/// migration nobody ran.
+const REQUIRED_MIGRATION: i64 = 7;
+
 impl DurableStore {
     /// Connect and verify that the first production schema migration exists.
     pub async fn connect(database_url: &str, max_connections: usize) -> Result<Self> {
@@ -36,14 +44,22 @@ impl DurableStore {
         let store = Self { pool };
         store.ready().await?;
         let client = store.pool.get().await.context("checking storage schema")?;
-        let found = client
-            .query_opt(
-                "SELECT version FROM moat.schema_migrations WHERE version = 5",
+        let applied: Option<i64> = client
+            .query_one(
+                "SELECT max(version)::bigint FROM moat.schema_migrations",
                 &[],
             )
             .await
-            .context("checking storage migration")?;
-        anyhow::ensure!(found.is_some(), "Moat database migration 5 is not applied");
+            .context("checking storage migration")?
+            .get(0);
+        // A version named by hand is a version that goes stale. This one at
+        // least says which build wants what, in a single place beside the
+        // migration that introduced the need.
+        anyhow::ensure!(
+            applied.unwrap_or(0) >= REQUIRED_MIGRATION,
+            "this build needs Moat database migration {REQUIRED_MIGRATION}; the database is at {}. Run scripts/migrate.sh.",
+            applied.unwrap_or(0)
+        );
         Ok(store)
     }
 
@@ -62,7 +78,7 @@ impl DurableStore {
     }
 
     /// Resolve an active bearer key to its active tenant.
-    pub async fn authenticate(&self, key_hash: &str, access_role: &str) -> Result<Option<String>> {
+    pub async fn authenticate(&self, key_hash: &str, access_role: &str) -> Result<Option<Caller>> {
         let client = self.pool.get().await.context("auth database connection")?;
         let row = client
             .query_opt(
@@ -74,12 +90,16 @@ impl DurableStore {
                    AND k.access_role = $2
                    AND k.active
                    AND t.active
-                 RETURNING k.tenant_id",
+                 RETURNING k.tenant_id, k.id, k.scopes",
                 &[&key_hash, &access_role],
             )
             .await
             .context("authenticating API key")?;
-        Ok(row.map(|row| row.get(0)))
+        Ok(row.map(|row| Caller {
+            tenant_id: row.get(0),
+            key_id: row.get(1),
+            scopes: row.get::<_, Vec<String>>(2),
+        }))
     }
 
     /// Restore one tenant-bound session snapshot.
@@ -273,15 +293,16 @@ impl DurableStore {
         access_role: &str,
         key_hash: &str,
         created_by: Option<&str>,
+        scopes: &[String],
     ) -> Result<ApiKey> {
         let client = self.pool.get().await.context("key database connection")?;
         let row = client
             .query_one(
                 "INSERT INTO moat.api_keys
-                     (id, tenant_id, label, key_hash, access_role, created_by)
-                 VALUES ($1, $2, $3, $4, $5, $6)
+                     (id, tenant_id, label, key_hash, access_role, created_by, scopes)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                  RETURNING id, label, access_role, active, created_at,
-                           last_used_at, revoked_at",
+                           last_used_at, revoked_at, scopes",
                 &[
                     &new_key_id(),
                     &tenant_id,
@@ -289,6 +310,7 @@ impl DurableStore {
                     &key_hash,
                     &access_role,
                     &created_by,
+                    &scopes,
                 ],
             )
             .await
@@ -440,21 +462,6 @@ impl DurableStore {
         Ok(Some(ApiKey::from_row(&row)))
     }
 
-    /// The id of the key with this hash, for audit attribution only. Does not
-    /// check `active` or the role: a key that has just been revoked is still
-    /// the key that minted whatever it minted.
-    pub async fn api_key_id(&self, key_hash: &str) -> Result<Option<String>> {
-        let client = self.pool.get().await.context("key database connection")?;
-        let row = client
-            .query_opt(
-                "SELECT id FROM moat.api_keys WHERE key_hash = $1",
-                &[&key_hash],
-            )
-            .await
-            .context("looking up API key id")?;
-        Ok(row.map(|row| row.get(0)))
-    }
-
     /// Every key this tenant has, newest first, revoked ones included. A
     /// credential that was withdrawn is part of the record, not a gap in it.
     pub async fn list_api_keys(&self, tenant_id: &str) -> Result<Vec<ApiKey>> {
@@ -462,7 +469,7 @@ impl DurableStore {
         let rows = client
             .query(
                 "SELECT id, label, access_role, active, created_at,
-                        last_used_at, revoked_at
+                        last_used_at, revoked_at, scopes
                  FROM moat.api_keys
                  WHERE tenant_id = $1
                  ORDER BY created_at DESC",
@@ -564,6 +571,33 @@ pub struct ApiKey {
     pub last_used_at: Option<String>,
     /// When it was withdrawn, if it was.
     pub revoked_at: Option<String>,
+    /// What the key may do within its role. Empty means the whole role.
+    pub scopes: Vec<String>,
+}
+
+/// Who is making a request: the tenant they belong to, which key it was, and
+/// what that key is allowed to do inside its role.
+///
+/// The role has already been checked by the time this exists. Scopes narrow
+/// what is left, and an empty list means nothing was narrowed.
+#[derive(Debug, Clone)]
+pub struct Caller {
+    /// The tenant every read and write is confined to.
+    pub tenant_id: String,
+    /// The key that authenticated, for attribution and for refusing to let a
+    /// key withdraw itself.
+    pub key_id: String,
+    /// Empty for a key that carries the whole of its role.
+    pub scopes: Vec<String>,
+}
+
+impl Caller {
+    /// Whether this key carries `scope`. A key with no scopes carries them all,
+    /// which is what every key minted before scopes existed has.
+    #[must_use]
+    pub fn may(&self, scope: &str) -> bool {
+        self.scopes.is_empty() || self.scopes.iter().any(|held| held == scope)
+    }
 }
 
 impl ApiKey {
@@ -576,6 +610,7 @@ impl ApiKey {
             created_at: stamp(Some(row.get::<_, SystemTime>("created_at"))).unwrap_or_default(),
             last_used_at: stamp(row.get::<_, Option<SystemTime>>("last_used_at")),
             revoked_at: stamp(row.get::<_, Option<SystemTime>>("revoked_at")),
+            scopes: row.get::<_, Vec<String>>("scopes"),
         }
     }
 }

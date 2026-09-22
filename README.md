@@ -525,7 +525,7 @@ sudo scripts/provision-tenant.sh pilot "Moat pilot" admin
 
 | | |
 |---|---|
-| `POST /v1/keys` | `{"label": "...", "access_role": "agent\|approver\|admin"}` returns the key **once** |
+| `POST /v1/keys` | `{"label": "...", "access_role": "agent\|approver\|admin", "scopes": []}` returns the key **once** |
 | `GET /v1/keys` | every key this tenant has, newest first, revoked ones included |
 | `DELETE /v1/keys/{id}` | withdraws one; revoking twice is not an error |
 
@@ -534,6 +534,32 @@ belongs to. There is no tenant parameter, so a guessed key id cannot reach
 another tenant's credentials. An `admin` key cannot sign or approve a payment:
 the gateway checks the role against the surface being asked for, and the three
 roles do not overlap.
+
+An `admin` key cannot revoke itself. Revoking is an admin-only call, so
+withdrawing the credential you are holding would destroy the one key that
+reaches the endpoint that mints a replacement; the gateway answers 409. Rotate
+in the order that leaves a way back: mint the new admin key, authenticate with
+it, then revoke the old one.
+
+**Scopes** narrow a key inside its role. They can never widen one: the role is
+checked first and separately, so no scope reaches a surface the role does not
+already open. An empty list means the whole role, which is what every key
+minted before scopes existed carries.
+
+| role | scopes | checked at |
+|---|---|---|
+| `admin` | `keys:read`, `keys:write`, `usage:read`, `verdicts:read` | the control plane endpoint |
+| `agent` | `rail:card`, `rail:bank`, `rail:crypto` | `tools/call`, from the rail of the upstream the tool is namespaced to |
+| `approver` | none | — |
+
+`approver` has none because this gateway checks none for that role: releasing a
+held payment goes through the intent API, a separate listener on a separate
+port. A scope accepted here and never consulted would read on the key as a
+restriction that is not being applied, so minting one is refused.
+
+Rail scopes are checked per request rather than per session. A session outlives
+the request that opened it and can be reached by several of a tenant's keys, so
+what a key may do travels with the request.
 
 Creating a *tenant* is still a database operation. That is the step that
 decides who is a customer, and it does not belong on a public endpoint. The pilot
