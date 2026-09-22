@@ -421,7 +421,152 @@ pub fn router(cfg: Config, shared: Arc<Shared>) -> Router {
         .route(MCP_PATH, get(get_mcp).post(post_mcp).delete(delete_mcp))
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
+        .route("/v1/keys", get(list_keys).post(create_key))
+        .route("/v1/keys/{id}", axum::routing::delete(revoke_key))
         .with_state(l)
+}
+
+// ---- the control plane ----
+//
+// Three calls, all requiring an `admin` key and all scoped to the tenant that
+// key belongs to. There is no tenant parameter anywhere: a caller can only
+// ever act on their own keys, so a wrong or guessed id cannot reach another
+// tenant's credentials.
+//
+// This deliberately does not create tenants. A tenant is still provisioned by
+// somebody with database access, because that is the step that decides who is
+// a customer; the control plane only manages credentials inside one.
+
+/// What a caller asks for when minting a key.
+#[derive(serde::Deserialize)]
+struct NewKey {
+    /// Whatever the tenant wants to call it, for their own listing.
+    label: String,
+    /// `agent`, `approver` or `admin`.
+    access_role: String,
+}
+
+/// The one and only time the raw key is returned.
+#[derive(serde::Serialize)]
+struct MintedKey {
+    #[serde(flatten)]
+    key: crate::storage::ApiKey,
+    /// Store this now; it is not recoverable afterwards.
+    secret: String,
+}
+
+/// Roles a key may be minted with. `admin` is here on purpose: a tenant that
+/// cannot mint a second admin key has no way to rotate the first one without
+/// calling us.
+const ROLES: [&str; 3] = ["agent", "approver", "admin"];
+
+fn bad_request(message: &str) -> Response {
+    (StatusCode::BAD_REQUEST, message.to_owned()).into_response()
+}
+
+fn storage_unavailable(error: &anyhow::Error) -> Response {
+    tracing::error!(%error, "control plane storage unavailable");
+    (StatusCode::SERVICE_UNAVAILABLE, "storage unavailable").into_response()
+}
+
+/// Authenticate an `admin` key and return both the tenant and the key id that
+/// authenticated, so a minted key records who minted it.
+async fn admin_caller(
+    listener: &Listener,
+    headers: &HeaderMap,
+) -> Result<(String, Option<String>), Box<Response>> {
+    match listener
+        .shared
+        .authenticate_bearer(bearer(headers), "admin")
+        .await
+    {
+        Ok(Some(tenant)) => {
+            let id = listener
+                .shared
+                .key_id_for_bearer(bearer(headers))
+                .await
+                .unwrap_or(None);
+            Ok((tenant, id))
+        }
+        Ok(None) => Err(Box::new(unauthorized())),
+        Err(error) => Err(Box::new(storage_unavailable(&error))),
+    }
+}
+
+async fn create_key(
+    State(listener): State<Arc<Listener>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let (tenant, by) = match admin_caller(&listener, &headers).await {
+        Ok(caller) => caller,
+        Err(response) => return *response,
+    };
+    let Ok(request) = serde_json::from_slice::<NewKey>(&body) else {
+        return bad_request("body must be {\"label\": string, \"access_role\": string}");
+    };
+    let label = request.label.trim();
+    if label.is_empty() || label.len() > 120 {
+        return bad_request("label must be 1 to 120 characters");
+    }
+    if !ROLES.contains(&request.access_role.as_str()) {
+        return bad_request("access_role must be agent, approver or admin");
+    }
+
+    // 32 bytes from the OS, rendered as hex. The database never sees this.
+    let secret_bytes: [u8; 32] = rand::random();
+    let secret = format!("moat_{}", moat_core::hash::sha256_hex(&secret_bytes));
+    let hash = moat_core::hash::sha256_hex(secret.as_bytes());
+
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it has no keys");
+    };
+    match storage
+        .create_api_key(&tenant, label, &request.access_role, &hash, by.as_deref())
+        .await
+    {
+        Ok(key) => {
+            tracing::info!(tenant = %tenant, key = %key.id, role = %key.access_role, "key minted");
+            (StatusCode::CREATED, axum::Json(MintedKey { key, secret })).into_response()
+        }
+        Err(error) => storage_unavailable(&error),
+    }
+}
+
+async fn list_keys(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Response {
+    let (tenant, _) = match admin_caller(&listener, &headers).await {
+        Ok(caller) => caller,
+        Err(response) => return *response,
+    };
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it has no keys");
+    };
+    match storage.list_api_keys(&tenant).await {
+        Ok(keys) => axum::Json(keys).into_response(),
+        Err(error) => storage_unavailable(&error),
+    }
+}
+
+async fn revoke_key(
+    State(listener): State<Arc<Listener>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let (tenant, _) = match admin_caller(&listener, &headers).await {
+        Ok(caller) => caller,
+        Err(response) => return *response,
+    };
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it has no keys");
+    };
+    match storage.revoke_api_key(&tenant, &id).await {
+        Ok(Some(key)) => {
+            tracing::info!(tenant = %tenant, key = %key.id, "key revoked");
+            axum::Json(key).into_response()
+        }
+        Ok(None) => (StatusCode::NOT_FOUND, "no such key").into_response(),
+        Err(error) => storage_unavailable(&error),
+    }
 }
 
 /// Bind and serve until the process exits.

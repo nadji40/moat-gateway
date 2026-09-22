@@ -513,7 +513,30 @@ sudo scripts/provision-tenant.sh pilot "Moat pilot" approver
 ```
 
 The provisioner writes each one-time raw API key to a root-only environment file
-under `/etc/moat/tenants/`; PostgreSQL receives only its SHA-256 hash. The pilot
+under `/etc/moat/tenants/`; PostgreSQL receives only its SHA-256 hash.
+
+That step needs somebody with root, which is right for the first key and wrong
+for every key after it. Provision one `admin` key that way, and a tenant
+manages the rest themselves over HTTP:
+
+```bash
+sudo scripts/provision-tenant.sh pilot "Moat pilot" admin
+```
+
+| | |
+|---|---|
+| `POST /v1/keys` | `{"label": "...", "access_role": "agent\|approver\|admin"}` returns the key **once** |
+| `GET /v1/keys` | every key this tenant has, newest first, revoked ones included |
+| `DELETE /v1/keys/{id}` | withdraws one; revoking twice is not an error |
+
+All three need an `admin` bearer token and act only on the tenant that token
+belongs to. There is no tenant parameter, so a guessed key id cannot reach
+another tenant's credentials. An `admin` key cannot sign or approve a payment:
+the gateway checks the role against the surface being asked for, and the three
+roles do not overlap.
+
+Creating a *tenant* is still a database operation. That is the step that
+decides who is a customer, and it does not belong on a public endpoint. The pilot
 config and hardened systemd unit are in `deploy/`. Health endpoints are
 `/health/live` and `/health/ready` on both HTTP listeners. See
 [`docs/pilot-operations.md`](docs/pilot-operations.md) for deployment,

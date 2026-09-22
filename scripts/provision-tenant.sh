@@ -16,8 +16,8 @@ if [[ ! "$tenant_id" =~ ^[a-z0-9][a-z0-9_-]{2,63}$ ]]; then
   echo "invalid tenant id" >&2
   exit 2
 fi
-if [[ "$access_role" != "agent" && "$access_role" != "approver" ]]; then
-  echo "access role must be agent or approver" >&2
+if [[ "$access_role" != "agent" && "$access_role" != "approver" && "$access_role" != "admin" ]]; then
+  echo "access role must be agent, approver or admin" >&2
   exit 2
 fi
 if [[ ! -r "$env_file" ]]; then

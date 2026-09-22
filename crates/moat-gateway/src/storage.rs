@@ -1,6 +1,7 @@
 //! Durable PostgreSQL state for authenticated gateway deployments.
 
 use std::str::FromStr;
+use std::time::SystemTime;
 
 use anyhow::{Context, Result};
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
@@ -37,12 +38,12 @@ impl DurableStore {
         let client = store.pool.get().await.context("checking storage schema")?;
         let found = client
             .query_opt(
-                "SELECT version FROM moat.schema_migrations WHERE version = 4",
+                "SELECT version FROM moat.schema_migrations WHERE version = 5",
                 &[],
             )
             .await
             .context("checking storage migration")?;
-        anyhow::ensure!(found.is_some(), "Moat database migration 4 is not applied");
+        anyhow::ensure!(found.is_some(), "Moat database migration 5 is not applied");
         Ok(store)
     }
 
@@ -255,6 +256,153 @@ impl DurableStore {
             value
         }))
     }
+
+    // ---- the control plane (migration 0005) ----
+    //
+    // Issuing and withdrawing credentials, so a tenant is not waiting on
+    // somebody with root to run a shell script. Every call here is already
+    // scoped to a tenant the caller authenticated as; none of these queries
+    // takes a tenant id the caller chose.
+
+    /// Record a new key. Only its SHA-256 is stored; the raw key is the
+    /// caller's to hand over once and then forget.
+    pub async fn create_api_key(
+        &self,
+        tenant_id: &str,
+        label: &str,
+        access_role: &str,
+        key_hash: &str,
+        created_by: Option<&str>,
+    ) -> Result<ApiKey> {
+        let client = self.pool.get().await.context("key database connection")?;
+        let row = client
+            .query_one(
+                "INSERT INTO moat.api_keys
+                     (id, tenant_id, label, key_hash, access_role, created_by)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 RETURNING id, label, access_role, active, created_at,
+                           last_used_at, revoked_at",
+                &[
+                    &new_key_id(),
+                    &tenant_id,
+                    &label,
+                    &key_hash,
+                    &access_role,
+                    &created_by,
+                ],
+            )
+            .await
+            .context("creating API key")?;
+        Ok(ApiKey::from_row(&row))
+    }
+
+    /// The id of the key with this hash, for audit attribution only. Does not
+    /// check `active` or the role: a key that has just been revoked is still
+    /// the key that minted whatever it minted.
+    pub async fn api_key_id(&self, key_hash: &str) -> Result<Option<String>> {
+        let client = self.pool.get().await.context("key database connection")?;
+        let row = client
+            .query_opt(
+                "SELECT id FROM moat.api_keys WHERE key_hash = $1",
+                &[&key_hash],
+            )
+            .await
+            .context("looking up API key id")?;
+        Ok(row.map(|row| row.get(0)))
+    }
+
+    /// Every key this tenant has, newest first, revoked ones included. A
+    /// credential that was withdrawn is part of the record, not a gap in it.
+    pub async fn list_api_keys(&self, tenant_id: &str) -> Result<Vec<ApiKey>> {
+        let client = self.pool.get().await.context("key database connection")?;
+        let rows = client
+            .query(
+                "SELECT id, label, access_role, active, created_at,
+                        last_used_at, revoked_at
+                 FROM moat.api_keys
+                 WHERE tenant_id = $1
+                 ORDER BY created_at DESC",
+                &[&tenant_id],
+            )
+            .await
+            .context("listing API keys")?;
+        Ok(rows.iter().map(ApiKey::from_row).collect())
+    }
+
+    /// Withdraw one key. Returns the key as it now stands, or `None` when
+    /// this tenant has no such key — the same answer either way, so probing
+    /// for another tenant's key ids tells the prober nothing.
+    ///
+    /// Revoking an already-revoked key is not an error and does not move
+    /// `revoked_at`: the first withdrawal is the one that happened.
+    pub async fn revoke_api_key(&self, tenant_id: &str, id: &str) -> Result<Option<ApiKey>> {
+        let client = self.pool.get().await.context("key database connection")?;
+        let row = client
+            .query_opt(
+                "UPDATE moat.api_keys
+                 SET active = false,
+                     revoked_at = COALESCE(revoked_at, now())
+                 WHERE tenant_id = $1 AND id = $2
+                 RETURNING id, label, access_role, active, created_at,
+                           last_used_at, revoked_at",
+                &[&tenant_id, &id],
+            )
+            .await
+            .context("revoking API key")?;
+        Ok(row.as_ref().map(ApiKey::from_row))
+    }
+}
+
+/// A key as the control plane reports it. Never carries the key itself.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ApiKey {
+    /// Stable identifier, safe to log and to put in a URL.
+    pub id: String,
+    /// Whatever the tenant called it.
+    pub label: String,
+    /// `agent`, `approver` or `admin`.
+    pub access_role: String,
+    /// False once withdrawn.
+    pub active: bool,
+    /// When it was minted, RFC 3339.
+    pub created_at: String,
+    /// When it last authenticated, if ever.
+    pub last_used_at: Option<String>,
+    /// When it was withdrawn, if it was.
+    pub revoked_at: Option<String>,
+}
+
+impl ApiKey {
+    fn from_row(row: &tokio_postgres::Row) -> Self {
+        Self {
+            id: row.get("id"),
+            label: row.get("label"),
+            access_role: row.get("access_role"),
+            active: row.get("active"),
+            created_at: stamp(Some(row.get::<_, SystemTime>("created_at"))).unwrap_or_default(),
+            last_used_at: stamp(row.get::<_, Option<SystemTime>>("last_used_at")),
+            revoked_at: stamp(row.get::<_, Option<SystemTime>>("revoked_at")),
+        }
+    }
+}
+
+fn new_key_id() -> String {
+    let random: [u8; 16] = rand::random();
+    format!("key_{}", &moat_core::hash::sha256_hex(&random)[..24])
+}
+
+/// A database timestamp in the same RFC 3339 shape the evidence records use,
+/// so a key's dates and a verdict's date can be compared without parsing two
+/// formats. `None` in, `None` out: a key that has never authenticated has no
+/// `last_used_at` and should not be given a fabricated one.
+fn stamp(value: Option<SystemTime>) -> Option<String> {
+    let ms = value?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_millis()
+        .try_into()
+        .ok()?;
+    Some(moat_core::evidence::rfc3339(ms))
 }
 
 // ---- the payment ledger (migration 0003) ----

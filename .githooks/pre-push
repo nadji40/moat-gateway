@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Refuse to push what has not been checked.
+#
+# GitHub Actions does not run on push for this repository. The workflow is
+# active, its triggers are correct and the file on the remote is right, but a
+# push creates no run at all while workflow_dispatch does, which is what
+# Actions being blocked at the account level looks like from inside the repo.
+# Seventeen commits landed that way before anyone noticed.
+#
+# Until that is fixed at the account, this hook is the check. It runs exactly
+# what CI would run, from the same script, so a green hook and a green CI mean
+# the same thing.
+#
+# Enable it once per clone:
+#
+#   git config core.hooksPath .githooks
+#
+# To push without it, in an emergency and knowing what it means:
+#
+#   MOAT_SKIP_VERIFY=1 git push
+set -euo pipefail
+
+if [[ -n "${MOAT_SKIP_VERIFY:-}" ]]; then
+  echo "pre-push: skipped by MOAT_SKIP_VERIFY; this push is unverified" >&2
+  exit 0
+fi
+
+# Nothing to check when the push deletes a ref.
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  if [[ "$local_sha" == "0000000000000000000000000000000000000000" ]]; then
+    exit 0
+  fi
+done
+
+root="$(git rev-parse --show-toplevel)"
+echo "pre-push: running the checks CI would run"
+if ! "$root/scripts/verify.sh"; then
+  cat >&2 <<'MSG'
+
+pre-push: refused.
+
+Fix it, or push anyway with MOAT_SKIP_VERIFY=1 if you know why that is the
+right call. Nothing else is checking this push: Actions does not run on push
+for this repository.
+MSG
+  exit 1
+fi

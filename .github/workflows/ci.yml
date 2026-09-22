@@ -22,14 +22,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Format
-        run: cargo fmt --all --check
-
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      - name: Test
-        run: cargo test --workspace
+      # The same script the pre-push hook runs, so a green hook and a green
+      # CI mean the same thing. Adding a check there adds it here.
+      - name: Verify
+        run: scripts/verify.sh rust
 
   arena:
     name: arena
@@ -67,7 +63,6 @@ jobs:
         working-directory: arena
         run: pnpm install --frozen-lockfile
 
-      - name: Test
+      - name: Verify
         if: steps.arena.outputs.present == 'true'
-        working-directory: arena
-        run: pnpm test
+        run: scripts/verify.sh arena
