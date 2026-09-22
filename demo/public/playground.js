@@ -85,7 +85,10 @@ async function asAgent(secret, sessionId, message) {
   });
   const text = await res.text();
   if (!res.ok && !text.trim().startsWith("{")) throw new Error(text.slice(0, 200) || res.statusText);
-  return { body: JSON.parse(text), session: res.headers.get("mcp-session-id") };
+  // A notification is answered with 202 and no body at all, so parsing
+  // unconditionally turned "the agent said hello" into a JSON error.
+  const body = text.trim() ? JSON.parse(text) : {};
+  return { body, session: res.headers.get("mcp-session-id") };
 }
 
 /* ---------------------------------------------------------------------
