@@ -114,8 +114,13 @@ async function copyText(text, btn, done = "Copied", selectOnFail) {
    hidden and a text link in there would vanish. */
 const ADMIN_SLOT = "moat.admin";
 
+/* localStorage, not sessionStorage: somebody who opened a workspace last week
+   should find it open when they come back, and the alternative is asking them
+   to keep a 69-character key somewhere less safe than their own browser. It
+   still never leaves the machine and is still only ever sent to the gateway
+   as a bearer token. Close on the tab bar clears it. */
 function signedIn() {
-  try { return Boolean(sessionStorage.getItem(ADMIN_SLOT)); } catch { return false; }
+  try { return Boolean(localStorage.getItem(ADMIN_SLOT)); } catch { return false; }
 }
 
 function mountAuthButton() {
@@ -130,11 +135,12 @@ function mountAuthButton() {
     a = document.createElement("a");
     a.id = "auth";
     a.href = "dashboard.html";
-    bar.insertBefore(a, document.getElementById("live"));
+    bar.appendChild(a);
   }
-  const inn = signedIn();
-  a.className = "statusbtn" + (inn ? " on" : "");
-  a.innerHTML = '<b></b><span>' + (inn ? "Dashboard" : "Log in") + '</span>';
+  // Primary, and it stays on a phone: it is the only way in, so hiding it with
+  // .navlinks at 760px would leave a visitor on a phone with no route at all.
+  a.className = "btn tiny";
+  a.textContent = signedIn() ? "Dashboard" : "Log in";
   if (location.pathname.endsWith("dashboard.html")) a.setAttribute("aria-current", "page");
 }
 

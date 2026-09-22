@@ -29,9 +29,8 @@
     </g>
   </svg></a>
   <div class="navlinks">
-    <a href="#compose">Compose one</a><a href="#api">API</a><a href="compare.html">Compare</a><a href="tests.html">The tests</a>
+    <a href="#compose">Compose one</a><a href="#api">API</a><a href="compare.html">Compare</a><a href="tests.html">The tests</a><a href="status.html">Status</a>
   </div>
-  <a class="statusbtn" id="live" href="status.html"><b></b><span>Status</span></a>
 </div></div></nav>
 
 <div class="wrap">
@@ -624,10 +623,6 @@ function agentPrompt(b){
     '<span class="c"># hand the sandbox back rather than waiting for it to expire</span>',
     `<span class="k">curl</span> -s -XDELETE <span class="u">${b}/v1/sandbox/$S</span>`,
   ].join(NL);
-  try{
-    await api("/v1/limits");
-    $("#live").classList.add("on"); $("#live").lastElementChild.textContent="Live";
-  }catch(e){ $("#live").classList.add("bad"); $("#live").lastElementChild.textContent="Down"; }
 })();
 </script>
 </body>

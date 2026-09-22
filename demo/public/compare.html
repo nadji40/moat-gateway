@@ -29,9 +29,8 @@
     </g>
   </svg></a>
   <div class="navlinks">
-    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html" aria-current="page">Compare</a><a href="tests.html">The tests</a>
+    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html" aria-current="page">Compare</a><a href="tests.html">The tests</a><a href="status.html">Status</a>
   </div>
-  <a class="statusbtn" id="live" href="status.html"><b></b><span>Status</span></a>
 </div></div></nav>
 
 <div class="wrap">
@@ -242,12 +241,6 @@
 
 <script src="app.js"></script>
 <script>
-(async()=>{
-  try{
-    await api("/v1/limits");
-    $("#live").classList.add("on"); $("#live").lastElementChild.textContent="Live";
-  }catch(e){ $("#live").classList.add("bad"); $("#live").lastElementChild.textContent="Down"; }
-})();
 </script>
 </body>
 </html>

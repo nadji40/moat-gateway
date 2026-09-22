@@ -31,7 +31,6 @@
   <div class="navlinks">
     <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html">Compare</a><a href="tests.html" aria-current="page">The tests</a>
   </div>
-  <a class="statusbtn" id="live" href="status.html"><b></b><span>Status</span></a>
 </div></div></nav>
 
 <div class="wrap">
@@ -173,10 +172,13 @@ $("#run-all").addEventListener("click",()=>runTests(TESTS.map(t=>t.id)));
 (async()=>{
   try{
     TESTS=(await api("/v1/tests")).tests; draw();
-    $("#live").classList.add("on"); $("#live").lastElementChild.textContent="Live";
     // arriving from the hero button on the front page
     if(new URLSearchParams(location.search).has("run")) runTests(TESTS.map(t=>t.id));
-  }catch(e){ $("#live").classList.add("bad"); $("#live").lastElementChild.textContent="Down"; }
+  }catch(e){
+    // A silent catch here would leave an empty page that looks like a corpus
+    // with nothing in it rather than a sandbox that could not be reached.
+    $("#tests").innerHTML=`<p class="hint">Could not reach the sandbox: ${esc(String(e.message||e))}</p>`;
+  }
 })();
 </script>
 </body>

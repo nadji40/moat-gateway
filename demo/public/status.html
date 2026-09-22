@@ -29,9 +29,8 @@
     </g>
   </svg></a>
   <div class="navlinks">
-    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html">Compare</a><a href="tests.html">The tests</a>
+    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html">Compare</a><a href="tests.html">The tests</a><a href="status.html">Status</a>
   </div>
-  <a class="statusbtn" id="live" href="status.html" aria-current="page"><b></b><span>Status</span></a>
 </div></div></nav>
 
 <div class="wrap">
@@ -51,6 +50,19 @@
 </header>
 
 <section class="tight">
+  <div class="headrow"><h2>Thirty days</h2></div>
+  <div class="panel glass">
+    <div class="ph"><h3 id="uptime-h">Availability</h3></div>
+    <div class="pb">
+      <div class="strip" id="strip"></div>
+      <div class="strip-ends"><span id="strip-from"></span><span id="strip-to">today</span></div>
+      <p class="hint" id="uptime-note">Loading.</p>
+    </div>
+  </div>
+</section>
+
+<section class="tight">
+  <div class="headrow"><h2>Right now</h2></div>
   <div class="summary glass" id="summary" hidden><span class="bar"></span></div>
   <div class="panel glass"><div class="ph">Endpoints</div><div class="pb">
     <div class="checks" id="checks"></div>
@@ -71,6 +83,38 @@
 </div></footer>
 
 <script src="app.js"></script>
+<script>
+/* The strip. One column a day, coloured by how much of that day the gateway
+   answered. Today is drawn faintly because it is still being counted, and a
+   day with no samples at all is drawn as a gap rather than as green. */
+(async () => {
+  try {
+    const u = await api("/v1/uptime");
+    const bars = u.days.map((d) => {
+      const pct = d.ratio === null ? null : Math.round(d.ratio * 1000) / 10;
+      const colour = pct === null ? "var(--line)"
+        : pct >= 99.5 ? "var(--green-l)"
+        : pct >= 95 ? "var(--yellow-l)"
+        : "var(--red-l)";
+      const title = pct === null ? `${d.date}: no samples`
+        : `${d.date}: ${pct}%${d.partial ? " so far today" : ""}`;
+      return `<span class="day${d.partial ? " partial" : ""}" style="background:${colour}" title="${esc(title)}"></span>`;
+    });
+    $("#strip").innerHTML = bars.join("");
+    $("#strip-from").textContent = u.days[0].date;
+
+    const whole = u.days.filter((d) => !d.partial && d.expected);
+    const ok = whole.reduce((a, d) => a + d.ok, 0);
+    const exp = whole.reduce((a, d) => a + d.expected, 0);
+    $("#uptime-h").textContent = exp
+      ? `Availability, ${(100 * ok / exp).toFixed(2)}% over ${whole.length} full days`
+      : "Availability";
+    $("#uptime-note").textContent = u.note;
+  } catch (e) {
+    $("#uptime-note").textContent = "Could not read the record: " + String(e.message || e);
+  }
+})();
+</script>
 <script>
 
 /* The flow an agent actually walks, in order. Later steps need the sandbox
@@ -149,8 +193,6 @@ async function run(){
   draw(rows,false); summarise(rows);
 
   const up=rows.filter(r=>r.state==="up"||r.state==="slow").length;
-  $("#live").classList.toggle("on",up===rows.length);
-  $("#live").classList.toggle("bad",up!==rows.length);
 
   idle(btn);
 }

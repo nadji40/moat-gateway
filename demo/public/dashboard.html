@@ -29,9 +29,8 @@
     </g>
   </svg></a>
   <div class="navlinks">
-    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html">Compare</a><a href="tests.html">The tests</a>
+    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html">Compare</a><a href="tests.html">The tests</a><a href="status.html">Status</a>
   </div>
-  <a class="statusbtn" id="live" href="status.html"><b></b><span>Status</span></a>
 </div></div></nav>
 
 <div class="wrap">
@@ -187,9 +186,9 @@
    localStorage: a shared machine should not keep an admin credential after
    the tab closes. Every accessor is wrapped, because a private window throws. */
 const SLOT = "moat.admin";
-const held = () => { try { return sessionStorage.getItem(SLOT); } catch { return null; } };
+const held = () => { try { return localStorage.getItem(SLOT); } catch { return null; } };
 const hold = (v) => {
-  try { v ? sessionStorage.setItem(SLOT, v) : sessionStorage.removeItem(SLOT); } catch {}
+  try { v ? localStorage.setItem(SLOT, v) : localStorage.removeItem(SLOT); } catch {}
   // The header button reads the same slot, so it is redrawn whenever this
   // changes rather than only at load.
   mountAuthButton();
@@ -428,11 +427,6 @@ const gate = mountSwiper("#gate-swiper", "#gate-deck");
 const resize = () => gate && gate.size();
 
 if (held()) openWorkspace();
-
-(async () => {
-  try { await api("/v1/limits"); $("#live").classList.add("on"); $("#live").lastElementChild.textContent = "Live"; }
-  catch { $("#live").classList.add("bad"); $("#live").lastElementChild.textContent = "Down"; }
-})();
 </script>
 
 </body>

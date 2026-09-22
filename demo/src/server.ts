@@ -18,6 +18,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chainDemo, chainState } from "./chain.js";
 import { isControlPath, proxyControl } from "./control.js";
+import { startUptime, uptime } from "./uptime.js";
 import { runSuite, TESTS } from "./suite.js";
 import {
   authorize,
@@ -162,6 +163,10 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    if (path === "/v1/uptime") {
+      return json(res, 200, uptime());
+    }
+
     if (path === "/v1/limits") {
       return json(res, 200, { ...stats(), ...LIMITS, chain: chainState() });
     }
@@ -228,6 +233,10 @@ const server = createServer(async (req, res) => {
     return json(res, 500, { error: "the sandbox could not complete that" });
   }
 });
+
+// Sampling starts with the process, not with the first visitor, or the strip
+// would only ever record the minutes somebody happened to be watching.
+startUptime();
 
 server.listen(PORT, "127.0.0.1", () => {
   process.stderr.write(`moat sandbox on http://127.0.0.1:${PORT}\n`);

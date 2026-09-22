@@ -1,0 +1,125 @@
+// Daily availability of the authenticated gateway, sampled from here.
+//
+// A status page that only says "up" because you are reading it says nothing:
+// the interesting question is what happened while nobody was looking. So the
+// demo process takes a sample a minute and keeps the tally per day.
+//
+// A day is 1440 minutes, and the denominator is always 1440 rather than the
+// number of samples actually taken. That is deliberate: if this process is
+// down it records nothing, and dividing by the samples it managed to take
+// would score a dead service at 100%. Missing samples are downtime, which is
+// the only honest reading.
+//
+// Today is therefore always partial and is reported as such, so nobody reads
+// a morning's 30% as an outage.
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+/** Minutes in a day, and so the denominator for a complete one. */
+const PER_DAY = 1440;
+/** How long the strip is. */
+const DAYS = 30;
+const EVERY_MS = 60_000;
+
+const FILE =
+  process.env["MOAT_UPTIME_FILE"] ?? join(process.env["HOME"] ?? ".", ".moat-uptime.json");
+const TARGET = (process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081") + "/health/ready";
+
+/** date (YYYY-MM-DD) -> samples that answered */
+type Tally = Record<string, number>;
+
+let tally: Tally = {};
+let timer: NodeJS.Timeout | undefined;
+
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function load(): void {
+  try {
+    if (existsSync(FILE)) tally = JSON.parse(readFileSync(FILE, "utf8")) as Tally;
+  } catch {
+    // A corrupt file is not worth refusing to start over. Losing history is
+    // better than a status page that cannot serve.
+    tally = {};
+  }
+}
+
+function save(): void {
+  try {
+    mkdirSync(dirname(FILE), { recursive: true });
+    writeFileSync(FILE, JSON.stringify(tally), "utf8");
+  } catch {
+    /* a read-only disk should not take the process down */
+  }
+}
+
+async function sample(): Promise<void> {
+  let ok = false;
+  try {
+    const res = await fetch(TARGET, { signal: AbortSignal.timeout(5_000) });
+    ok = res.ok;
+  } catch {
+    ok = false;
+  }
+  if (!ok) return;
+  const day = today();
+  tally[day] = (tally[day] ?? 0) + 1;
+
+  // Keep a little more than the strip shows, and no more.
+  const keep = new Set(lastDays(DAYS + 5));
+  for (const key of Object.keys(tally)) if (!keep.has(key)) delete tally[key];
+  save();
+}
+
+function lastDays(n: number): string[] {
+  const out: string[] = [];
+  const now = Date.now();
+  for (let i = n - 1; i >= 0; i--) {
+    out.push(new Date(now - i * 86_400_000).toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+export function startUptime(): void {
+  if (timer) return;
+  load();
+  void sample();
+  timer = setInterval(() => void sample(), EVERY_MS);
+  timer.unref?.();
+}
+
+export interface Day {
+  date: string;
+  /** Samples that answered. */
+  ok: number;
+  /** Samples expected by now: 1440 for a past day, fewer for today. */
+  expected: number;
+  /** `ok / expected`, or null for a day with no expectation yet. */
+  ratio: number | null;
+  /** Today is still accumulating, so its ratio is not comparable. */
+  partial: boolean;
+}
+
+export function uptime(): { days: Day[]; window: number; note: string } {
+  const now = new Date();
+  const minutesToday = now.getUTCHours() * 60 + now.getUTCMinutes() + 1;
+  const stamp = today();
+
+  const days = lastDays(DAYS).map((date) => {
+    const partial = date === stamp;
+    const expected = partial ? minutesToday : PER_DAY;
+    const ok = Math.min(tally[date] ?? 0, expected);
+    return { date, ok, expected, ratio: expected ? ok / expected : null, partial };
+  });
+
+  return {
+    days,
+    window: DAYS,
+    note:
+      "One sample a minute against the gateway's readiness endpoint. A day is " +
+      "scored out of 1440 whether or not this process was alive to take the " +
+      "samples, so a gap counts against it.",
+  };
+}
