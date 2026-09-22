@@ -8,10 +8,10 @@
 //
 // What it will not do:
 //
-//   * forward any path it was not told about by name. `/mcp` is on the same
-//     listener and must not become reachable from a browser through here,
-//     and neither must the intent API, which is a separate port precisely so
-//     that it is not public.
+//   * forward any path it was not told about by name. The intent API must not
+//     become reachable through here: it is on a separate port precisely so
+//     that it is not public, and releasing a held payment is not something a
+//     stranger gets to do.
 //   * invent, cache or inspect a bearer token. The header is copied across
 //     untouched; this process never learns a key and never stores one.
 //
@@ -19,6 +19,8 @@
 // gateway decides those; signup is the one that writes for a stranger.
 
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 /** Where the authenticated gateway listens. Loopback in every deployment. */
 const GATEWAY = process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081";
@@ -114,4 +116,146 @@ export async function proxyControl(
     res.end(JSON.stringify({ error: "the control plane is unavailable" }));
   }
   return true;
+}
+
+
+/* ---- the MCP endpoint ---------------------------------------------------
+   An agent key exists to be used against /mcp and nothing else. While this
+   proxy refused to forward it, a tenant could issue one from the dashboard
+   and then have nowhere on the internet to present it: the gateway binds
+   127.0.0.1, so the only way to use a key was to run the gateway yourself.
+   That made the page's offer untrue.
+
+   Forwarded rather than reimplemented. Every check that matters already lives
+   in the gateway -- the bearer is authenticated per request, the role must be
+   `agent`, scopes are checked at the tool call, and the tenant bounds every
+   read and write -- so this adds no decision of its own. It carries bytes and
+   headers faithfully and gets out of the way.
+
+   Two things it does not do:
+
+     * It does not widen CORS. The OPTIONS handler still allows only
+       content-type, so a browser page cannot send an authorization header
+       here cross-origin. The gateway would refuse it anyway: its own origin
+       check accepts loopback origins only, and Origin is forwarded so that
+       check still runs. An MCP client is not a browser and sends no Origin.
+     * It does not buffer. The streamable HTTP transport answers a POST with
+       either JSON or an event stream, and a GET is a long-lived stream, so
+       the body is piped. Reading it to a string the way the control paths do
+       would hold every event until the stream closed, which for a GET is
+       never. */
+
+/** The path the gateway serves MCP on, here and there. */
+const MCP_PATH = "/mcp";
+
+/** Headers an MCP client needs carried to the gateway. */
+const FORWARD = [
+  "authorization",
+  "content-type",
+  "accept",
+  "mcp-session-id",
+  "mcp-protocol-version",
+  "last-event-id",
+  // Forwarded so the gateway's own origin check still runs. It accepts
+  // loopback only, which is the DNS-rebinding defence, and stripping it here
+  // would silently disarm that.
+  "origin",
+] as const;
+
+/** Headers the client needs carried back. The session id is how it resumes. */
+const RETURN = ["content-type", "mcp-session-id", "cache-control"] as const;
+
+/** A tool call can carry a page of text; a JSON-RPC frame is still not large. */
+const MAX_BODY = 1024 * 1024;
+
+export function isMcpPath(path: string): boolean {
+  return path === MCP_PATH;
+}
+
+async function readBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > MAX_BODY) throw new Error("body too large");
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/** Forward one MCP call, streaming the answer. */
+export async function proxyMcp(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const method = (req.method ?? "GET").toUpperCase();
+  // POST carries a JSON-RPC frame, GET opens the stream, DELETE ends the
+  // session. Nothing else is part of the transport.
+  if (method !== "POST" && method !== "GET" && method !== "DELETE") {
+    res.writeHead(405, { "content-type": "application/json", allow: "GET,POST,DELETE" });
+    res.end(JSON.stringify({ error: "the MCP endpoint takes GET, POST or DELETE" }));
+    return;
+  }
+
+  const headers: Record<string, string> = {};
+  for (const name of FORWARD) {
+    const value = req.headers[name];
+    if (typeof value === "string") headers[name] = value;
+  }
+
+  let body: string | undefined;
+  if (method === "POST") {
+    try {
+      body = await readBody(req);
+    } catch {
+      res.writeHead(413, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "body too large" }));
+      return;
+    }
+  }
+
+  // A stream ends when the client goes away, not after a fixed time: a GET is
+  // held open for as long as the agent wants it. Tying the upstream to this
+  // connection is what stops an abandoned client leaving one behind.
+  const stop = new AbortController();
+  const abort = (): void => stop.abort();
+  req.on("close", abort);
+
+  try {
+    const upstream = await fetch(`${GATEWAY}${MCP_PATH}`, {
+      method,
+      headers,
+      ...(body !== undefined ? { body } : {}),
+      signal: stop.signal,
+    });
+
+    const out: Record<string, string> = {};
+    for (const name of RETURN) {
+      const value = upstream.headers.get(name);
+      if (value) out[name] = value;
+    }
+    res.writeHead(upstream.status, out);
+
+    if (!upstream.body) {
+      res.end();
+      return;
+    }
+    // pipeline rather than a write loop: it honours backpressure and tears
+    // both ends down together when either fails.
+    await pipeline(Readable.fromWeb(upstream.body as never), res);
+  } catch (error) {
+    // An abort is the client hanging up, which is not an error to report.
+    if (stop.signal.aborted) {
+      res.end();
+      return;
+    }
+    if (!res.headersSent) {
+      res.writeHead(503, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "the gateway is unavailable" }));
+    } else {
+      // Mid-stream there is no status left to change, so the honest thing is
+      // to close and let the client's transport notice.
+      res.end();
+    }
+    void error;
+  } finally {
+    req.off("close", abort);
+  }
 }

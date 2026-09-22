@@ -17,7 +17,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chainDemo, chainState } from "./chain.js";
-import { isControlPath, proxyControl } from "./control.js";
+import { isControlPath, isMcpPath, proxyControl, proxyMcp } from "./control.js";
 import { startUptime, uptime } from "./uptime.js";
 import { runSuite, TESTS } from "./suite.js";
 import {
@@ -137,10 +137,18 @@ const server = createServer(async (req, res) => {
   }
 
   try {
-    if (path.startsWith("/v1/")) {
+    if (path.startsWith("/v1/") || isMcpPath(path)) {
       if (overLimit(caller(req.headers))) {
         return json(res, 429, { error: "too many requests from here; wait a minute" });
       }
+    }
+
+    // The MCP endpoint, forwarded to the authenticated gateway. This is the
+    // one surface an agent key is for, so it has to be reachable or a key
+    // issued in the dashboard has nowhere to be used. The gateway does every
+    // check: the bearer, the `agent` role, the scopes and the tenant.
+    if (isMcpPath(path)) {
+      return proxyMcp(req, res);
     }
 
     if (path === "/v1/tests") {

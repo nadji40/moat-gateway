@@ -142,6 +142,9 @@
     <div class="panel glass" style="margin-top:18px">
       <div class="ph"><h3>Point an agent at it</h3></div>
       <div class="pb">
+        <p class="hint">This is the address an agent key is for. An admin key
+          cannot pay through it and an agent key cannot manage keys, so the
+          one you hand your agent is the one that can only spend.</p>
         <pre class="glass" id="curl"></pre>
         <div class="row">
           <button class="btn" id="copy-curl">Copy</button>
@@ -408,8 +411,21 @@ async function refresh(){
 
 function openWorkspace(){
   show("#gate", false); show("#workspace", true); show("#foot", true);
-  $("#curl").textContent =
-    `curl -s ${location.origin}/v1/keys \\\n  -H 'authorization: Bearer YOUR_KEY'`;
+  // This panel used to hand out a /v1/keys call, which an agent key cannot
+  // make: that path needs an admin key, so the first thing a new tenant was
+  // told to run answered 401 with the credential they had just been given.
+  // The address an agent key is for is the MCP endpoint.
+  $("#curl").textContent = [
+    `${location.origin}/mcp`,
+    ``,
+    `# any MCP client, with the agent key as a bearer token:`,
+    `curl -s ${location.origin}/mcp \\`,
+    `  -H 'authorization: Bearer YOUR_AGENT_KEY' \\`,
+    `  -H 'content-type: application/json' \\`,
+    `  -H 'accept: application/json, text/event-stream' \\`,
+    `  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":` +
+      `{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"you","version":"1"}}}'`,
+  ].join("\n");
   openPane(location.hash.slice(1));
   drawScopes();
   refresh();
