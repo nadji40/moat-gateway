@@ -174,6 +174,21 @@ export function isMcpPath(path: string): boolean {
   return path === MCP_PATH;
 }
 
+/** Whether an Origin names the host this very request was addressed to. */
+function sameOrigin(origin: string, host: string | undefined): boolean {
+  if (!host) return false;
+  try {
+    // Compared by host rather than by whole origin: the browser says https
+    // and the proxy in front terminates it, so the schemes legitimately
+    // differ and the port is already part of Host when it is not the default.
+    return new URL(origin).host === host;
+  } catch {
+    // An Origin that is not a URL is not this one. "null" arrives from a
+    // sandboxed frame, and that is exactly a caller to forward and refuse.
+    return false;
+  }
+}
+
 async function readBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
@@ -200,6 +215,20 @@ export async function proxyMcp(req: IncomingMessage, res: ServerResponse): Promi
   for (const name of FORWARD) {
     const value = req.headers[name];
     if (typeof value === "string") headers[name] = value;
+  }
+  // The gateway's origin check trusts loopback origins and nothing else,
+  // which is the DNS-rebinding defence: a page on some other site must not be
+  // able to drive a gateway listening on 127.0.0.1. A page this server itself
+  // served is not that page, and it is the only party in the chain that can
+  // tell the difference -- the gateway sees every request arriving from
+  // loopback and cannot know which host the browser asked for.
+  //
+  // So a same-origin Origin is dropped and every other one is forwarded to be
+  // refused. Dropping it is not a hole: a genuinely cross-origin caller never
+  // reaches here either way, because the preflight allows content-type alone
+  // and an authorization header is not on that list.
+  if (headers["origin"] && sameOrigin(headers["origin"], req.headers.host)) {
+    delete headers["origin"];
   }
 
   let body: string | undefined;
