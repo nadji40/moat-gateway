@@ -175,7 +175,7 @@ function mountNav() {
     `<a class="navmark" href="/" aria-label="moat, home">${NAV_MARK}</a>` +
     `<div class="navlinks">${links}</div>` +
     "</div></div>";
-  mountNav();
+  mountAuthButton();
 }
 
 function mountAuthButton() {
