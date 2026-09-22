@@ -102,12 +102,17 @@ header.hero{padding-block:clamp(56px,9vw,112px) clamp(40px,6vw,72px)}
 .kicker{display:inline-block;font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:22px}
 h1 .g{color:var(--orange)}
 .hero .lede{color:var(--ink-2);max-width:48ch;margin:22px auto 0;font-size:1.0625rem}
-/* the cursor trail sits behind the hero's words, never over them, and never
-   in the way of a click */
-.hero{position:relative}
-.trailfx{position:absolute;inset:0;z-index:0;pointer-events:none;
-  border-radius:inherit;opacity:.9}
-.hero > div{position:relative;z-index:1}
+/* The cursor trail covers the viewport rather than one section, so it is
+   fixed rather than absolute: the page scrolls over a trail that stays where
+   the cursor left it on screen. It is behind every word and cannot take a
+   click.
+
+   `has-trail` is set by trail.js, so the lift can only reach a page
+   that actually loads it. The nav already carries a z-index of its own and
+   needs nothing here. */
+.trailfx{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.9}
+body.has-trail .wrap,
+body.has-trail footer.foot{position:relative;z-index:1}
 
 .hero .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:36px}
 /* extruded: a solid face with a solid edge beneath it, and the whole

@@ -1,4 +1,4 @@
-// A cursor trail behind the hero, after rock-biter/cursor-trail.
+// A cursor trail behind the whole page, after rock-biter/cursor-trail.
 //
 // The technique is a feedback buffer. Each frame samples the frame before it
 // through a curl-noise displacement, fades what it found, and deposits colour
@@ -14,20 +14,21 @@
 // the result is smoke and nobody can see the difference while the curl noise
 // costs real time per pixel. And the simulation stores colour only; alpha is
 // computed when the buffer is drawn to screen, so the canvas composites over
-// the page instead of painting a black rectangle across the hero.
+// the page instead of painting a black rectangle across it.
 
 (() => {
-  const host = document.querySelector(".hero");
-  if (!host) return;
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   const canvas = document.createElement("canvas");
   canvas.className = "trailfx";
   canvas.setAttribute("aria-hidden", "true");
-  host.prepend(canvas);
+  document.body.prepend(canvas);
+  // Only the page that loads this script lifts its content above the canvas,
+  // so the rule cannot reach a page that has no trail.
+  document.body.classList.add("has-trail");
 
   const gl = canvas.getContext("webgl2", { alpha: true, antialias: false, depth: false });
-  // No WebGL2 is not a failure worth reporting: the hero reads the same
+  // No WebGL2 is not a failure worth reporting: the page reads the same
   // without it.
   if (!gl) return;
 
@@ -197,7 +198,7 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     // Clamped, not repeated: a trail that wrapped round the edge would draw
-    // smoke on the opposite side of the hero from the cursor.
+    // smoke on the opposite side of the screen from the cursor.
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     const fb = gl.createFramebuffer();
@@ -209,7 +210,10 @@
   }
 
   function resize() {
-    const r = host.getBoundingClientRect();
+    // The canvas is fixed to the viewport, so its cost does not grow with the
+    // length of the page: a long page scrolls under a trail the same size as
+    // a short one.
+    const r = { width: innerWidth, height: innerHeight };
     // Half resolution. It is smoke; the curl noise is the expensive part and
     // it costs per pixel.
     const next = [Math.max(1, Math.round(r.width / 2)), Math.max(1, Math.round(r.height / 2))];
@@ -232,9 +236,10 @@
   addEventListener(
     "pointermove",
     (ev) => {
-      const r = host.getBoundingClientRect();
-      pointer.x = ((ev.clientX - r.left) / r.width) * 2 - 1;
-      pointer.y = (1 - (ev.clientY - r.top) / r.height) * 2 - 1;
+      // clientX/Y are already viewport coordinates, which is what a fixed
+      // canvas wants; no scroll offset belongs in here.
+      pointer.x = (ev.clientX / innerWidth) * 2 - 1;
+      pointer.y = (1 - ev.clientY / innerHeight) * 2 - 1;
       pointer.seen = true;
     },
     { passive: true },
@@ -242,26 +247,16 @@
 
   let src = 0;
   let last = performance.now();
-  let running = true;
-
-  // A hero scrolled out of view should not be burning a GPU.
-  if ("IntersectionObserver" in window) {
-    new IntersectionObserver(
-      ([entry]) => {
-        running = entry.isIntersecting;
-        if (running) last = performance.now();
-      },
-      { threshold: 0 },
-    ).observe(host);
-  }
 
   function frame(now) {
     requestAnimationFrame(frame);
-    if (!running || document.hidden) return;
+    // The canvas covers the viewport, so there is nothing to scroll out of
+    // view and nothing to observe. A hidden tab is still worth stopping for.
+    if (document.hidden) return;
 
     resize();
     // Clamped: a tab restored after a minute would otherwise arrive with a
-    // delta that wipes the buffer and jumps the trail across the hero.
+    // delta that wipes the buffer and jumps the trail across the screen.
     const dt = Math.min((now - last) / 1000, 1 / 30);
     last = now;
 
