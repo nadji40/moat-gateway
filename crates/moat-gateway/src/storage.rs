@@ -477,8 +477,20 @@ impl DurableStore {
             .await
             .context("creating the first admin key")?;
 
+        // Read the row before committing, not after.
+        //
+        // The secret for this key exists only in the caller's memory: the
+        // database has a hash. So anything that fails between the commit and
+        // the reply leaves a tenant with an admin key nobody holds, and the id
+        // is taken, so they cannot even sign up again. That is exactly what
+        // happened when from_row panicked on a column the RETURNING clause had
+        // stopped carrying.
+        //
+        // Built first, the same failure rolls the transaction back and the
+        // caller gets an error and an id they can still use.
+        let key = ApiKey::from_row(&row);
         tx.commit().await.context("committing signup")?;
-        Ok(Some(ApiKey::from_row(&row)))
+        Ok(Some(key))
     }
 
     /// Every key this tenant has, newest first, revoked ones included. A
