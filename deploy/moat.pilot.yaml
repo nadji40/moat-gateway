@@ -17,3 +17,7 @@ storage:
   max_connections: 12
 auth:
   required: true
+  # This deployment is the public trial, so a stranger can create a workspace
+  # and its first admin key. A pilot for one named customer leaves this off and
+  # provisions that key with scripts/provision-tenant.sh instead.
+  self_signup: true
