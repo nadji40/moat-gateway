@@ -32,12 +32,15 @@ type Tally = Record<string, number>;
 interface Store {
   /** The first day this recorder ran. Days before it were never measured. */
   since?: string;
+  /** The exact minute it started, so its first day is not scored from midnight. */
+  startedAt?: string;
   days: Tally;
 }
 
 let tally: Tally = {};
 /** Undefined only between construction and the first load. */
 let since: string | undefined;
+let startedAt: string | undefined;
 let timer: NodeJS.Timeout | undefined;
 
 function today(): string {
@@ -52,6 +55,7 @@ function load(): void {
       if (raw && typeof raw === "object" && "days" in raw) {
         tally = (raw as Store).days ?? {};
         since = (raw as Store).since;
+        startedAt = (raw as Store).startedAt;
       } else {
         tally = raw as Tally;
         since = Object.keys(tally).sort()[0];
@@ -62,14 +66,20 @@ function load(): void {
     // better than a status page that cannot serve.
     tally = {};
   }
-  // A recorder that started today has not been failing since last month.
+  // A recorder that started today has not been failing since last month, and
+  // one that started this minute has not been failing since midnight.
   since ??= today();
+  startedAt ??= new Date().toISOString();
 }
 
 function save(): void {
   try {
     mkdirSync(dirname(FILE), { recursive: true });
-    const store: Store = { days: tally, ...(since ? { since } : {}) };
+    const store: Store = {
+      days: tally,
+      ...(since ? { since } : {}),
+      ...(startedAt ? { startedAt } : {}),
+    };
     writeFileSync(FILE, JSON.stringify(store), "utf8");
   } catch {
     /* a read-only disk should not take the process down */
@@ -127,6 +137,11 @@ export function uptime(): { days: Day[]; window: number; note: string } {
   const now = new Date();
   const minutesToday = now.getUTCHours() * 60 + now.getUTCMinutes() + 1;
   const stamp = today();
+  const began = startedAt ? new Date(startedAt) : null;
+  const skipToday =
+    began && began.toISOString().slice(0, 10) === stamp
+      ? began.getUTCHours() * 60 + began.getUTCMinutes()
+      : 0;
 
   const days = lastDays(DAYS).map((date) => {
     const partial = date === stamp;
@@ -135,7 +150,10 @@ export function uptime(): { days: Day[]; window: number; note: string } {
     if (since && date < since) {
       return { date, ok: 0, expected: 0, ratio: null, partial: false };
     }
-    const expected = partial ? minutesToday : PER_DAY;
+    // On the first day, only the minutes since the recorder started could
+    // have been sampled. Scoring from midnight would mark the hours before it
+    // existed as an outage.
+    const expected = partial ? Math.max(1, minutesToday - skipToday) : PER_DAY;
     const ok = Math.min(tally[date] ?? 0, expected);
     return { date, ok, expected, ratio: expected ? ok / expected : null, partial };
   });
