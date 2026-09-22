@@ -462,4 +462,11 @@ drawChains(); drawChain(); show(0);
 // is zero. The deck gets its real height the first time the tab is opened.
 addEventListener("moat:pane", (e) => { if (e.detail === "pane-playground") show(active); });
 
+// And the tab may already be open before this file has loaded at all. The
+// dashboard restores the pane from the URL at the end of its inline script,
+// which is one line above the tag that fetches this one, so arriving straight
+// at #pane-playground fired that event into a page with no listener yet and
+// left the deck at the zero height it measured while hidden.
+if (!$("#pane-playground").hidden) requestAnimationFrame(() => show(active));
+
 })();
