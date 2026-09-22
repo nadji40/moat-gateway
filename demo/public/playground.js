@@ -239,9 +239,11 @@ for(const el of $("#chips").querySelectorAll(".chip"))
    beside the new one, and a payee approved a moment ago would still
    resolve to User.
    --------------------------------------------------------------------- */
-let pgSession = null, mandate = null;
+let pgSession = null;
 
-async function ensure() {
+/** The session and the user's words: registered once, because intent is
+    append-only and re-registering it would leave both sentences on record. */
+async function ensureSession() {
   if (pgSession) return pgSession;
   const keys = pgKeys() || await pgMint();
 
@@ -258,33 +260,44 @@ async function ensure() {
   await asKey(keys.approver.secret, `/v1/session/${encodeURIComponent(session)}/intent`, {
     method: "POST", body: JSON.stringify({ text: $("#intent").value }),
   });
-
-  mandate = null;
-  if ($("#a-payee").value.trim()) {
-    const authorization_id = "pg-" + Math.random().toString(36).slice(2, 10);
-    const invoice_id = "INV-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-    await asKey(keys.approver.secret, `/v1/session/${encodeURIComponent(session)}/authorizations`, {
-      method: "POST",
-      body: JSON.stringify({
-        authorization_id, invoice_id,
-        payee: $("#a-payee").value,
-        amount: $("#a-amount").value,
-        currency: $("#a-currency").value,
-        // An hour is longer than anyone will sit here, and short enough that
-        // a mandate left behind expires on its own.
-        expires_at: new Date(Date.now() + 3600000).toISOString(),
-        repeat_payments: true,
-        max_payments: 20,
-      }),
-    });
-    mandate = { authorization_id, invoice_id };
-  }
   pgSession = session;
   return session;
 }
 
+/**
+ * A fresh authorization for every attempt, single-use, as production would
+ * write it.
+ *
+ * Reusing one mandate meant that once an attempt actually paid, every later
+ * verdict also carried `authorization-duplicate: invoice already settled`.
+ * True, and nothing to do with the field the visitor had just changed: they
+ * altered the currency and were told about replay protection. One experiment
+ * per attempt keeps the answer about the question.
+ */
+async function newMandate(session) {
+  if (!$("#a-payee").value.trim()) return null;
+  const keys = pgKeys();
+  const authorization_id = "pg-" + Math.random().toString(36).slice(2, 10);
+  const invoice_id = "INV-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+  await asKey(keys.approver.secret, `/v1/session/${encodeURIComponent(session)}/authorizations`, {
+    method: "POST",
+    body: JSON.stringify({
+      authorization_id, invoice_id,
+      payee: $("#a-payee").value,
+      amount: $("#a-amount").value,
+      currency: $("#a-currency").value,
+      // An hour is longer than anyone will sit here, and short enough that
+      // a mandate left behind expires on its own.
+      expires_at: new Date(Date.now() + 3600000).toISOString(),
+      repeat_payments: false,
+      max_payments: 1,
+    }),
+  });
+  return { authorization_id, invoice_id };
+}
+
 for (const id of ["intent", "a-payee", "a-amount", "a-currency"])
-  $("#" + id).addEventListener("change", () => { pgSession = null; mandate = null; });
+  $("#" + id).addEventListener("change", () => { pgSession = null; });
 
 $("#attempt").addEventListener("click", async () => {
   const s = $("#attempt-status");
@@ -295,7 +308,8 @@ $("#attempt").addEventListener("click", async () => {
   working($("#attempt"), "Evaluating");
   const call = { payee: $("#p-payee").value, amount, currency: $("#p-currency").value };
   try {
-    const session = await ensure();
+    const session = await ensureSession();
+    const mandate = await newMandate(session);
     const keys = pgKeys();
     const args = { ...call };
     if (mandate) { args.authorization_id = mandate.authorization_id; args.invoice_id = mandate.invoice_id; }
