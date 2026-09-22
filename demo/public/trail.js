@@ -112,13 +112,17 @@
   void main() {
     vec2 uv = gl_FragCoord.xy / uResolution;
 
-    vec2 uv2 = uv + curlNoise(vec3(uv * 4. + uTime * 0.1, uTime * 0.1)).xy * uDt * 0.3;
-    uv += curlNoise(vec3(uv * 2. + uTime * 0.1, uTime * 0.1)).xy * uDt * 0.15;
+    // Drift and fade. Halving both the displacement and the rate the noise
+    // field itself evolves is what makes the smoke unhurried rather than
+    // merely long-lived, and the slower decay lets it hang instead of
+    // snapping out.
+    vec2 uv2 = uv + curlNoise(vec3(uv * 4. + uTime * 0.05, uTime * 0.05)).xy * uDt * 0.16;
+    uv += curlNoise(vec3(uv * 2. + uTime * 0.05, uTime * 0.05)).xy * uDt * 0.08;
 
     vec3 a = texture(uMap, uv).rgb;
     vec3 b = texture(uMap, uv2).rgb;
     vec3 color = mix(a, b, 0.5);
-    color *= 1. - uDt * 2.;
+    color *= 1. - uDt * 1.35;
 
     uv -= 0.5;
     uv *= 2.0;
@@ -126,17 +130,23 @@
     vec2 pointer = uPointer;
     pointer.x *= uResolution.x / uResolution.y;
 
+    // A wider radius carrying less colour: the same ink spread over more
+    // pixels reads as softer, where simply dimming it reads as faded. The
+    // exponents come down with it, because the shoulder between the pool and
+    // the body is where the hard edge was.
     float d = distance(uv, pointer);
-    float speed = clamp(uSpeed * 2., 0.075, 0.25);
-    float scale = speed * 5. * uActive;
+    float speed = clamp(uSpeed * 2., 0.10, 0.32);
+    float scale = speed * 4.2 * uActive;
 
     float t  = smoothstep(speed, 0., d) * scale;
-    float t3 = pow(smoothstep(speed, 0., d), 4.) * scale;
-    float t2 = pow(smoothstep(speed, 0., d), 10.) * scale;
+    float t3 = pow(smoothstep(speed, 0., d), 3.) * scale;
+    float t2 = pow(smoothstep(speed, 0., d), 7.) * scale;
 
     color = mix(color, vec3(0.92, 0.00, 0.10), t);   // --red, the outer pool
     color = mix(color, vec3(1.00, 0.37, 0.00), t3);  // --orange, the body
-    color = mix(color, vec3(1.00, 0.93, 0.78), t2);  // the hot core
+    // Warm rather than white: the old near-white core was the one part of
+    // this that looked like a highlight instead of like the brand.
+    color = mix(color, vec3(1.00, 0.72, 0.42), t2);
 
     fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
   }`;
@@ -291,7 +301,7 @@
     gl.bindTexture(gl.TEXTURE_2D, targets[dst].tex);
     gl.uniform1i(gl.getUniformLocation(draw, "uMap"), 0);
     gl.uniform2f(gl.getUniformLocation(draw, "uResolution"), w, h);
-    gl.uniform1f(gl.getUniformLocation(draw, "uFade"), 0.85);
+    gl.uniform1f(gl.getUniformLocation(draw, "uFade"), 0.75);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.clearColor(0, 0, 0, 0);
