@@ -128,7 +128,18 @@ setInterval(reap, 30_000).unref();
 export async function destroy(id: string): Promise<void> {
   const s = live.get(id);
   if (!s) return;
+  // Unreachable from this moment: nothing can route to it once it is out of
+  // the map, and the slot it occupied is free.
   live.delete(id);
+  // The caller does not need to watch a process die. Closing the transport
+  // waits for the gateway and the mock provider it spawned to exit, which was
+  // two seconds of a DELETE that had already done its job. Reaping continues
+  // in the background; a stray process outlives the response by a moment and
+  // nothing observable depends on it.
+  void reapSandbox(s);
+}
+
+async function reapSandbox(s: Live): Promise<void> {
   await s.client.close().catch(() => {});
   for (const path of [s.configPath, s.evidencePath, s.ledger]) {
     try {
@@ -230,7 +241,12 @@ export async function create(cfg: SandboxConfig): Promise<{ id: string; expires_
     ledger, api, configPath, evidencePath,
   });
 
-  for (let i = 0; i < 80; i += 1) {
+  // Ramp the wait instead of sleeping a flat 100ms. The gateway is usually
+  // listening in a few tens of milliseconds, and a fixed tick meant a process
+  // that was ready at 30ms still cost a full 100, several times over. Same
+  // overall deadline, most of the idle time gone.
+  const deadline = Date.now() + 8_000;
+  for (let wait = 5; Date.now() < deadline; wait = Math.min(wait * 2, 100)) {
     try {
       if ((await fetch(`${api}/v1/session/${encodeURIComponent(session)}/evidence`)).ok) {
         return { id, expires_in_s: Math.round(LIMITS.idleMs / 1000) };
@@ -238,7 +254,7 @@ export async function create(cfg: SandboxConfig): Promise<{ id: string; expires_
     } catch {
       /* not up yet */
     }
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, wait));
   }
   await destroy(id);
   throw new SandboxError(503, "the gateway did not come up in time");

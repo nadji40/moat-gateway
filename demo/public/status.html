@@ -42,6 +42,9 @@
   </div>
 
   <div class="rows" id="days" style="margin-top:14px"></div>
+  <div class="row" style="justify-content:center;margin-top:12px">
+    <button class="btn ghost" id="more" hidden></button>
+  </div>
   <p class="hint foot-note" id="days-note" hidden></p>
 </section>
 
@@ -102,7 +105,13 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
     /* The strip answers "was it up"; the list answers "what happened on the
        ninth". Days nobody measured are left out rather than listed as zero. */
     const measured = u.days.filter((d) => d.ratio !== null).slice().reverse();
-    $("#days").innerHTML = measured.map((d) => {
+
+    /* Five is a glance. The rest is a click, because a month of rows pushes
+       the live checks off the page for a reader who only wanted to know
+       whether yesterday was fine. */
+    const PAGE = 5;
+    let shown = PAGE;
+    const dayRow = (d) => {
       const pct = Math.round(d.ratio * 1000) / 10;
       const colour = pct >= 99.5 ? "var(--green-l)" : pct >= 95 ? "var(--yellow-l)" : "var(--red-l)";
       const missed = d.expected - d.ok;
@@ -122,7 +131,17 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
         </div>
         <span class="row-r" style="color:${colour};font-size:1.1rem">${pct}%</span>
       </article>`;
-    }).join("");
+    };
+
+    const draw = () => {
+      $("#days").innerHTML = measured.slice(0, shown).map(dayRow).join("");
+      const left = measured.length - shown;
+      const more = $("#more");
+      more.hidden = left <= 0;
+      more.textContent = `Show ${Math.min(left, PAGE)} more of ${left}`;
+    };
+    $("#more").addEventListener("click", () => { shown += PAGE; draw(); });
+    draw();
     const declared = measured.filter((d) => d.declared).length;
     note("#days-note", declared
       ? `${measured.length - declared} day${measured.length - declared === 1 ? "" : "s"} sampled a minute at a time. `
