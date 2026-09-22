@@ -131,6 +131,11 @@
         </div>
         <p class="hint">An agent key cannot manage keys. An admin key cannot pay
           or approve. The three roles do not overlap.</p>
+        <!-- Whatever the Issue button has to say belongs beside the Issue
+             button. It used to land in #keys-note, which is below the list of
+             keys: "Give the key a label" appeared a screen away from the
+             empty label. -->
+        <p class="hint" id="mint-note" hidden></p>
       </div>
     </div>
     <div class="rows" id="keys"></div>
@@ -300,9 +305,15 @@ function keyRow(k){
       <p class="row-s mono">${esc(k.id)}</p>
       <p class="row-b">created ${esc(when(k.created_at))} · last used ${esc(when(k.last_used_at))}</p>
     </div>
-    ${k.active
-      ? `<button class="btn ghost small" data-revoke="${esc(k.id)}">Revoke</button>`
-      : `<span class="row-r" style="font-size:.8rem;color:var(--ink-3)">revoked</span>`}
+    ${!k.active
+      ? `<span class="row-r" style="font-size:.8rem;color:var(--ink-3)">revoked</span>`
+      : k.current
+      // The key this browser is signed in with. Offering to revoke it offers
+      // to lock the workspace, since revoking is admin-only and this is the
+      // credential that reaches it. The gateway refuses the call as well;
+      // this is so the button is never there to press.
+      ? `<span class="row-r" style="font-size:.8rem;color:var(--orange)">in use here</span>`
+      : `<button class="btn ghost small" data-revoke="${esc(k.id)}">Revoke</button>`}
   </article>`;
 }
 
@@ -336,7 +347,8 @@ async function refresh(){
     $("#keys").innerHTML = rows.map(keyRow).join("");
     const live = rows.filter(k => k.active).length;
     badge("#tab-keys-n", live);
-    note("#keys-note", `${live} active, ${rows.length - live} revoked. A revoked key stays listed: it is part of the record.`);
+    note("#keys-note", `${live} active, ${rows.length - live} revoked. A revoked key stays listed: it is part of the record. `
+      + "To rotate the key you are signed in with, issue another admin key, sign in with it, then revoke this one.");
     for (const b of document.querySelectorAll("[data-revoke]")) {
       b.addEventListener("click", async () => {
         working(b, "Revoking");
@@ -387,7 +399,7 @@ $("#copy-curl").addEventListener("click", (e) => copyText($("#curl").textContent
 
 $("#mint").addEventListener("click", async () => {
   const label = $("#lbl").value.trim();
-  if (!label) return note("#keys-note", "Give the key a label.", true);
+  if (!label) return note("#mint-note", "Give the key a label.", true);
   const btn = $("#mint"); working(btn, "Issuing");
   try {
     const out = await control("/v1/keys", {
@@ -397,7 +409,8 @@ $("#mint").addEventListener("click", async () => {
     $("#secret").textContent = out.secret;
     show("#workspace", false); show("#minted", true);
     $("#lbl").value = "";
-  } catch (e) { note("#keys-note", String(e.message || e), true); }
+    note("#mint-note", "");
+  } catch (e) { note("#mint-note", String(e.message || e), true); }
   finally { idle(btn); }
 });
 

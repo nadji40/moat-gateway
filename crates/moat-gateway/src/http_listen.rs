@@ -563,6 +563,18 @@ struct MintedKey {
     secret: String,
 }
 
+/// A key as the control plane lists it: the record, plus whether it is the one
+/// the caller is holding. The dashboard cannot work that out for itself, since
+/// it has the secret and the list has only the id, and without the flag the
+/// only way to find out is to revoke it and be locked out.
+#[derive(serde::Serialize)]
+struct ListedKey {
+    #[serde(flatten)]
+    key: crate::storage::ApiKey,
+    /// True for the key that authenticated this request.
+    current: bool,
+}
+
 /// Roles a key may be minted with. `admin` is here on purpose: a tenant that
 /// cannot mint a second admin key has no way to rotate the first one without
 /// calling us.
@@ -642,7 +654,7 @@ async fn create_key(
 }
 
 async fn list_keys(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Response {
-    let (tenant, _) = match admin_caller(&listener, &headers).await {
+    let (tenant, by) = match admin_caller(&listener, &headers).await {
         Ok(caller) => caller,
         Err(response) => return *response,
     };
@@ -650,7 +662,16 @@ async fn list_keys(State(listener): State<Arc<Listener>>, headers: HeaderMap) ->
         return bad_request("this gateway has no durable storage, so it has no keys");
     };
     match storage.list_api_keys(&tenant).await {
-        Ok(keys) => axum::Json(keys).into_response(),
+        Ok(keys) => {
+            let listed: Vec<ListedKey> = keys
+                .into_iter()
+                .map(|key| ListedKey {
+                    current: by.as_deref() == Some(key.id.as_str()),
+                    key,
+                })
+                .collect();
+            axum::Json(listed).into_response()
+        }
         Err(error) => storage_unavailable(&error),
     }
 }
@@ -660,10 +681,22 @@ async fn revoke_key(
     axum::extract::Path(id): axum::extract::Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (tenant, _) = match admin_caller(&listener, &headers).await {
+    let (tenant, by) = match admin_caller(&listener, &headers).await {
         Ok(caller) => caller,
         Err(response) => return *response,
     };
+    // An admin key cannot withdraw itself. Revoking is an admin-only call, so
+    // the caller would be destroying the one credential that reaches this
+    // endpoint and would have no way to mint a replacement. Rotation still
+    // works, in the order that leaves a way back: mint the new admin key
+    // first, sign in with it, then revoke the old one.
+    if by.as_deref() == Some(id.as_str()) {
+        return (
+            StatusCode::CONFLICT,
+            "this is the key you are signed in with. Issue another admin key,              sign in with it, then revoke this one.",
+        )
+            .into_response();
+    }
     let Some(storage) = listener.shared.storage() else {
         return bad_request("this gateway has no durable storage, so it has no keys");
     };

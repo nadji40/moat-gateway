@@ -75,8 +75,8 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
         : pct >= 99.5 ? "var(--green-l)"
         : pct >= 95 ? "var(--yellow-l)"
         : "var(--red-l)";
-      const title = pct === null ? `${d.date}: no samples`
-        : d.declared ? `${d.date}: up, stated by the operator, not sampled`
+      const title = pct === null ? `${d.date}: not measured`
+        : d.declared ? `${d.date}: up, stated rather than measured`
         : `${d.date}: ${pct}%${d.partial ? " so far today" : ""}`;
       const cls = d.declared ? " declared" : d.partial ? " partial" : "";
       return `<span class="day${cls}" style="background:${colour}" title="${esc(title)}"></span>`;
@@ -89,7 +89,7 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
     const ok = whole.reduce((a, d) => a + d.ok, 0);
     const exp = whole.reduce((a, d) => a + d.expected, 0);
     $("#uptime-h").textContent = exp
-      ? `Availability, ${(100 * ok / exp).toFixed(2)}% over ${whole.length} sampled day${whole.length === 1 ? "" : "s"}`
+      ? `Availability, ${(100 * ok / exp).toFixed(2)}% over ${whole.length} day${whole.length === 1 ? "" : "s"}`
       : "Availability";
 
     /* The strip answers "was it up"; the list answers "what happened on the
@@ -101,10 +101,14 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
        whether yesterday was fine. */
     const PAGE = 5;
     let shown = PAGE;
+    /* A day is its date and its figure. How that figure is arrived at is the
+       recorder's business, not the reader's: nobody came here to be told
+       about minutes or denominators. The one thing worth keeping is whether
+       a day was measured or stated, because that changes what the number is
+       worth. */
     const dayRow = (d) => {
       const pct = Math.round(d.ratio * 1000) / 10;
       const colour = pct >= 99.5 ? "var(--green-l)" : pct >= 95 ? "var(--yellow-l)" : "var(--red-l)";
-      const missed = d.expected - d.ok;
       const when = new Date(d.date + "T00:00:00Z").toLocaleDateString(undefined,
         { weekday: "short", day: "numeric", month: "short" });
       return `<article class="row">
@@ -114,10 +118,7 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
         <div class="row-t">
           <h3>${esc(when)}${d.partial ? ' <span class="row-e">so far today</span>'
             : d.declared ? ' <span class="row-e">declared</span>' : ""}</h3>
-          <p class="row-s">${d.declared
-            ? "up, stated by the operator"
-            : missed ? `${missed} minute${missed === 1 ? "" : "s"} unanswered` : "every sample answered"}</p>
-          <p class="row-b mono">${esc(d.date)} · ${d.declared ? "not sampled" : `${d.ok} of ${d.expected}`}</p>
+          <p class="row-s mono">${esc(d.date)}${d.declared ? " · stated, not sampled" : ""}</p>
         </div>
         <span class="row-r" style="color:${colour};font-size:1.1rem">${pct}%</span>
       </article>`;
