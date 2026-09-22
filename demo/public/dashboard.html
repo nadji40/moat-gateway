@@ -142,12 +142,21 @@
     <div class="panel glass" style="margin-top:18px">
       <div class="ph"><h3>Point an agent at it</h3></div>
       <div class="pb">
-        <p class="hint">This is the address an agent key is for. An admin key
-          cannot pay through it and an agent key cannot manage keys, so the
-          one you hand your agent is the one that can only spend.</p>
+        <p class="hint">Two keys, two sides. The agent gets an
+          <b>agent</b> key and the MCP address below; it can only spend, and
+          only within what has been authorized. Your own application, the code
+          that owns the chat box, gets an <b>approver</b> key scoped to
+          <span class="mono">intent:write</span> and registers what the user
+          typed before the agent runs. The agent never sees that key, which is
+          the point: an agent that could declare its own intent would be
+          authorizing itself.</p>
+        <p class="lbl" style="margin-top:6px">1. The agent</p>
         <pre class="glass" id="curl"></pre>
+        <p class="lbl" style="margin-top:12px">2. Your application, with an approver key</p>
+        <pre class="glass" id="curl-intent"></pre>
         <div class="row">
-          <button class="btn" id="copy-curl">Copy</button>
+          <button class="btn" id="copy-curl">Copy the agent side</button>
+          <button class="btn ghost" id="copy-curl-intent">Copy the approver side</button>
           <a class="btn ghost" href="/tests">Run the nine tests</a>
         </div>
       </div>
@@ -293,9 +302,10 @@ const NO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
    behind it, and the gateway refuses anything the key was not given.
 
    These lists mirror scopes_for_role in the gateway. Only scopes the gateway
-   actually checks are offered: an approver has none, because releasing a held
-   payment goes through the intent API on its own listener, and a scope nothing
-   enforces would read on the key as a restriction that is not being applied.
+   actually checks are offered. The approver ones are checked by the intent
+   API and split along the line between a machine and a person: the harness
+   that registers what the user typed gets intent:write, the screen a person
+   approves on gets holds:release, and neither needs the other.
 
    Nothing ticked means the whole role, which is what every key issued before
    scopes existed carries. That is a deliberate default rather than an empty
@@ -312,7 +322,12 @@ const SCOPES = {
     ["rail:bank", "Pay by bank transfer"],
     ["rail:crypto", "Pay on chain"],
   ],
-  approver: [],
+  approver: [
+    ["intent:write", "Register what the user typed"],
+    ["authorizations:write", "Register and cancel what a person signed off"],
+    ["holds:release", "Approve or refuse a held payment"],
+    ["evidence:read", "Read outcomes and evidence"],
+  ],
 };
 
 function drawScopes(){
@@ -426,6 +441,23 @@ function openWorkspace(){
     `  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":` +
       `{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"you","version":"1"}}}'`,
   ].join("\n");
+  // The session id comes back in the mcp-session-id header of the agent's
+  // initialize call. The application needs it to say which conversation
+  // the user's words belong to.
+  $("#curl-intent").textContent = [
+    `# before the agent runs: what the user actually typed, from your own code`,
+    `curl -s ${location.origin}/v1/session/SESSION_ID/intent \\`,
+    `  -H 'authorization: Bearer YOUR_APPROVER_KEY' \\`,
+    `  -H 'content-type: application/json' \\`,
+    `  -d '{"text":"Pay the Aseer Cloud Co invoice INV-4471 for 480 USD."}'`,
+    ``,
+    `# what a person signed off, if you use structured authorizations`,
+    `curl -s ${location.origin}/v1/session/SESSION_ID/authorizations \\`,
+    `  -H 'authorization: Bearer YOUR_APPROVER_KEY' \\`,
+    `  -H 'content-type: application/json' \\`,
+    `  -d '{"authorization_id":"auth-1","invoice_id":"INV-4471","payee":"Aseer Cloud Co",` +
+      `"amount":"480","currency":"USD","expires_at":"2030-01-01T00:00:00Z"}'`,
+  ].join("\n");
   openPane(location.hash.slice(1));
   drawScopes();
   refresh();
@@ -459,6 +491,7 @@ $("#signin").addEventListener("click", async () => {
 $("#minted-done").addEventListener("click", () => { show("#minted", false); openWorkspace(); });
 $("#copy-secret").addEventListener("click", (e) => copyText($("#secret").textContent, e.currentTarget, "Copied"));
 $("#copy-curl").addEventListener("click", (e) => copyText($("#curl").textContent, e.currentTarget, "Copied"));
+$("#copy-curl-intent").addEventListener("click", (e) => copyText($("#curl-intent").textContent, e.currentTarget, "Copied"));
 
 $("#mint").addEventListener("click", async () => {
   const label = $("#lbl").value.trim();

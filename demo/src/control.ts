@@ -8,10 +8,10 @@
 //
 // What it will not do:
 //
-//   * forward any path it was not told about by name. The intent API must not
-//     become reachable through here: it is on a separate port precisely so
-//     that it is not public, and releasing a held payment is not something a
-//     stranger gets to do.
+//   * forward any path it was not told about by name. The intent API is
+//     forwarded, but only its per-session and per-tenant paths, and only to
+//     an `approver` key: its health and cosigner endpoints stay where they
+//     are, and an agent key presented there is refused by the gateway.
 //   * invent, cache or inspect a bearer token. The header is copied across
 //     untouched; this process never learns a key and never stores one.
 //
@@ -24,6 +24,8 @@ import { pipeline } from "node:stream/promises";
 
 /** Where the authenticated gateway listens. Loopback in every deployment. */
 const GATEWAY = process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081";
+/** Where its intent API listens: a separate port, and now a separate key. */
+const INTENT = process.env["MOAT_INTENT_URL"] ?? "http://127.0.0.1:7082";
 
 /** Exactly the paths the dashboard needs. Anything else is a 404. */
 function target(path: string, method: string): string | undefined {
@@ -257,5 +259,60 @@ export async function proxyMcp(req: IncomingMessage, res: ServerResponse): Promi
     void error;
   } finally {
     req.off("close", abort);
+  }
+}
+
+
+/* ---- the intent API -----------------------------------------------------
+   The trusted side. What the user said, what a person approved, and what
+   came of it. It is on its own port and takes an `approver` key, and both of
+   those are the design rather than an accident: an agent key cannot reach
+   it, so an agent cannot register its own intent, so provenance means what
+   it says.
+
+   While this stayed loopback-only, a remote agent could be refused but never
+   allowed. Every payment through the public /mcp resolved to Unknown because
+   nothing on the internet could tell the session what the user had asked.
+   Now the customer's own application -- the code that owns the chat box, not
+   the agent -- registers the user's words here with an approver key the agent
+   never sees, and a legitimate payment can pass.
+
+   Plain request and reply, so it is read to a string like the control paths.
+   Nothing here streams. */
+
+/** The paths a customer's application needs, and only those. */
+const INTENT_PATH = /^\/v1\/(session\/[A-Za-z0-9_-]{1,128}(\/[a-z/_-]{1,80})?|outcomes|authorizations\/[A-Za-z0-9_-]{1,128})$/;
+
+export function isIntentPath(path: string): boolean {
+  return INTENT_PATH.test(path);
+}
+
+/** Forward one intent API call. */
+export async function proxyIntent(
+  req: IncomingMessage,
+  res: ServerResponse,
+  path: string,
+  body: string,
+): Promise<void> {
+  const method = (req.method ?? "GET").toUpperCase();
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  const auth = req.headers["authorization"];
+  if (typeof auth === "string") headers["authorization"] = auth;
+  try {
+    const sends = method !== "GET" && method !== "DELETE";
+    const upstream = await fetch(`${INTENT}${path}`, {
+      method,
+      headers,
+      ...(sends ? { body } : {}),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const text = await upstream.text();
+    res.writeHead(upstream.status, {
+      "content-type": upstream.headers.get("content-type") ?? "application/json",
+    });
+    res.end(text);
+  } catch {
+    res.writeHead(503, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: "the intent API is unavailable" }));
   }
 }

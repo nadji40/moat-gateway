@@ -550,12 +550,18 @@ minted before scopes existed carries.
 |---|---|---|
 | `admin` | `keys:read`, `keys:write`, `usage:read`, `verdicts:read` | the control plane endpoint |
 | `agent` | `rail:card`, `rail:bank`, `rail:crypto` | `tools/call`, from the rail of the upstream the tool is namespaced to |
-| `approver` | none | — |
+| `approver` | `intent:write`, `authorizations:write`, `holds:release`, `evidence:read` | the intent API |
 
-`approver` has none because this gateway checks none for that role: releasing a
-held payment goes through the intent API, a separate listener on a separate
-port. A scope accepted here and never consulted would read on the key as a
-restriction that is not being applied, so minting one is refused.
+The approver scopes split along the line between a machine and a person. The
+harness that captures what the user typed and registers it needs
+`intent:write` and nothing more. The screen a person approves a held payment
+on needs `holds:release` and nothing more. Before scopes, one approver key did
+both, which meant the machine that registers intent could also release holds.
+
+The intent API is the trusted side, and the reason it takes an `approver` key
+rather than an `agent` key is the whole design: intent must come from code the
+agent does not control. An agent that could register its own intent would be
+an agent that authorizes itself, and provenance would mean nothing.
 
 Rail scopes are checked per request rather than per session. A session outlives
 the request that opened it and can be reached by several of a tenant's keys, so

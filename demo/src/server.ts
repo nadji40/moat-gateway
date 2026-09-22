@@ -17,7 +17,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chainDemo, chainState } from "./chain.js";
-import { isControlPath, isMcpPath, proxyControl, proxyMcp } from "./control.js";
+import { isControlPath, isIntentPath, isMcpPath, proxyControl, proxyIntent, proxyMcp } from "./control.js";
 import { startUptime, uptime } from "./uptime.js";
 import { runSuite, TESTS } from "./suite.js";
 import {
@@ -221,6 +221,12 @@ const server = createServer(async (req, res) => {
     if (isControlPath(path)) {
       const raw = await readBody(req);
       if (await proxyControl(req, res, path, raw, caller(req.headers))) return;
+    }
+
+    // The intent API: the trusted side, on an approver key. Placed after the
+    // sandbox routes so /v1/sandbox/... is never mistaken for a session path.
+    if (isIntentPath(path)) {
+      return proxyIntent(req, res, path, await readBody(req));
     }
 
     if (path.startsWith("/v1/")) return json(res, 404, { error: "no such endpoint" });

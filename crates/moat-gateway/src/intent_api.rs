@@ -104,14 +104,37 @@ fn bearer(headers: &HeaderMap) -> Option<&str> {
         .filter(|value| !value.is_empty())
 }
 
-async fn authenticated_tenant(shared: &Shared, headers: &HeaderMap) -> ApiResultTenant {
+/// Authenticate an `approver` key and refuse it if it was narrowed away from
+/// `scope`. Returns the tenant, which is all the handlers need once the two
+/// checks have passed.
+///
+/// This listener is the trusted side. What arrives here is what the user
+/// said and what a person approved, and it must come from code the agent does
+/// not control: an agent that could register its own intent would be an agent
+/// that authorizes itself. The role check is what keeps an agent key out. The
+/// scope check is what keeps a harness that only registers intent from also
+/// releasing held payments, which is a person's decision and not a machine's.
+async fn authenticated_tenant(
+    shared: &Shared,
+    headers: &HeaderMap,
+    scope: &str,
+) -> ApiResultTenant {
     match shared
         .authenticate_bearer(bearer(headers), "approver")
         .await
     {
-        // Scopes narrow a key inside its role, and this listener checks none:
-        // there is nothing here to narrow, so only the tenant is taken.
-        Ok(Some(caller)) => Ok(caller.tenant_id),
+        Ok(Some(caller)) => {
+            if !caller.may(scope) {
+                return Err(err(
+                    StatusCode::FORBIDDEN,
+                    format!(
+                        "this key is not scoped to {scope}. It carries: {}.",
+                        caller.scopes.join(", ")
+                    ),
+                ));
+            }
+            Ok(caller.tenant_id)
+        }
         Ok(None) => Err(err(
             StatusCode::UNAUTHORIZED,
             "valid Moat bearer token required",
@@ -175,7 +198,7 @@ async fn post_intent(
     Path(id): Path<String>,
     Json(body): Json<IntentBody>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "intent:write").await?;
     let text = body.text.trim();
     if text.is_empty() {
         return Err(err(StatusCode::BAD_REQUEST, "text is empty"));
@@ -195,7 +218,7 @@ async fn post_resume(
     Path(id): Path<String>,
     Json(body): Json<ResumeBody>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "holds:release").await?;
     let _session = session_for_request(&shared, &tenant_id, &id).await?;
     let Some(pending) = shared
         .take_resume(&tenant_id, &id, &body.resume_token)
@@ -238,7 +261,7 @@ async fn post_headless(
     Path(id): Path<String>,
     Json(body): Json<HeadlessBody>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "intent:write").await?;
     let _session = session_for_request(&shared, &tenant_id, &id).await?;
     mutate(&shared, &tenant_id, &id, |session| {
         session.set_headless(body.headless);
@@ -255,7 +278,7 @@ async fn post_authorization(
     Path(id): Path<String>,
     Json(body): Json<AuthorizationBody>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "authorizations:write").await?;
     let authorization_id = body.authorization_id.trim();
     let invoice_id = body.invoice_id.trim();
     let payee = body.payee.trim();
@@ -414,7 +437,7 @@ async fn cancel_authorization(
     headers: HeaderMap,
     Path((id, authorization_id)): Path<(String, String)>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "authorizations:write").await?;
     let _session = session_for_request(&shared, &tenant_id, &id).await?;
     let cancelled = mutate(&shared, &tenant_id, &id, |session| {
         Ok(session.cancel_payment_authorization(&authorization_id))
@@ -451,7 +474,7 @@ async fn get_outcomes(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "evidence:read").await?;
     let session = session_for_request(&shared, &tenant_id, &id).await?;
     let (open, all) = {
         let session = lock(&session);
@@ -490,7 +513,7 @@ async fn reconcile_outcome(
     Path((id, evidence_id)): Path<(String, String)>,
     Json(body): Json<ReconcileBody>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "holds:release").await?;
     let session = session_for_request(&shared, &tenant_id, &id).await?;
     let status = OutcomeStatus::from_provider(&body.status);
     if status == OutcomeStatus::Unknown {
@@ -587,7 +610,7 @@ async fn cosign_verdict(
     Path(id): Path<String>,
     Json(body): Json<CosignBody>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "holds:release").await?;
     let session = session_for_request(&shared, &tenant_id, &id).await?;
     let Some(cosign) = shared.cosign() else {
         return Err(err(
@@ -775,7 +798,7 @@ fn address_arg(text: &str, field: &str) -> Result<[u8; 20], (StatusCode, Json<Er
 /// mandate whether or not anyone still has the session that made it open,
 /// and before the payment ledger there was no way to ask.
 async fn get_tenant_outcomes(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "evidence:read").await?;
     let Some(storage) = shared.storage() else {
         return Err(err(
             StatusCode::NOT_IMPLEMENTED,
@@ -798,7 +821,7 @@ async fn get_tenant_authorization(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "evidence:read").await?;
     let Some(storage) = shared.storage() else {
         return Err(err(
             StatusCode::NOT_IMPLEMENTED,
@@ -837,7 +860,7 @@ async fn get_workflow(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "evidence:read").await?;
     let session = session_for_request(&shared, &tenant_id, &id).await?;
     let (authorizations, payment_outcomes, events) = {
         let session = lock(&session);
@@ -871,7 +894,7 @@ async fn get_evidence(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> ApiResult {
-    let tenant_id = authenticated_tenant(&shared, &headers).await?;
+    let tenant_id = authenticated_tenant(&shared, &headers, "evidence:read").await?;
     let _session = session_for_request(&shared, &tenant_id, &id).await?;
     let records = shared
         .evidence_for_tenant(&tenant_id, &id)

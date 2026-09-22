@@ -232,17 +232,31 @@ async fn refuses_a_scope_the_role_cannot_carry() {
     );
 }
 
-/// This gateway checks no approver scope, because releasing a held payment
-/// goes through the intent API on its own listener. Accepting one here would
-/// write a restriction on a key that nothing applies.
+/// An approver key splits along the line between a machine and a person: the
+/// harness that registers what the user typed needs `intent:write`, and the
+/// screen a person approves on needs `holds:release`. Both are real scopes
+/// because the intent API checks them; a scope the role cannot carry is
+/// refused with the list of what it can.
 #[tokio::test]
-async fn an_approver_key_takes_no_scopes() {
+async fn an_approver_key_takes_the_intent_api_scopes_and_no_others() {
     let gw = Gateway::start("cp-scope-approver").await;
     let (status, text) = gw
-        .post_key(r#"{"label":"ci","access_role":"approver","scopes":["holds:release"]}"#)
+        .post_key(r#"{"label":"harness","access_role":"approver","scopes":["intent:write"]}"#)
         .await;
     assert_eq!(status, 400, "{text}");
-    assert!(text.contains("takes no scopes"), "{text}");
+    assert!(
+        text.contains("durable storage"),
+        "intent:write is a scope an approver can carry, so it reaches storage: {text}"
+    );
+
+    let (status, text) = gw
+        .post_key(r#"{"label":"harness","access_role":"approver","scopes":["keys:write"]}"#)
+        .await;
+    assert_eq!(status, 400, "{text}");
+    assert!(
+        text.contains("holds:release"),
+        "it must list what is allowed: {text}"
+    );
 }
 
 /// Scopes are validated before storage, like everything else in this handler.

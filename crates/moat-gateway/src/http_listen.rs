@@ -637,13 +637,25 @@ const ROLES: [&str; 3] = ["agent", "approver", "admin"];
 /// Only scopes this gateway actually checks are listed. A name that is
 /// accepted at mint time and then never consulted is worse than no scope at
 /// all: it reads on the key as a restriction that is not being applied.
-/// `approver` has none for that reason. Releasing a held payment goes through
-/// the intent API, which is a separate listener on a separate port, so nothing
-/// here would enforce a scope written on an approver key.
+///
+/// The approver scopes are checked by the intent API, which is the trusted
+/// side: what the user said and what a person approved arrive there, from
+/// code the agent does not control. They split along a line that matters. A
+/// harness that captures the user's words from the chat box and registers
+/// them is a machine and needs `intent:write` and nothing more; releasing a
+/// held payment is a person's decision, so `holds:release` belongs on the
+/// approval screen's key and on no other. One approver key that did both let
+/// the machine that registers intent also release holds.
 fn scopes_for_role(role: &str) -> &'static [&'static str] {
     match role {
         "admin" => &["keys:read", "keys:write", "usage:read", "verdicts:read"],
         "agent" => &["rail:card", "rail:bank", "rail:crypto"],
+        "approver" => &[
+            "intent:write",
+            "authorizations:write",
+            "holds:release",
+            "evidence:read",
+        ],
         _ => &[],
     }
 }
