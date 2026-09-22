@@ -26,6 +26,7 @@ import {
   destroy,
   evidence,
   intent,
+  startWarm,
   LIMITS,
   pay,
   SandboxError,
@@ -246,6 +247,9 @@ const server = createServer(async (req, res) => {
 // Sampling starts with the process, not with the first visitor, or the strip
 // would only ever record the minutes somebody happened to be watching.
 startUptime();
+// One sandbox ready before anyone asks, so the first visitor of the day is
+// not the one who pays for the spawn.
+startWarm(CFG);
 
 server.listen(PORT, "127.0.0.1", () => {
   process.stderr.write(`moat sandbox on http://127.0.0.1:${PORT}\n`);

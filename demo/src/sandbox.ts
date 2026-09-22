@@ -111,8 +111,57 @@ function childEnv(extra: Record<string, string>): Record<string, string> {
 
 const live = new Map<string, Live>();
 
-export function stats(): { live: number; max: number } {
-  return { live: live.size, max: LIMITS.maxLive };
+/* ------------------------------------------------------------------ warm ---
+ * One sandbox kept ready so the first visitor does not pay for the spawn.
+ *
+ * It lives outside `live` on purpose. The map is what the limit counts and
+ * what the reaper sweeps by idleness, and a spare that nobody has touched is
+ * neither in use nor abandoned. Keeping it separate means it does not consume
+ * one of the twelve, and the reaper does not collect it a minute after it is
+ * made. It does cost one extra gateway process, which is the trade.
+ */
+let warm: Live | null = null;
+let warming = false;
+
+/** Take the spare, if there is one still young enough to hand over. */
+function takeWarm(): Live | null {
+  const ready = warm;
+  if (!ready) return null;
+  warm = null;
+  // A spare that has been sitting since before the last restart would hand a
+  // visitor a session already most of the way through its life.
+  if (Date.now() - ready.created > LIMITS.lifetimeMs / 2) {
+    void reapSandbox(ready);
+    return null;
+  }
+  return ready;
+}
+
+/**
+ * Build the next spare, unless one exists, one is being built, or the service
+ * is full. Failures are swallowed: a spare is an optimisation, and a host
+ * that cannot spawn one will say so loudly enough when a visitor asks for a
+ * real sandbox.
+ */
+async function refill(cfg: SandboxConfig): Promise<void> {
+  if (warm || warming || live.size >= LIMITS.maxLive) return;
+  warming = true;
+  try {
+    warm = await spawn(cfg);
+  } catch {
+    warm = null;
+  } finally {
+    warming = false;
+  }
+}
+
+/** Warm the pool at boot, so the first visitor of the day is not the one who pays. */
+export function startWarm(cfg: SandboxConfig): void {
+  void refill(cfg);
+}
+
+export function stats(): { live: number; max: number; warm: boolean } {
+  return { live: live.size, max: LIMITS.maxLive, warm: Boolean(warm) };
 }
 
 function reap(): void {
@@ -185,6 +234,33 @@ export async function create(cfg: SandboxConfig): Promise<{ id: string; expires_
       `all ${LIMITS.maxLive} sandboxes are in use; they expire quickly, try again shortly`,
     );
   }
+
+  // A sandbox that already exists costs nothing to hand over. Most of the
+  // second a cold create took was spawning a gateway and a Node upstream that
+  // compiles TypeScript on the way up, and none of that work needs the
+  // visitor to be waiting for it.
+  const ready = takeWarm();
+  if (ready) {
+    const now = Date.now();
+    ready.created = now;
+    ready.touched = now;
+    live.set(ready.id, ready);
+    void refill(cfg);
+    return { id: ready.id, expires_in_s: Math.round(LIMITS.idleMs / 1000) };
+  }
+
+  const spawned = await spawn(cfg);
+  live.set(spawned.id, spawned);
+  void refill(cfg);
+  return { id: spawned.id, expires_in_s: Math.round(LIMITS.idleMs / 1000) };
+}
+
+/**
+ * Build a sandbox and wait until its intent API answers. The caller decides
+ * whether it becomes a live session or sits warm, so nothing here touches the
+ * map or the limit.
+ */
+async function spawn(cfg: SandboxConfig): Promise<Live> {
   const id = randomBytes(9).toString("base64url");
   const session = `sandbox-${id}`;
   const tmp = tmpdir();
@@ -236,10 +312,10 @@ export async function create(cfg: SandboxConfig): Promise<{ id: string; expires_
     }),
   );
   const now = Date.now();
-  live.set(id, {
+  const record: Live = {
     id, client, session, created: now, touched: now, calls: 0,
     ledger, api, configPath, evidencePath,
-  });
+  };
 
   // Ramp the wait instead of sleeping a flat 100ms. The gateway is usually
   // listening in a few tens of milliseconds, and a fixed tick meant a process
@@ -249,14 +325,15 @@ export async function create(cfg: SandboxConfig): Promise<{ id: string; expires_
   for (let wait = 5; Date.now() < deadline; wait = Math.min(wait * 2, 100)) {
     try {
       if ((await fetch(`${api}/v1/session/${encodeURIComponent(session)}/evidence`)).ok) {
-        return { id, expires_in_s: Math.round(LIMITS.idleMs / 1000) };
+        return record;
       }
     } catch {
       /* not up yet */
     }
     await new Promise((r) => setTimeout(r, wait));
   }
-  await destroy(id);
+  // It never joined the map, so it has to be reaped directly.
+  void reapSandbox(record);
   throw new SandboxError(503, "the gateway did not come up in time");
 }
 
