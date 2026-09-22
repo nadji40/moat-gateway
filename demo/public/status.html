@@ -38,7 +38,6 @@
     <div class="pb">
       <div class="strip" id="strip"></div>
       <div class="strip-ends"><span id="strip-from"></span><span id="strip-to">today</span></div>
-      <p class="hint" id="uptime-note">Loading.</p>
     </div>
   </div>
 
@@ -84,19 +83,21 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
         : pct >= 95 ? "var(--yellow-l)"
         : "var(--red-l)";
       const title = pct === null ? `${d.date}: no samples`
+        : d.declared ? `${d.date}: up, stated by the operator, not sampled`
         : `${d.date}: ${pct}%${d.partial ? " so far today" : ""}`;
-      return `<span class="day${d.partial ? " partial" : ""}" style="background:${colour}" title="${esc(title)}"></span>`;
+      const cls = d.declared ? " declared" : d.partial ? " partial" : "";
+      return `<span class="day${cls}" style="background:${colour}" title="${esc(title)}"></span>`;
     });
     $("#strip").innerHTML = bars.join("");
     $("#strip-from").textContent = u.days[0].date;
 
-    const whole = u.days.filter((d) => !d.partial && d.expected);
+    // Declared days are not evidence, so they stay out of the headline number.
+    const whole = u.days.filter((d) => !d.partial && !d.declared && d.expected);
     const ok = whole.reduce((a, d) => a + d.ok, 0);
     const exp = whole.reduce((a, d) => a + d.expected, 0);
     $("#uptime-h").textContent = exp
-      ? `Availability, ${(100 * ok / exp).toFixed(2)}% over ${whole.length} full days`
+      ? `Availability, ${(100 * ok / exp).toFixed(2)}% over ${whole.length} sampled day${whole.length === 1 ? "" : "s"}`
       : "Availability";
-    $("#uptime-note").textContent = u.note;
 
     /* The strip answers "was it up"; the list answers "what happened on the
        ninth". Days nobody measured are left out rather than listed as zero. */
@@ -112,18 +113,23 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/></svg>
         </span>
         <div class="row-t">
-          <h3>${esc(when)}${d.partial ? ' <span class="row-e">so far today</span>' : ""}</h3>
-          <p class="row-s">${missed ? `${missed} minute${missed === 1 ? "" : "s"} unanswered` : "every sample answered"}</p>
-          <p class="row-b mono">${esc(d.date)} · ${d.ok} of ${d.expected}</p>
+          <h3>${esc(when)}${d.partial ? ' <span class="row-e">so far today</span>'
+            : d.declared ? ' <span class="row-e">declared</span>' : ""}</h3>
+          <p class="row-s">${d.declared
+            ? "up, stated by the operator"
+            : missed ? `${missed} minute${missed === 1 ? "" : "s"} unanswered` : "every sample answered"}</p>
+          <p class="row-b mono">${esc(d.date)} · ${d.declared ? "not sampled" : `${d.ok} of ${d.expected}`}</p>
         </div>
         <span class="row-r" style="color:${colour};font-size:1.1rem">${pct}%</span>
       </article>`;
     }).join("");
-    note("#days-note", measured.length > 1
-      ? `${measured.length} days recorded so far. The strip above is the same data.`
-      : "One day recorded so far. The list fills out as the recorder runs.");
+    const declared = measured.filter((d) => d.declared).length;
+    note("#days-note", declared
+      ? `${measured.length - declared} day${measured.length - declared === 1 ? "" : "s"} sampled a minute at a time. `
+        + `The ${declared} before that are marked declared: the service was running, but nothing was measuring it.`
+      : `${measured.length} day${measured.length === 1 ? "" : "s"} sampled, one sample a minute.`);
   } catch (e) {
-    $("#uptime-note").textContent = "Could not read the record: " + String(e.message || e);
+    note("#days-note", "Could not read the record: " + String(e.message || e));
   }
 })();
 </script>

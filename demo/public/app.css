@@ -105,28 +105,29 @@ h1 .g{color:var(--orange)}
 .hero .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:36px}
 /* extruded: a solid face with a solid edge beneath it, and the whole
    thing travels down onto that edge when pressed. No gradients in it. */
-.btn{display:inline-flex;align-items:center;gap:10px;color:#000;border:0;border-radius:999px;padding:14px 26px;text-decoration:none;
-  font:700 .9375rem var(--font);cursor:pointer;letter-spacing:-.01em;background:var(--orange);--edge:#A33D00;
-  box-shadow:0 6px 0 var(--edge),0 12px 22px -8px rgba(0,0,0,.9),
-    inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 7px -3px rgba(0,0,0,.4);
-  transition:transform .12s var(--ease),box-shadow .12s var(--ease),background .2s}
-.btn:hover{transform:translateY(-2px);background:#FF7A2B;
-  box-shadow:0 8px 0 var(--edge),0 16px 28px -8px rgba(0,0,0,.95),
-    inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 7px -3px rgba(0,0,0,.4)}
-.btn:active{transform:translateY(5px);
-  box-shadow:0 1px 0 var(--edge),0 3px 8px -4px rgba(0,0,0,.9),
-    inset 0 2px 0 rgba(255,255,255,.3),inset 0 -2px 6px -3px rgba(0,0,0,.45)}
-.btn[disabled]{opacity:.4;cursor:not-allowed;transform:translateY(5px);
-  box-shadow:0 1px 0 var(--edge),inset 0 2px 0 rgba(255,255,255,.25)}
-.btn[aria-busy="true"]{opacity:1;cursor:progress;transform:none;
-  box-shadow:0 6px 0 var(--edge),0 12px 22px -8px rgba(0,0,0,.9),
-    inset 0 2px 0 rgba(255,255,255,.45),inset 0 -3px 7px -3px rgba(0,0,0,.4)}
-.btn .spin-mark{width:1.15em;height:1.15em}
-.btn.ghost{background:rgba(255,255,255,.08);color:var(--ink);border:1px solid var(--line-2);--edge:rgba(255,255,255,.09);
+/* Flat, layered rather than extruded: six stacked shadows for depth instead
+   of a hard edge underneath, and it presses by scaling rather than by moving
+   down the page. The old one shifted 5px on :active, which nudged whatever
+   sat beside it. */
+.btn{display:inline-flex;align-items:center;gap:10px;color:#000;border:0;border-radius:10px;
+  padding:13px 26px;text-decoration:none;font:700 .9375rem var(--font);cursor:pointer;
+  letter-spacing:-.01em;
+  background-image:linear-gradient(180deg,#FF7A2B 0%,var(--orange) 100%);
+  box-shadow:0 1px 2px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.07),0 4px 8px rgba(0,0,0,.07),
+    0 8px 16px rgba(0,0,0,.07),0 16px 32px rgba(0,0,0,.07),0 32px 64px rgba(0,0,0,.07),
+    inset 0 1px 0 0 rgba(255,255,255,.22);
+  transition:filter 150ms ease-in-out,transform 150ms ease-in-out}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:scale(.95)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;filter:none;transform:none}
+.btn[aria-busy="true"]{opacity:1;cursor:progress;transform:none;filter:none}
+.btn.ghost{color:var(--ink);background-image:none;background:rgba(255,255,255,.07);
+  border:1px solid var(--line-2);
   -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  box-shadow:0 6px 0 var(--edge),0 12px 22px -10px rgba(0,0,0,.95),inset 0 1px 0 rgba(255,255,255,.2)}
-.btn.ghost:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);
-  box-shadow:0 8px 0 var(--edge),0 16px 28px -10px rgba(0,0,0,1),inset 0 1px 0 rgba(255,255,255,.24)}
+  box-shadow:0 1px 2px rgba(0,0,0,.07),0 4px 8px rgba(0,0,0,.07),0 16px 32px rgba(0,0,0,.07),
+    inset 0 1px 0 0 rgba(255,255,255,.14)}
+.btn.ghost:hover{filter:none;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28)}
+.btn .spin-mark{width:1.15em;height:1.15em}
 @keyframes turn{to{transform:rotate(360deg)}}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
@@ -372,11 +373,15 @@ footer.foot p{max-width:64ch;margin:0 auto}
 .strip{display:flex;gap:3px;align-items:flex-end;height:44px}
 .strip .day{flex:1 1 0;min-width:4px;height:100%;border-radius:3px;opacity:.9}
 .strip .day.partial{opacity:.45}
+/* A declared day is drawn hollow. It reads as up without reading as a sample,
+   which is the distinction the strip exists to make. */
+.strip .day.declared{background:transparent!important;
+  border:1.5px solid var(--green-l);opacity:.5}
 .strip-ends{display:flex;justify-content:space-between;margin-top:8px;
   font-size:.72rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
 
 /* the way in, in the navbar: primary, compact, and never hidden */
-.btn.tiny{padding:9px 18px;font-size:.82rem;flex:none;--edge:#A33D00}
+.btn.tiny{padding:9px 18px;font-size:.82rem;flex:none}
 
 /* the auth forms are a single column of short fields, so they read better
    narrow than stretched across a desktop */
@@ -433,12 +438,12 @@ select:focus{outline:0;border-color:var(--orange);
   box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95),0 0 0 3px rgba(255,95,0,.18)}
 select option{background:#101013;color:var(--ink)}
 
-.btn.small{padding:9px 16px;font-size:.82rem;--edge:#2a2a2e}
+.btn.small{padding:9px 16px;font-size:.82rem}
 
 /* a revoked key is still listed, so it has to read as past rather than as a
    row that failed to load */
-.row.spent{opacity:.55}
-.row.spent .row-i{color:var(--ink-3)}
+.rows .row.spent{opacity:.55}
+.rows .row.spent .row-i{color:var(--ink-3)}
 
 .rows .btn{justify-self:end}
 #secret{font-size:.8rem;word-break:break-all;text-align:center}
@@ -450,7 +455,7 @@ select option{background:#101013;color:var(--ink)}
 
 /* one row per mechanism: mark, what it sees, what it comes to */
 .rows{display:grid;gap:10px}
-.row{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;text-align:left;
+.rows .row{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;text-align:left;
   padding:18px 22px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);
   box-shadow:var(--pane);--c:var(--ink-3)}
 .row-i{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
@@ -464,11 +469,11 @@ select option{background:#101013;color:var(--ink)}
 .row-r i{display:block;font-size:.7rem;font-style:normal;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;color:var(--ink-3);margin-top:3px}
 .row-r.bad{color:var(--red-l)} .row-r.warn{color:var(--yellow-l)} .row-r.good{color:var(--green-l)}
-.row.us{border-color:color-mix(in srgb,var(--green-l) 45%,transparent);--c:var(--green-l)}
-.row.us .row-i{background:color-mix(in srgb,var(--green-l) 12%,transparent);
+.rows .row.us{border-color:color-mix(in srgb,var(--green-l) 45%,transparent);--c:var(--green-l)}
+.rows .row.us .row-i{background:color-mix(in srgb,var(--green-l) 12%,transparent);
   border-color:color-mix(in srgb,var(--green-l) 32%,transparent)}
 @media(max-width:700px){
-  .row{grid-template-columns:1fr;gap:12px;text-align:center;justify-items:center;padding:20px}
+  .rows .row{grid-template-columns:1fr;gap:12px;text-align:center;justify-items:center;padding:20px}
   .row-r{text-align:center}
   .row-r i{margin-top:2px}
 }

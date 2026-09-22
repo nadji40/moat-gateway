@@ -26,6 +26,18 @@ const FILE =
   process.env["MOAT_UPTIME_FILE"] ?? join(process.env["HOME"] ?? ".", ".moat-uptime.json");
 const TARGET = (process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081") + "/health/ready";
 
+/**
+ * Days the operator states the service was up, before this recorder existed.
+ *
+ * The service ran for weeks before anything sampled it, and a strip that
+ * shows those days blank understates it as much as showing them red would
+ * overstate it. So they can be declared. They are never called measured: the
+ * API marks them `declared` and the page labels them, because the whole point
+ * of the strip is that it is sampled, and a declaration that looked like a
+ * sample would quietly spend that credibility.
+ */
+const DECLARED_FROM = process.env["MOAT_UPTIME_FROM"];
+
 /** date (YYYY-MM-DD) -> samples that answered */
 type Tally = Record<string, number>;
 
@@ -131,6 +143,8 @@ export interface Day {
   ratio: number | null;
   /** Today is still accumulating, so its ratio is not comparable. */
   partial: boolean;
+  /** Stated by the operator rather than sampled. Never presented as measured. */
+  declared: boolean;
 }
 
 export function uptime(): { days: Day[]; window: number; note: string } {
@@ -148,14 +162,25 @@ export function uptime(): { days: Day[]; window: number; note: string } {
     // A day before this recorder existed was never measured, and drawing it
     // as an outage would claim a month of downtime that never happened.
     if (since && date < since) {
-      return { date, ok: 0, expected: 0, ratio: null, partial: false };
+      // Before the recorder, but inside the declared window.
+      if (DECLARED_FROM && date >= DECLARED_FROM) {
+        return { date, ok: PER_DAY, expected: PER_DAY, ratio: 1, partial: false, declared: true };
+      }
+      return { date, ok: 0, expected: 0, ratio: null, partial: false, declared: false };
     }
     // On the first day, only the minutes since the recorder started could
     // have been sampled. Scoring from midnight would mark the hours before it
     // existed as an outage.
     const expected = partial ? Math.max(1, minutesToday - skipToday) : PER_DAY;
     const ok = Math.min(tally[date] ?? 0, expected);
-    return { date, ok, expected, ratio: expected ? ok / expected : null, partial };
+    return {
+      date,
+      ok,
+      expected,
+      ratio: expected ? ok / expected : null,
+      partial,
+      declared: false,
+    };
   });
 
   return {
@@ -164,7 +189,6 @@ export function uptime(): { days: Day[]; window: number; note: string } {
     note:
       "One sample a minute against the gateway's readiness endpoint. A day is " +
       "scored out of 1440 whether or not this process was alive to take the " +
-      "samples, so a gap counts against it. Days before the recorder existed " +
-      "are shown blank rather than scored.",
+      "samples, so a gap counts against it.",
   };
 }
