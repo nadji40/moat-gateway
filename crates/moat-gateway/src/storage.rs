@@ -296,6 +296,105 @@ impl DurableStore {
         Ok(ApiKey::from_row(&row))
     }
 
+    /// What this tenant's agents have been doing, counted by decision.
+    ///
+    /// Reads the evidence table rather than a counter kept alongside it. A
+    /// counter can disagree with the record; a count of the record cannot.
+    pub async fn usage_for(&self, tenant_id: &str) -> Result<Usage> {
+        let client = self.pool.get().await.context("usage connection")?;
+        let rows = client
+            .query(
+                "SELECT COALESCE(record->>'verdict', 'unknown') AS verdict,
+                        count(*)::bigint AS total,
+                        count(*) FILTER (
+                            WHERE created_at > now() - interval '7 days'
+                        )::bigint AS week
+                 FROM moat.evidence_records
+                 WHERE tenant_id = $1
+                 GROUP BY 1",
+                &[&tenant_id],
+            )
+            .await
+            .context("counting usage")?;
+
+        let mut usage = Usage::default();
+        for row in &rows {
+            let verdict: String = row.get("verdict");
+            let total: i64 = row.get("total");
+            let week: i64 = row.get("week");
+            usage.total += total;
+            usage.week += week;
+            match verdict.as_str() {
+                "allow" => usage.allow = total,
+                "step_up" => usage.step_up = total,
+                "deny" => usage.deny = total,
+                _ => usage.other += total,
+            }
+        }
+
+        let row = client
+            .query_one(
+                "SELECT count(DISTINCT session_id)::bigint AS sessions,
+                        max(created_at) AS last_at
+                 FROM moat.evidence_records
+                 WHERE tenant_id = $1",
+                &[&tenant_id],
+            )
+            .await
+            .context("counting sessions")?;
+        usage.sessions = row.get("sessions");
+        usage.last_at = stamp(row.get::<_, Option<SystemTime>>("last_at"));
+        Ok(usage)
+    }
+
+    /// The most recent verdicts for this tenant, newest first.
+    ///
+    /// Returns the fields a feed shows, not the whole signed record: the full
+    /// record is what the evidence endpoint is for, and putting a hundred of
+    /// them through a dashboard would move megabytes to render a list.
+    pub async fn recent_verdicts(&self, tenant_id: &str, limit: i64) -> Result<Vec<Verdict>> {
+        let client = self.pool.get().await.context("verdict connection")?;
+        let rows = client
+            .query(
+                "SELECT evidence_id, created_at, session_id,
+                        record->>'verdict'            AS verdict,
+                        record->>'rail'               AS rail,
+                        record#>>'{call,tool}'        AS tool,
+                        record#>>'{call,args,payee}'  AS payee,
+                        record#>>'{call,args,amount}' AS amount,
+                        record#>>'{call,args,currency}' AS currency,
+                        record#>>'{provenance,payee,source,kind}' AS payee_source,
+                        (SELECT string_agg(r->>'id', ', ')
+                         FROM jsonb_array_elements(
+                                COALESCE(record->'rules', '[]'::jsonb)) AS r
+                         WHERE r->>'passed' = 'false') AS failed
+                 FROM moat.evidence_records
+                 WHERE tenant_id = $1
+                 ORDER BY created_at DESC, evidence_id DESC
+                 LIMIT $2",
+                &[&tenant_id, &limit],
+            )
+            .await
+            .context("loading recent verdicts")?;
+
+        Ok(rows
+            .iter()
+            .map(|row| Verdict {
+                evidence_id: row.get("evidence_id"),
+                at: stamp(Some(row.get::<_, SystemTime>("created_at"))).unwrap_or_default(),
+                session_id: row.get("session_id"),
+                verdict: row.get::<_, Option<String>>("verdict").unwrap_or_default(),
+                rail: row.get("rail"),
+                tool: row.get("tool"),
+                payee: row.get("payee"),
+                amount: row.get("amount"),
+                currency: row.get("currency"),
+                payee_source: row.get("payee_source"),
+                failed_rules: row.get("failed"),
+            })
+            .collect())
+    }
+
     /// Create a tenant and its first `admin` key in one transaction, so a
     /// signup that fails halfway leaves no tenant nobody can reach.
     ///
@@ -396,6 +495,56 @@ impl DurableStore {
             .context("revoking API key")?;
         Ok(row.as_ref().map(ApiKey::from_row))
     }
+}
+
+/// What a tenant's agents have done, counted from the evidence itself.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct Usage {
+    /// Every verdict ever recorded for this tenant.
+    pub total: i64,
+    /// Of those, the ones in the last seven days.
+    pub week: i64,
+    /// Forwarded to the provider.
+    pub allow: i64,
+    /// Held for a person.
+    pub step_up: i64,
+    /// Refused.
+    pub deny: i64,
+    /// Anything a future verdict kind adds, so a new one is visible in the
+    /// total rather than silently dropped.
+    pub other: i64,
+    /// Distinct agent sessions seen.
+    pub sessions: i64,
+    /// When the most recent verdict was recorded.
+    pub last_at: Option<String>,
+}
+
+/// One line of the verdict feed. A summary of a signed record, not the record.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Verdict {
+    /// Ties the line back to the full signed record.
+    pub evidence_id: String,
+    /// RFC 3339.
+    pub at: String,
+    /// Which agent session produced it.
+    pub session_id: String,
+    /// `allow`, `step_up` or `deny`.
+    pub verdict: String,
+    /// Which settlement rail, when the record names one.
+    pub rail: Option<String>,
+    /// The tool that was called.
+    pub tool: Option<String>,
+    /// Who was going to be paid.
+    pub payee: Option<String>,
+    /// How much, as the call stated it.
+    pub amount: Option<String>,
+    /// In what.
+    pub currency: Option<String>,
+    /// Where the payee came from: `user`, `tool_result`, `allowlist`,
+    /// `unknown`. The single most useful field on the line.
+    pub payee_source: Option<String>,
+    /// The rules that did not pass, comma separated. `None` when all passed.
+    pub failed_rules: Option<String>,
 }
 
 /// A key as the control plane reports it. Never carries the key itself.

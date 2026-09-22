@@ -36,7 +36,7 @@
 
 <div class="wrap">
 
-<header class="hero">
+<header class="hero" id="hero">
   <div>
     <p class="kicker">Your workspace</p>
     <h1>Keys, and what<br><span class="g">they decided.</span></h1>
@@ -45,8 +45,7 @@
 
 <section class="tight" id="gate">
   <div class="cards">
-
-    <article class="panel glass" id="signin-card">
+    <article class="panel glass">
       <div class="ph"><span class="num">1</span><h3>Open a workspace</h3></div>
       <div class="pb">
         <p class="hint">A workspace holds your keys and every verdict made with
@@ -74,7 +73,6 @@
         <p class="hint" id="signin-note" hidden></p>
       </div>
     </article>
-
   </div>
 </section>
 
@@ -82,8 +80,8 @@
   <div class="panel glass">
     <div class="ph"><h3>Save this now</h3></div>
     <div class="pb">
-      <p class="hint">This is the only time the key is shown. There is no copy
-        of it on the server, only a hash, so it cannot be shown again.</p>
+      <p class="hint">This is the only time the key is shown. The server keeps
+        a hash, never the key, so it cannot be shown again.</p>
       <pre class="glass" id="secret"></pre>
       <div class="row">
         <button class="btn" id="copy-secret">Copy key</button>
@@ -93,48 +91,72 @@
   </div>
 </section>
 
-<section class="tight" id="workspace" hidden>
-  <div class="headrow"><h2 id="ws-title">Keys</h2></div>
+<div id="workspace" hidden>
 
-  <div class="panel glass">
-    <div class="ph"><h3>Issue a key</h3></div>
-    <div class="pb">
-      <div class="row">
-        <input id="lbl" name="lbl" placeholder="staging agent" maxlength="120"
-               autocomplete="off" style="max-width:280px">
-        <select id="role" name="role" aria-label="Role">
-          <option value="agent">agent, makes payments</option>
-          <option value="approver">approver, releases held ones</option>
-          <option value="admin">admin, manages keys</option>
-        </select>
-        <button class="btn" id="mint">Issue</button>
+  <div class="tabbar glass" role="tablist" aria-label="Workspace">
+    <button class="tab" role="tab" data-pane="pane-usage" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M6 16v-4M11 16V7M16 16v-7"/></svg>
+      Usage</button>
+    <button class="tab" role="tab" data-pane="pane-verdicts" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16l-7-3-7 3z"/></svg>
+      Verdicts<span class="tab-n" id="tab-verdicts-n" hidden></span></button>
+    <button class="tab" role="tab" data-pane="pane-keys" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/></svg>
+      Keys<span class="tab-n" id="tab-keys-n" hidden></span></button>
+    <span class="tab-sp"></span>
+    <button class="tab quiet" id="signout" role="tab" aria-selected="false">Close</button>
+  </div>
+
+  <section class="tight pane" id="pane-usage">
+    <div class="stats" id="stats"></div>
+    <div class="panel glass" id="split-panel">
+      <div class="ph"><h3>How the verdicts went</h3></div>
+      <div class="pb">
+        <div id="split"></div>
+        <p class="hint" id="usage-note">Loading.</p>
       </div>
-      <p class="hint">An agent key cannot manage keys. An admin key cannot pay
-        or approve. The three roles do not overlap.</p>
     </div>
-  </div>
+  </section>
 
-  <div class="rows" id="keys"></div>
-  <p class="hint foot-note" id="keys-note">Loading.</p>
+  <section class="tight pane" id="pane-verdicts" hidden>
+    <div class="rows" id="feed"></div>
+    <p class="hint foot-note" id="feed-note">Loading.</p>
+  </section>
 
-  <div class="headrow" style="margin-top:34px"><h2>Point an agent at it</h2></div>
-  <div class="panel glass">
-    <div class="ph"><h3>Your endpoint</h3></div>
-    <div class="pb">
-      <pre class="glass" id="curl"></pre>
-      <div class="row">
-        <button class="btn" id="copy-curl">Copy</button>
-        <a class="btn ghost" href="tests.html">Run the nine tests</a>
+  <section class="tight pane" id="pane-keys" hidden>
+    <div class="panel glass">
+      <div class="ph"><h3>Issue a key</h3></div>
+      <div class="pb">
+        <div class="row">
+          <input id="lbl" name="lbl" placeholder="staging agent" maxlength="120"
+                 autocomplete="off" style="max-width:280px">
+          <select id="role" name="role" aria-label="Role">
+            <option value="agent">agent, makes payments</option>
+            <option value="approver">approver, releases held ones</option>
+            <option value="admin">admin, manages keys</option>
+          </select>
+          <button class="btn" id="mint">Issue</button>
+        </div>
+        <p class="hint">An agent key cannot manage keys. An admin key cannot pay
+          or approve. The three roles do not overlap.</p>
       </div>
-      <p class="hint">Every call made with these keys is recorded against this
-        workspace, signed and hash-chained, whatever the verdict.</p>
     </div>
-  </div>
+    <div class="rows" id="keys"></div>
+    <p class="hint foot-note" id="keys-note">Loading.</p>
 
-  <div class="row" style="margin-top:26px">
-    <button class="btn ghost" id="signout">Close workspace</button>
-  </div>
-</section>
+    <div class="panel glass" style="margin-top:18px">
+      <div class="ph"><h3>Point an agent at it</h3></div>
+      <div class="pb">
+        <pre class="glass" id="curl"></pre>
+        <div class="row">
+          <button class="btn" id="copy-curl">Copy</button>
+          <a class="btn ghost" href="tests.html">Run the nine tests</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
 
 </div>
 
@@ -151,13 +173,13 @@
 <script src="app.js"></script>
 <script>
 /* The key lives in this browser and nowhere else. sessionStorage rather than
-   localStorage: a shared machine should not keep an admin credential after the
-   tab closes. Every accessor is wrapped, because a private window throws. */
+   localStorage: a shared machine should not keep an admin credential after
+   the tab closes. Every accessor is wrapped, because a private window throws. */
 const SLOT = "moat.admin";
-function held(){ try { return sessionStorage.getItem(SLOT); } catch { return null; } }
-function hold(v){ try { v ? sessionStorage.setItem(SLOT, v) : sessionStorage.removeItem(SLOT); } catch {} }
+const held = () => { try { return sessionStorage.getItem(SLOT); } catch { return null; } };
+const hold = (v) => { try { v ? sessionStorage.setItem(SLOT, v) : sessionStorage.removeItem(SLOT); } catch {} };
 
-const show = (el, on) => { $(el).hidden = !on; };
+const show = (sel, on) => { $(sel).hidden = !on; };
 function note(sel, text, bad){
   const el = $(sel);
   el.textContent = text;
@@ -167,19 +189,105 @@ function note(sel, text, bad){
 
 async function control(path, opts = {}){
   const key = held();
-  const res = await fetch(path, {
-    ...opts,
-    headers: {
-      "content-type": "application/json",
-      ...(key ? { authorization: "Bearer " + key } : {}),
-      ...(opts.headers || {}),
-    },
-  });
+  const res = await fetch(path, { ...opts, headers: {
+    "content-type": "application/json",
+    ...(key ? { authorization: "Bearer " + key } : {}),
+    ...(opts.headers || {}),
+  }});
   const text = await res.text();
   let body; try { body = text ? JSON.parse(text) : null; } catch { body = text; }
   if (!res.ok) throw new Error(typeof body === "string" ? body : (body && body.error) || res.statusText);
   return body;
 }
+
+/* ---- tabs ---------------------------------------------------------------
+   Which pane is open is the page's only real state, so it lives in the URL
+   hash: a reload, a bookmark or a link all land where they should. */
+const PANES = ["pane-usage", "pane-verdicts", "pane-keys"];
+function openPane(id){
+  if (!PANES.includes(id)) id = PANES[0];
+  for (const p of PANES) show("#" + p, p === id);
+  for (const t of document.querySelectorAll(".tab[data-pane]")) {
+    t.setAttribute("aria-selected", String(t.dataset.pane === id));
+  }
+  if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+}
+for (const t of document.querySelectorAll(".tab[data-pane]")) {
+  t.addEventListener("click", () => openPane(t.dataset.pane));
+}
+addEventListener("hashchange", () => openPane(location.hash.slice(1)));
+
+/* ---- usage ---- */
+const n = (v) => Number(v || 0).toLocaleString("en-US");
+
+function stat(label, value, sub, colour){
+  return `<div class="stat glass">
+    <div class="stat-v" ${colour ? `style="color:${colour}"` : ""}>${esc(String(value))}</div>
+    <div class="stat-l">${esc(label)}</div>
+    ${sub ? `<div class="stat-s">${esc(sub)}</div>` : ""}
+  </div>`;
+}
+
+function renderUsage(u){
+  const when = u.last_at ? new Date(u.last_at).toLocaleString() : "nothing yet";
+  $("#stats").innerHTML = [
+    stat("verdicts recorded", n(u.total), `${n(u.week)} in the last 7 days`),
+    stat("paid through", n(u.allow), "forwarded to the provider", "var(--green-l)"),
+    stat("held for a person", n(u.step_up), "waiting on approval", "var(--yellow-l)"),
+    stat("refused", n(u.deny), "nothing forwarded", "var(--red-l)"),
+    stat("agent sessions", n(u.sessions), `last activity ${when}`),
+  ].join("");
+
+  const parts = [
+    ["allow", u.allow, "var(--green-l)"],
+    ["step up", u.step_up, "var(--yellow-l)"],
+    ["deny", u.deny, "var(--red-l)"],
+    ["other", u.other, "var(--ink-3)"],
+  ].filter(([, v]) => v > 0);
+  const sum = parts.reduce((a, [, v]) => a + v, 0);
+
+  if (!sum) {
+    $("#split").innerHTML = "";
+    note("#usage-note", "No verdicts yet. Issue an agent key and point an agent at the gateway.");
+    return;
+  }
+  $("#split").innerHTML =
+    `<div class="bar">${parts.map(([, v, c]) =>
+       `<span style="width:${(100 * v / sum).toFixed(2)}%;background:${c}"></span>`).join("")}</div>
+     <div class="legend">${parts.map(([k, v, c]) =>
+       `<b><span class="dot" style="background:${c}"></span>${esc(k)} ${n(v)}</b>`).join("")}</div>`;
+  note("#usage-note", "Counted from the signed evidence itself, not from a separate tally that could disagree with it.");
+}
+
+/* ---- verdict feed ---- */
+const SOURCE_COLOUR = { user: "var(--green-l)", allowlist: "var(--green-l)", tool_result: "var(--red-l)", unknown: "var(--red-l)" };
+
+function verdictRow(v){
+  const colour = v.verdict === "allow" ? "var(--green-l)"
+    : v.verdict === "step_up" ? "var(--yellow-l)" : "var(--red-l)";
+  const money = [v.amount, v.currency].filter(Boolean).join(" ");
+  const where = v.payee_source
+    ? `<span style="color:${SOURCE_COLOUR[v.payee_source] || "var(--ink-3)"}">payee from ${esc(v.payee_source.replace("_", " "))}</span>`
+    : "";
+  return `<article class="row">
+    <span class="row-i" style="color:${colour}">${
+      v.verdict === "allow" ? OK_ICON : v.verdict === "step_up" ? HOLD_ICON : NO_ICON}</span>
+    <div class="row-t">
+      <h3>${esc(v.payee || v.tool || "call")} ${money ? `<span class="row-e">${esc(money)}</span>` : ""}</h3>
+      <p class="row-s">${where}${v.failed_rules ? ` · <span class="mono">${esc(v.failed_rules)}</span>` : ""}</p>
+      <p class="row-b mono">${esc(new Date(v.at).toLocaleString())} · ${esc(v.rail || "")} · ${esc(v.evidence_id)}</p>
+    </div>
+    <span class="row-r" style="color:${colour};font-size:1rem">${esc(v.verdict.replace("_", " "))}</span>
+  </article>`;
+}
+
+const OK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
+const HOLD_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6v12M15 6v12"/></svg>`;
+const NO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+
+/* ---- keys ---- */
+const KEY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/></svg>`;
+const GONE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>`;
 
 function roleChip(role){
   const c = role === "admin" ? "var(--orange)" : role === "approver" ? "var(--yellow-l)" : "var(--green-l)";
@@ -201,15 +309,37 @@ function keyRow(k){
   </article>`;
 }
 
-const KEY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/></svg>`;
-const GONE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>`;
+function badge(sel, count){
+  const el = $(sel);
+  el.textContent = String(count);
+  el.hidden = !count;
+}
 
 async function refresh(){
-  try {
-    const keys = await control("/v1/keys");
-    $("#keys").innerHTML = keys.map(keyRow).join("");
-    const live = keys.filter(k => k.active).length;
-    note("#keys-note", `${live} active, ${keys.length - live} revoked. A revoked key stays listed: it is part of the record.`);
+  /* One pass for all three panes. They share a credential and a round trip is
+     cheaper than three, so switching tabs never waits on the network. */
+  const [usage, feed, keys] = await Promise.allSettled([
+    control("/v1/usage"), control("/v1/verdicts"), control("/v1/keys"),
+  ]);
+
+  if (usage.status === "fulfilled") renderUsage(usage.value);
+  else note("#usage-note", String(usage.reason.message || usage.reason), true);
+
+  if (feed.status === "fulfilled") {
+    const rows = feed.value;
+    $("#feed").innerHTML = rows.map(verdictRow).join("");
+    badge("#tab-verdicts-n", rows.length);
+    note("#feed-note", rows.length
+      ? `The ${rows.length} most recent. Every one has a signed record behind it.`
+      : "No verdicts yet. Point an agent at the gateway with an agent key.");
+  } else note("#feed-note", String(feed.reason.message || feed.reason), true);
+
+  if (keys.status === "fulfilled") {
+    const rows = keys.value;
+    $("#keys").innerHTML = rows.map(keyRow).join("");
+    const live = rows.filter(k => k.active).length;
+    badge("#tab-keys-n", live);
+    note("#keys-note", `${live} active, ${rows.length - live} revoked. A revoked key stays listed: it is part of the record.`);
     for (const b of document.querySelectorAll("[data-revoke]")) {
       b.addEventListener("click", async () => {
         working(b, "Revoking");
@@ -218,16 +348,14 @@ async function refresh(){
         finally { idle(b); }
       });
     }
-  } catch (e) {
-    note("#keys-note", String(e.message || e), true);
-  }
+  } else note("#keys-note", String(keys.reason.message || keys.reason), true);
 }
 
 function openWorkspace(){
-  show("#gate", false); show("#workspace", true);
+  show("#gate", false); show("#hero", false); show("#workspace", true);
   $("#curl").textContent =
-    `curl -s ${location.origin}/v1/keys \\
-  -H 'authorization: Bearer YOUR_KEY'`;
+    `curl -s ${location.origin}/v1/keys \\\n  -H 'authorization: Bearer YOUR_KEY'`;
+  openPane(location.hash.slice(1));
   refresh();
 }
 
@@ -240,8 +368,7 @@ $("#create").addEventListener("click", async () => {
     const out = await control("/v1/signup", { method: "POST", body: JSON.stringify({ id, name }) });
     hold(out.secret);
     $("#secret").textContent = out.secret;
-    show("#gate", false); show("#minted", true);
-    $("#ws-title").textContent = name;
+    show("#gate", false); show("#hero", false); show("#minted", true);
     note("#signup-note", "");
   } catch (e) { note("#signup-note", String(e.message || e), true); }
   finally { idle(btn); }
@@ -277,7 +404,7 @@ $("#mint").addEventListener("click", async () => {
   finally { idle(btn); }
 });
 
-$("#signout").addEventListener("click", () => { hold(null); location.reload(); });
+$("#signout").addEventListener("click", () => { hold(null); location.hash = ""; location.reload(); });
 
 if (held()) openWorkspace();
 

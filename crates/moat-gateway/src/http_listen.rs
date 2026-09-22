@@ -424,7 +424,43 @@ pub fn router(cfg: Config, shared: Arc<Shared>) -> Router {
         .route("/v1/keys", get(list_keys).post(create_key))
         .route("/v1/keys/{id}", axum::routing::delete(revoke_key))
         .route("/v1/signup", axum::routing::post(signup))
+        .route("/v1/usage", get(usage))
+        .route("/v1/verdicts", get(verdicts))
         .with_state(l)
+}
+
+/// How many verdicts this tenant's agents have produced, and how they went.
+async fn usage(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Response {
+    let (tenant, _) = match admin_caller(&listener, &headers).await {
+        Ok(caller) => caller,
+        Err(response) => return *response,
+    };
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it counts nothing");
+    };
+    match storage.usage_for(&tenant).await {
+        Ok(usage) => axum::Json(usage).into_response(),
+        Err(error) => storage_unavailable(&error),
+    }
+}
+
+/// The most recent verdicts, newest first.
+///
+/// A summary per line rather than the signed records themselves: the evidence
+/// endpoint serves those, and a feed does not need a hundred of them to draw
+/// a list.
+async fn verdicts(State(listener): State<Arc<Listener>>, headers: HeaderMap) -> Response {
+    let (tenant, _) = match admin_caller(&listener, &headers).await {
+        Ok(caller) => caller,
+        Err(response) => return *response,
+    };
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it has no verdicts");
+    };
+    match storage.recent_verdicts(&tenant, 50).await {
+        Ok(rows) => axum::Json(rows).into_response(),
+        Err(error) => storage_unavailable(&error),
+    }
 }
 
 /// What a stranger sends to get a workspace.

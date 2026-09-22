@@ -27,6 +27,7 @@ const GATEWAY = process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081";
 function target(path: string, method: string): string | undefined {
   if (path === "/v1/signup" && method === "POST") return path;
   if (path === "/v1/keys" && (method === "GET" || method === "POST")) return path;
+  if ((path === "/v1/usage" || path === "/v1/verdicts") && method === "GET") return path;
   if (/^\/v1\/keys\/[A-Za-z0-9_-]{1,64}$/.test(path) && method === "DELETE") return path;
   return undefined;
 }
@@ -55,7 +56,13 @@ function signupAllowed(who: string): boolean {
 }
 
 export function isControlPath(path: string): boolean {
-  return path === "/v1/signup" || path === "/v1/keys" || path.startsWith("/v1/keys/");
+  return (
+    path === "/v1/signup" ||
+    path === "/v1/keys" ||
+    path === "/v1/usage" ||
+    path === "/v1/verdicts" ||
+    path.startsWith("/v1/keys/")
+  );
 }
 
 /**

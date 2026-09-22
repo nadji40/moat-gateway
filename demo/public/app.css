@@ -362,6 +362,38 @@ footer.foot p{max-width:64ch;margin:0 auto}
 /* the dashboard: two panels side by side, a key list, and the controls that
    issue and withdraw. Everything else on the page is borrowed from the rest
    of the site, so only what is genuinely new lives here. */
+/* the dashboard's own navigation: which pane is open, and how many things
+   are in each, without scrolling to find out */
+.tabbar{display:flex;align-items:center;gap:6px;border-radius:16px;padding:7px;margin:26px 0 18px;
+  overflow-x:auto;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;border:0;cursor:pointer;
+  border-radius:11px;padding:10px 15px;font:700 .875rem var(--font);color:var(--ink-2);
+  background:transparent;transition:color .15s,background .15s}
+.tab svg{width:15px;height:15px;flex:none}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:#000;background:var(--orange);
+  box-shadow:0 3px 0 #A33D00,0 8px 16px -8px rgba(0,0,0,.9)}
+.tab.quiet{color:var(--ink-3)}
+.tab.quiet:hover{color:var(--red-l)}
+.tab-sp{flex:1 1 auto;min-width:8px}
+.tab-n{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;
+  border-radius:999px;font-size:.7rem;background:rgba(255,255,255,.12);color:inherit}
+.tab[aria-selected="true"] .tab-n{background:rgba(0,0,0,.22)}
+
+/* the numbers, and the one bar that shows how the verdicts split */
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px}
+.stat{border-radius:16px;padding:16px 14px;box-shadow:var(--pane)}
+.stat-v{font-size:1.9rem;font-weight:800;letter-spacing:-.03em;line-height:1.05;
+  font-variant-numeric:tabular-nums}
+.stat-l{font-size:.78rem;color:var(--ink-2);margin-top:5px}
+.stat-s{font-size:.72rem;color:var(--ink-3);margin-top:3px}
+.bar{display:flex;height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.06)}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:.8rem;color:var(--ink-2)}
+.legend b{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--ink)}
+.legend .dot{width:9px;height:9px;border-radius:3px;flex:none}
+
 .cards{display:grid;gap:14px}
 @media(min-width:820px){.cards{grid-template-columns:1fr 1fr;align-items:start}}
 
