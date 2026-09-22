@@ -188,7 +188,12 @@
    the tab closes. Every accessor is wrapped, because a private window throws. */
 const SLOT = "moat.admin";
 const held = () => { try { return sessionStorage.getItem(SLOT); } catch { return null; } };
-const hold = (v) => { try { v ? sessionStorage.setItem(SLOT, v) : sessionStorage.removeItem(SLOT); } catch {} };
+const hold = (v) => {
+  try { v ? sessionStorage.setItem(SLOT, v) : sessionStorage.removeItem(SLOT); } catch {}
+  // The header button reads the same slot, so it is redrawn whenever this
+  // changes rather than only at load.
+  mountAuthButton();
+};
 
 const show = (sel, on) => { $(sel).hidden = !on; };
 function note(sel, text, bad){

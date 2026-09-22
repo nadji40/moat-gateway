@@ -120,16 +120,22 @@ function signedIn() {
 
 function mountAuthButton() {
   const bar = document.querySelector(".navbar");
-  if (!bar || document.getElementById("auth")) return;
-  const here = location.pathname.endsWith("dashboard.html");
+  if (!bar) return;
+  // Idempotent on purpose: signing in and out happens after the page has
+  // loaded, so this is also how the button is brought up to date. Mounting
+  // once and never looking again left the header saying Log in while the
+  // workspace was open behind it.
+  let a = document.getElementById("auth");
+  if (!a) {
+    a = document.createElement("a");
+    a.id = "auth";
+    a.href = "dashboard.html";
+    bar.insertBefore(a, document.getElementById("live"));
+  }
   const inn = signedIn();
-  const a = document.createElement("a");
-  a.id = "auth";
   a.className = "statusbtn" + (inn ? " on" : "");
-  a.href = "dashboard.html";
   a.innerHTML = '<b></b><span>' + (inn ? "Dashboard" : "Log in") + '</span>';
-  if (here) a.setAttribute("aria-current", "page");
-  bar.insertBefore(a, document.getElementById("live"));
+  if (location.pathname.endsWith("dashboard.html")) a.setAttribute("aria-current", "page");
 }
 
 /* A pair of tabs over a deck of slides, as the front page uses for the rails.
