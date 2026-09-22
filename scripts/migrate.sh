@@ -37,11 +37,20 @@ fi
 # ignored here, because this line said "1 2 3 4"; the gateway then refused to
 # start against a schema that was missing a migration nobody had been told was
 # skipped. A migration that exists is a migration that runs.
-versions="$(find "$repo_root/migrations" -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql'   -printf '%f
-' | sed 's/^0*\([0-9]*\)_.*//' | sort -n)"
-[[ -n "$versions" ]] || { echo "no migrations found in $repo_root/migrations" >&2; exit 1; }
+versions=()
+for file in "$repo_root"/migrations/[0-9][0-9][0-9][0-9]_*.sql; do
+  [[ -e "$file" ]] || continue
+  name="${file##*/}"
+  # 10# forces base ten, so 0008 is eight rather than an invalid octal literal.
+  versions+=("$((10#${name%%_*}))")
+done
+if [[ ${#versions[@]} -eq 0 ]]; then
+  echo "no migrations found in $repo_root/migrations" >&2
+  exit 1
+fi
+readarray -t versions < <(printf '%s\n' "${versions[@]}" | sort -n)
 
-for version in $versions; do
+for version in "${versions[@]}"; do
   if ! applied="$(psql "$MOAT_MIGRATOR_DATABASE_URL" -XAtqc \
     "set role moat_owner; select to_regclass('moat.schema_migrations') is not null and exists (select 1 from moat.schema_migrations where version = ${version})" 2>&1)"; then
     echo "cannot tell whether migration $version is applied: $applied" >&2
