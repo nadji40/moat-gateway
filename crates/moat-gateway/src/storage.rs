@@ -18,6 +18,21 @@ pub struct DurableStore {
     pool: Pool,
 }
 
+/// The columns [`ApiKey::from_row`] reads, as one string.
+///
+/// `from_row` takes columns by name and panics on one the result does not
+/// carry, so every query that builds an `ApiKey` has to return exactly this
+/// list. Three separate queries do, and a RETURNING clause written out by hand
+/// is easy to write from memory and then forget when the shape changes: adding
+/// `scopes` to one of the three left signup and revoke panicking on a column
+/// the row did not have. A macro rather than a constant so the result is still
+/// a compile-time literal that `concat!` can splice into each query.
+macro_rules! api_key_columns {
+    () => {
+        "id, label, access_role, active, created_at, last_used_at, revoked_at, scopes"
+    };
+}
+
 /// The lowest schema version this build can run against.
 ///
 /// Raised by the migration that made it necessary, never separately: a gateway
@@ -298,11 +313,13 @@ impl DurableStore {
         let client = self.pool.get().await.context("key database connection")?;
         let row = client
             .query_one(
-                "INSERT INTO moat.api_keys
-                     (id, tenant_id, label, key_hash, access_role, created_by, scopes)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
-                 RETURNING id, label, access_role, active, created_at,
-                           last_used_at, revoked_at, scopes",
+                concat!(
+                    "INSERT INTO moat.api_keys
+                         (id, tenant_id, label, key_hash, access_role, created_by, scopes)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)
+                     RETURNING ",
+                    api_key_columns!()
+                ),
                 &[
                     &new_key_id(),
                     &tenant_id,
@@ -448,11 +465,13 @@ impl DurableStore {
 
         let row = tx
             .query_one(
-                "INSERT INTO moat.api_keys
-                     (id, tenant_id, label, key_hash, access_role)
-                 VALUES ($1, $2, 'first admin key', $3, 'admin')
-                 RETURNING id, label, access_role, active, created_at,
-                           last_used_at, revoked_at",
+                concat!(
+                    "INSERT INTO moat.api_keys
+                         (id, tenant_id, label, key_hash, access_role)
+                     VALUES ($1, $2, 'first admin key', $3, 'admin')
+                     RETURNING ",
+                    api_key_columns!()
+                ),
                 &[&new_key_id(), &id, &key_hash],
             )
             .await
@@ -468,11 +487,13 @@ impl DurableStore {
         let client = self.pool.get().await.context("key database connection")?;
         let rows = client
             .query(
-                "SELECT id, label, access_role, active, created_at,
-                        last_used_at, revoked_at, scopes
-                 FROM moat.api_keys
-                 WHERE tenant_id = $1
-                 ORDER BY created_at DESC",
+                concat!(
+                    "SELECT ",
+                    api_key_columns!(),
+                    " FROM moat.api_keys
+                     WHERE tenant_id = $1
+                     ORDER BY created_at DESC"
+                ),
                 &[&tenant_id],
             )
             .await
@@ -490,12 +511,14 @@ impl DurableStore {
         let client = self.pool.get().await.context("key database connection")?;
         let row = client
             .query_opt(
-                "UPDATE moat.api_keys
-                 SET active = false,
-                     revoked_at = COALESCE(revoked_at, now())
-                 WHERE tenant_id = $1 AND id = $2
-                 RETURNING id, label, access_role, active, created_at,
-                           last_used_at, revoked_at",
+                concat!(
+                    "UPDATE moat.api_keys
+                     SET active = false,
+                         revoked_at = COALESCE(revoked_at, now())
+                     WHERE tenant_id = $1 AND id = $2
+                     RETURNING ",
+                    api_key_columns!()
+                ),
                 &[&tenant_id, &id],
             )
             .await
@@ -1520,5 +1543,29 @@ mod ledger_tests {
         );
 
         cleanup(&store, &id).await;
+    }
+}
+
+#[cfg(test)]
+mod column_tests {
+    /// `ApiKey::from_row` takes columns by name and panics on one the result
+    /// does not carry. Four queries build an `ApiKey`; when `scopes` was added
+    /// only two were updated, and signup and revoke panicked in production on
+    /// a column the row did not have.
+    ///
+    /// `api_key_columns!()` is the fix. This is what keeps it the fix: the
+    /// list must appear once, in the macro, and never be written out again
+    /// beside a query where it can fall behind.
+    #[test]
+    fn nothing_spells_out_the_api_key_columns_by_hand() {
+        let source = include_str!("storage.rs");
+        // Split so this test's own literal is not one of the copies it counts.
+        let needle = concat!("access_role,", " active");
+        let spelled_out = source.matches(needle).count();
+        assert_eq!(
+            spelled_out, 1,
+            "the column list belongs in api_key_columns!() and nowhere else; \
+             found {spelled_out} copies of it"
+        );
     }
 }
