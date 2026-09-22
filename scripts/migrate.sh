@@ -32,7 +32,16 @@ fi
 #
 # Errors are no longer swallowed. A check that cannot answer stops the
 # run, because the alternative is re-applying migrations blindly.
-for version in 1 2 3 4; do
+# The versions come from the files on disk, not from a list kept in step with
+# them by hand. Migration 5 was added, committed, pulled to the server and
+# ignored here, because this line said "1 2 3 4"; the gateway then refused to
+# start against a schema that was missing a migration nobody had been told was
+# skipped. A migration that exists is a migration that runs.
+versions="$(find "$repo_root/migrations" -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql'   -printf '%f
+' | sed 's/^0*\([0-9]*\)_.*//' | sort -n)"
+[[ -n "$versions" ]] || { echo "no migrations found in $repo_root/migrations" >&2; exit 1; }
+
+for version in $versions; do
   if ! applied="$(psql "$MOAT_MIGRATOR_DATABASE_URL" -XAtqc \
     "set role moat_owner; select to_regclass('moat.schema_migrations') is not null and exists (select 1 from moat.schema_migrations where version = ${version})" 2>&1)"; then
     echo "cannot tell whether migration $version is applied: $applied" >&2
