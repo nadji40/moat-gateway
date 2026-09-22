@@ -296,6 +296,51 @@ impl DurableStore {
         Ok(ApiKey::from_row(&row))
     }
 
+    /// Create a tenant and its first `admin` key in one transaction, so a
+    /// signup that fails halfway leaves no tenant nobody can reach.
+    ///
+    /// The id is the caller's, checked against the table's own pattern before
+    /// it gets here. A collision is an ordinary outcome, not an error: two
+    /// people will want the same name, and the second one needs to be told so
+    /// rather than shown a database message.
+    pub async fn create_tenant(
+        &self,
+        id: &str,
+        name: &str,
+        key_hash: &str,
+    ) -> Result<Option<ApiKey>> {
+        let mut client = self.pool.get().await.context("signup connection")?;
+        let tx = client.transaction().await.context("signup transaction")?;
+
+        let inserted = tx
+            .query_opt(
+                "INSERT INTO moat.tenants (id, name) VALUES ($1, $2)
+                 ON CONFLICT (id) DO NOTHING
+                 RETURNING id",
+                &[&id, &name],
+            )
+            .await
+            .context("creating tenant")?;
+        if inserted.is_none() {
+            return Ok(None);
+        }
+
+        let row = tx
+            .query_one(
+                "INSERT INTO moat.api_keys
+                     (id, tenant_id, label, key_hash, access_role)
+                 VALUES ($1, $2, 'first admin key', $3, 'admin')
+                 RETURNING id, label, access_role, active, created_at,
+                           last_used_at, revoked_at",
+                &[&new_key_id(), &id, &key_hash],
+            )
+            .await
+            .context("creating the first admin key")?;
+
+        tx.commit().await.context("committing signup")?;
+        Ok(Some(ApiKey::from_row(&row)))
+    }
+
     /// The id of the key with this hash, for audit attribution only. Does not
     /// check `active` or the role: a key that has just been revoked is still
     /// the key that minted whatever it minted.

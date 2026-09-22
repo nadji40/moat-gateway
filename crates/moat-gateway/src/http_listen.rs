@@ -423,7 +423,79 @@ pub fn router(cfg: Config, shared: Arc<Shared>) -> Router {
         .route("/health/ready", get(ready))
         .route("/v1/keys", get(list_keys).post(create_key))
         .route("/v1/keys/{id}", axum::routing::delete(revoke_key))
+        .route("/v1/signup", axum::routing::post(signup))
         .with_state(l)
+}
+
+/// What a stranger sends to get a workspace.
+#[derive(serde::Deserialize)]
+struct Signup {
+    /// The workspace id, and the only thing the caller picks. Lowercase,
+    /// 3 to 64 characters; the table enforces the same pattern.
+    id: String,
+    /// A display name for their own benefit.
+    name: String,
+}
+
+/// Create a tenant and hand back its first `admin` key.
+///
+/// The only endpoint that writes for a caller holding no credential, so it is
+/// off unless `auth.self_signup` says otherwise, and it refuses when the
+/// gateway has no database rather than pretending to have made something.
+async fn signup(State(listener): State<Arc<Listener>>, body: Bytes) -> Response {
+    if !listener.cfg.auth.self_signup {
+        return (
+            StatusCode::NOT_FOUND,
+            "self-service signup is not enabled on this gateway",
+        )
+            .into_response();
+    }
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it has no tenants");
+    };
+    let Ok(request) = serde_json::from_slice::<Signup>(&body) else {
+        return bad_request("body must be {\"id\": string, \"name\": string}");
+    };
+
+    let id = request.id.trim().to_lowercase();
+    // The same shape the tenants table checks, applied here so the caller gets
+    // a sentence instead of a constraint violation.
+    let shaped = id.len() >= 3
+        && id.len() <= 64
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+        && id
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_lowercase() || c.is_ascii_digit());
+    if !shaped {
+        return bad_request(
+            "id must be 3 to 64 characters of lowercase letters, digits, _ or -, \
+             and start with a letter or digit",
+        );
+    }
+    let name = request.name.trim();
+    if name.is_empty() || name.len() > 120 {
+        return bad_request("name must be 1 to 120 characters");
+    }
+
+    let secret_bytes: [u8; 32] = rand::random();
+    let secret = format!("moat_{}", moat_core::hash::sha256_hex(&secret_bytes));
+    let hash = moat_core::hash::sha256_hex(secret.as_bytes());
+
+    match storage.create_tenant(&id, name, &hash).await {
+        Ok(Some(key)) => {
+            tracing::info!(tenant = %id, "tenant created through self-service signup");
+            (StatusCode::CREATED, axum::Json(MintedKey { key, secret })).into_response()
+        }
+        Ok(None) => (
+            StatusCode::CONFLICT,
+            format!("the workspace id {id} is taken"),
+        )
+            .into_response(),
+        Err(error) => storage_unavailable(&error),
+    }
 }
 
 // ---- the control plane ----

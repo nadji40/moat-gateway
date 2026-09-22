@@ -139,6 +139,14 @@ pub struct Auth {
     /// Require a database-backed bearer key on HTTP and intent requests.
     #[serde(default)]
     pub required: bool,
+    /// Let anyone create a tenant and its first `admin` key over HTTP.
+    ///
+    /// Off unless a deployment says otherwise, because it is the one endpoint
+    /// that writes a row for a caller who has no credential yet. Turning it on
+    /// is how a public trial works; leaving it off is how a pilot for one
+    /// named customer stays that way.
+    #[serde(default)]
+    pub self_signup: bool,
 }
 
 fn default_evidence() -> PathBuf {

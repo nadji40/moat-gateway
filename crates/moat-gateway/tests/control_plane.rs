@@ -186,3 +186,21 @@ async fn validates_the_request_before_consulting_storage() {
         "label is checked before the role, and both before storage: {text}"
     );
 }
+
+/// Signup writes a row for a caller holding no credential, so it is the one
+/// endpoint that must be invisible unless a deployment asked for it. A 404
+/// rather than a 403: a gateway that has not enabled it should not advertise
+/// that the feature exists.
+#[tokio::test]
+async fn signup_is_absent_unless_the_config_enables_it() {
+    let gw = Gateway::start("cp-signup-off").await;
+    let (status, text) = gw
+        .send(
+            reqwest::Method::POST,
+            "/v1/signup",
+            Some(r#"{"id":"acme","name":"Acme"}"#),
+        )
+        .await;
+    assert_eq!(status, 404, "{text}");
+    assert!(text.contains("not enabled"), "{text}");
+}

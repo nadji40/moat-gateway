@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>moat, your workspace</title>
+<meta name="description" content="Open a workspace, issue keys for your agents, and see every verdict made with them.">
+<meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<nav><div class="wrap"><div class="navbar glass">
+  <a class="navmark" href="index.html" aria-label="moat, home"><svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg" aria-label="moat">
+    <g class="e-ring">
+      <g fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round">
+        <path class="arc" pathLength="1" d="M117 52.4 A67 67 0 0 1 202.7 141.2"></path>
+        <path class="arc two" pathLength="1" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6"></path>
+      </g>
+      <g fill="currentColor"><circle class="dot" cx="99.7" cy="62.2" r="11"></circle><circle class="dot two" cx="192.3" cy="158.1" r="11"></circle></g>
+    </g>
+    <path class="body e-front" fill="currentColor" fill-rule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z"></path>
+    <g class="e-back" fill="currentColor">
+      <path d="M110 90 H173 A7 7 0 0 1 180 97 V100 H103 V97 A7 7 0 0 1 110 90 Z"></path>
+      <path fill-rule="evenodd" d="M103 110 H180 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 Z M112 118 H148 A2 2 0 0 1 150 120 V124 A2 2 0 0 1 148 126 H112 A2 2 0 0 1 110 124 V120 A2 2 0 0 1 112 118 Z"></path>
+    </g>
+  </svg></a>
+  <div class="navlinks">
+    <a href="index.html#compose">Compose one</a><a href="index.html#api">API</a><a href="compare.html">Compare</a><a href="tests.html">The tests</a><a href="dashboard.html" aria-current="page">Dashboard</a>
+  </div>
+  <a class="statusbtn" id="live" href="status.html"><b></b><span>Status</span></a>
+</div></div></nav>
+
+<div class="wrap">
+
+<header class="hero">
+  <div>
+    <p class="kicker">Your workspace</p>
+    <h1>Keys, and what<br><span class="g">they decided.</span></h1>
+  </div>
+</header>
+
+<section class="tight" id="gate">
+  <div class="cards">
+
+    <article class="panel glass" id="signin-card">
+      <div class="ph"><span class="num">1</span><h3>Open a workspace</h3></div>
+      <div class="pb">
+        <p class="hint">A workspace holds your keys and every verdict made with
+          them. Pick an id you will recognise later; it cannot be changed.</p>
+        <label class="lbl" for="new-id">Workspace id</label>
+        <input id="new-id" name="new-id" placeholder="aseer-cloud" autocomplete="off"
+               spellcheck="false" maxlength="64">
+        <label class="lbl" for="new-name">Display name</label>
+        <input id="new-name" name="new-name" placeholder="Aseer Cloud Co" autocomplete="off"
+               maxlength="120">
+        <button class="btn" id="create">Create workspace</button>
+        <p class="hint" id="signup-note" hidden></p>
+      </div>
+    </article>
+
+    <article class="panel glass">
+      <div class="ph"><span class="num">2</span><h3>Already have a key</h3></div>
+      <div class="pb">
+        <p class="hint">Paste an admin key. It is kept in this browser only and
+          never sent anywhere but your own gateway.</p>
+        <label class="lbl" for="key-in">Admin key</label>
+        <input id="key-in" name="key-in" placeholder="moat_..." autocomplete="off"
+               spellcheck="false" type="password">
+        <button class="btn ghost" id="signin">Open it</button>
+        <p class="hint" id="signin-note" hidden></p>
+      </div>
+    </article>
+
+  </div>
+</section>
+
+<section class="tight" id="minted" hidden>
+  <div class="panel glass">
+    <div class="ph"><h3>Save this now</h3></div>
+    <div class="pb">
+      <p class="hint">This is the only time the key is shown. There is no copy
+        of it on the server, only a hash, so it cannot be shown again.</p>
+      <pre class="glass" id="secret"></pre>
+      <div class="row">
+        <button class="btn" id="copy-secret">Copy key</button>
+        <button class="btn ghost" id="minted-done">I have saved it</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="tight" id="workspace" hidden>
+  <div class="headrow"><h2 id="ws-title">Keys</h2></div>
+
+  <div class="panel glass">
+    <div class="ph"><h3>Issue a key</h3></div>
+    <div class="pb">
+      <div class="row">
+        <input id="lbl" name="lbl" placeholder="staging agent" maxlength="120"
+               autocomplete="off" style="max-width:280px">
+        <select id="role" name="role" aria-label="Role">
+          <option value="agent">agent, makes payments</option>
+          <option value="approver">approver, releases held ones</option>
+          <option value="admin">admin, manages keys</option>
+        </select>
+        <button class="btn" id="mint">Issue</button>
+      </div>
+      <p class="hint">An agent key cannot manage keys. An admin key cannot pay
+        or approve. The three roles do not overlap.</p>
+    </div>
+  </div>
+
+  <div class="rows" id="keys"></div>
+  <p class="hint foot-note" id="keys-note">Loading.</p>
+
+  <div class="headrow" style="margin-top:34px"><h2>Point an agent at it</h2></div>
+  <div class="panel glass">
+    <div class="ph"><h3>Your endpoint</h3></div>
+    <div class="pb">
+      <pre class="glass" id="curl"></pre>
+      <div class="row">
+        <button class="btn" id="copy-curl">Copy</button>
+        <a class="btn ghost" href="tests.html">Run the nine tests</a>
+      </div>
+      <p class="hint">Every call made with these keys is recorded against this
+        workspace, signed and hash-chained, whatever the verdict.</p>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:26px">
+    <button class="btn ghost" id="signout">Close workspace</button>
+  </div>
+</section>
+
+</div>
+
+<footer class="foot"><div class="wrap">
+  <p class="rails-lead">One authorization core, four rails.</p>
+  <div class="rails" aria-label="Rails">
+    <span class="rail" style="--c:var(--red-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="3"/><path d="M2.6 9.6h18.8"/><path d="M6 14.5h3.5"/></svg>Cards</span>
+    <span class="rail" style="--c:var(--orange-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.6 12 4.2l9 5.4"/><path d="M5.8 11.4v6.2M10 11.4v6.2M14 11.4v6.2M18.2 11.4v6.2"/><path d="M3.6 20h16.8"/></svg>Bank transfers</span>
+    <span class="rail" style="--c:var(--yellow-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2 5.2 12.1 12 15.9l6.8-3.8z" opacity=".55"/><path d="M12 17.2 5.2 13.4 12 22l6.8-8.6z"/></svg>Ethereum</span>
+    <span class="rail" style="--c:var(--green-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.8 5.6H20.5L17.2 8.9H3.5z"/><path d="M3.5 10.4h13.7l3.3 3.3H6.8z" opacity=".65"/><path d="M6.8 15.1H20.5L17.2 18.4H3.5z"/></svg>Solana</span>
+  </div>
+</div></footer>
+
+<script src="app.js"></script>
+<script>
+/* The key lives in this browser and nowhere else. sessionStorage rather than
+   localStorage: a shared machine should not keep an admin credential after the
+   tab closes. Every accessor is wrapped, because a private window throws. */
+const SLOT = "moat.admin";
+function held(){ try { return sessionStorage.getItem(SLOT); } catch { return null; } }
+function hold(v){ try { v ? sessionStorage.setItem(SLOT, v) : sessionStorage.removeItem(SLOT); } catch {} }
+
+const show = (el, on) => { $(el).hidden = !on; };
+function note(sel, text, bad){
+  const el = $(sel);
+  el.textContent = text;
+  el.style.color = bad ? "var(--red-l)" : "var(--ink-2)";
+  el.hidden = !text;
+}
+
+async function control(path, opts = {}){
+  const key = held();
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      "content-type": "application/json",
+      ...(key ? { authorization: "Bearer " + key } : {}),
+      ...(opts.headers || {}),
+    },
+  });
+  const text = await res.text();
+  let body; try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+  if (!res.ok) throw new Error(typeof body === "string" ? body : (body && body.error) || res.statusText);
+  return body;
+}
+
+function roleChip(role){
+  const c = role === "admin" ? "var(--orange)" : role === "approver" ? "var(--yellow-l)" : "var(--green-l)";
+  return `<span class="row-e" style="color:${c}">${esc(role)}</span>`;
+}
+
+function keyRow(k){
+  const when = (t) => t ? new Date(t).toLocaleString() : "never";
+  return `<article class="row${k.active ? "" : " spent"}">
+    <span class="row-i">${k.active ? KEY_ICON : GONE_ICON}</span>
+    <div class="row-t">
+      <h3>${esc(k.label)} ${roleChip(k.access_role)}</h3>
+      <p class="row-s mono">${esc(k.id)}</p>
+      <p class="row-b">created ${esc(when(k.created_at))} · last used ${esc(when(k.last_used_at))}</p>
+    </div>
+    ${k.active
+      ? `<button class="btn ghost small" data-revoke="${esc(k.id)}">Revoke</button>`
+      : `<span class="row-r" style="font-size:.8rem;color:var(--ink-3)">revoked</span>`}
+  </article>`;
+}
+
+const KEY_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3.5M15.5 12v2.5"/></svg>`;
+const GONE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>`;
+
+async function refresh(){
+  try {
+    const keys = await control("/v1/keys");
+    $("#keys").innerHTML = keys.map(keyRow).join("");
+    const live = keys.filter(k => k.active).length;
+    note("#keys-note", `${live} active, ${keys.length - live} revoked. A revoked key stays listed: it is part of the record.`);
+    for (const b of document.querySelectorAll("[data-revoke]")) {
+      b.addEventListener("click", async () => {
+        working(b, "Revoking");
+        try { await control("/v1/keys/" + b.dataset.revoke, { method: "DELETE" }); await refresh(); }
+        catch (e) { note("#keys-note", String(e.message || e), true); }
+        finally { idle(b); }
+      });
+    }
+  } catch (e) {
+    note("#keys-note", String(e.message || e), true);
+  }
+}
+
+function openWorkspace(){
+  show("#gate", false); show("#workspace", true);
+  $("#curl").textContent =
+    `curl -s ${location.origin}/v1/keys \\
+  -H 'authorization: Bearer YOUR_KEY'`;
+  refresh();
+}
+
+$("#create").addEventListener("click", async () => {
+  const id = $("#new-id").value.trim().toLowerCase();
+  const name = $("#new-name").value.trim();
+  if (!id || !name) return note("#signup-note", "Both fields are needed.", true);
+  const btn = $("#create"); working(btn, "Creating");
+  try {
+    const out = await control("/v1/signup", { method: "POST", body: JSON.stringify({ id, name }) });
+    hold(out.secret);
+    $("#secret").textContent = out.secret;
+    show("#gate", false); show("#minted", true);
+    $("#ws-title").textContent = name;
+    note("#signup-note", "");
+  } catch (e) { note("#signup-note", String(e.message || e), true); }
+  finally { idle(btn); }
+});
+
+$("#signin").addEventListener("click", async () => {
+  const key = $("#key-in").value.trim();
+  if (!key) return note("#signin-note", "Paste a key first.", true);
+  hold(key);
+  const btn = $("#signin"); working(btn, "Opening");
+  try { await control("/v1/keys"); openWorkspace(); }
+  catch (e) { hold(null); note("#signin-note", String(e.message || e), true); }
+  finally { idle(btn); }
+});
+
+$("#minted-done").addEventListener("click", () => { show("#minted", false); openWorkspace(); });
+$("#copy-secret").addEventListener("click", (e) => copyText($("#secret").textContent, e.currentTarget, "Copied"));
+$("#copy-curl").addEventListener("click", (e) => copyText($("#curl").textContent, e.currentTarget, "Copied"));
+
+$("#mint").addEventListener("click", async () => {
+  const label = $("#lbl").value.trim();
+  if (!label) return note("#keys-note", "Give the key a label.", true);
+  const btn = $("#mint"); working(btn, "Issuing");
+  try {
+    const out = await control("/v1/keys", {
+      method: "POST",
+      body: JSON.stringify({ label, access_role: $("#role").value }),
+    });
+    $("#secret").textContent = out.secret;
+    show("#workspace", false); show("#minted", true);
+    $("#lbl").value = "";
+  } catch (e) { note("#keys-note", String(e.message || e), true); }
+  finally { idle(btn); }
+});
+
+$("#signout").addEventListener("click", () => { hold(null); location.reload(); });
+
+if (held()) openWorkspace();
+
+(async () => {
+  try { await api("/v1/limits"); $("#live").classList.add("on"); $("#live").lastElementChild.textContent = "Live"; }
+  catch { $("#live").classList.add("bad"); $("#live").lastElementChild.textContent = "Down"; }
+})();
+</script>
+
+</body>
+</html>

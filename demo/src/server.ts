@@ -17,6 +17,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chainDemo, chainState } from "./chain.js";
+import { isControlPath, proxyControl } from "./control.js";
 import { runSuite, TESTS } from "./suite.js";
 import {
   authorize,
@@ -80,6 +81,17 @@ function json(res: ServerResponse, status: number, body: unknown): void {
     "access-control-allow-origin": "*",
   });
   res.end(JSON.stringify(body, null, 2));
+}
+
+async function readBody(req: import("node:http").IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > 64 * 1024) throw new Error("body too large");
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 async function readJson(req: import("node:http").IncomingMessage): Promise<Record<string, unknown>> {
@@ -187,6 +199,14 @@ const server = createServer(async (req, res) => {
     if (path === "/v1/chain" && method === "POST") {
       const outcome = await chainDemo(caller(req.headers), url.searchParams.get("mode") ?? "approved");
       return json(res, outcome.status, outcome.body);
+    }
+
+    // The dashboard's three calls, forwarded to the authenticated gateway.
+    // Placed last so nothing above it can be shadowed, and before the 404 so
+    // an unknown /v1/ path still means what it always meant.
+    if (isControlPath(path)) {
+      const raw = await readBody(req);
+      if (await proxyControl(req, res, path, raw, caller(req.headers))) return;
     }
 
     if (path.startsWith("/v1/")) return json(res, 404, { error: "no such endpoint" });
