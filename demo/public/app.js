@@ -105,3 +105,75 @@ async function copyText(text, btn, done = "Copied", selectOnFail) {
   btn._t = setTimeout(() => { btn.innerHTML = was; delete btn.dataset.said; }, 1600);
   return ok;
 }
+
+/* ------------------------------------------------------------------ nav ---
+   The way into the dashboard, on every page. Two states, one place: signed
+   out it says Log in, signed in it says Dashboard and lights its dot. It is
+   built here rather than written into each page's markup so the two states
+   cannot drift apart, and so it survives on phones, where .navlinks is
+   hidden and a text link in there would vanish. */
+const ADMIN_SLOT = "moat.admin";
+
+function signedIn() {
+  try { return Boolean(sessionStorage.getItem(ADMIN_SLOT)); } catch { return false; }
+}
+
+function mountAuthButton() {
+  const bar = document.querySelector(".navbar");
+  if (!bar || document.getElementById("auth")) return;
+  const here = location.pathname.endsWith("dashboard.html");
+  const inn = signedIn();
+  const a = document.createElement("a");
+  a.id = "auth";
+  a.className = "statusbtn" + (inn ? " on" : "");
+  a.href = "dashboard.html";
+  a.innerHTML = '<b></b><span>' + (inn ? "Dashboard" : "Log in") + '</span>';
+  if (here) a.setAttribute("aria-current", "page");
+  bar.insertBefore(a, document.getElementById("live"));
+}
+
+/* A pair of tabs over a deck of slides, as the front page uses for the rails.
+   Returns its own resize, because a deck inside something hidden measures as
+   zero and has to be told to measure again once it is on screen. */
+function mountSwiper(barSel, deckSel) {
+  const bar = document.querySelector(barSel);
+  const deck = document.querySelector(deckSel);
+  if (!bar || !deck) return null;
+  const tabs = [...bar.querySelectorAll("[role=tab]")];
+  const slides = [...deck.querySelectorAll(".slide")];
+  const thumb = bar.querySelector(".thumb");
+  if (!tabs.length || !slides.length || !thumb) return null;
+  let active = 0;
+
+  const size = () => { const h = slides[active].offsetHeight; if (h) deck.style.height = h + "px"; };
+
+  function show(i, focus) {
+    active = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, n) => {
+      s.classList.toggle("on", n === active);
+      // leaving slides pull back the way they came, so the motion has a direction
+      s.style.setProperty("--x", n === active ? "0px" : (n < active ? "-30px" : "30px"));
+    });
+    tabs.forEach((t, n) => t.setAttribute("aria-selected", String(n === active)));
+    const t = tabs[active];
+    thumb.style.width = t.offsetWidth + "px";
+    thumb.style.transform = "translateX(" + (t.offsetLeft - 4) + "px)";
+    size();
+    if (focus) t.focus();
+  }
+
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => show(i));
+    t.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        show(active + (e.key === "ArrowRight" ? 1 : -1), true);
+      }
+    });
+  });
+  addEventListener("resize", size);
+  show(0);
+  return { show, size };
+}
+
+mountAuthButton();

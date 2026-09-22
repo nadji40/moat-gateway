@@ -44,35 +44,46 @@
 </header>
 
 <section class="tight" id="gate">
-  <div class="cards">
-    <article class="panel glass">
-      <div class="ph"><span class="num">1</span><h3>Open a workspace</h3></div>
-      <div class="pb">
-        <p class="hint">A workspace holds your keys and every verdict made with
-          them. Pick an id you will recognise later; it cannot be changed.</p>
-        <label class="lbl" for="new-id">Workspace id</label>
-        <input id="new-id" name="new-id" placeholder="aseer-cloud" autocomplete="off"
-               spellcheck="false" maxlength="64">
-        <label class="lbl" for="new-name">Display name</label>
-        <input id="new-name" name="new-name" placeholder="Aseer Cloud Co" autocomplete="off"
-               maxlength="120">
-        <button class="btn" id="create">Create workspace</button>
-        <p class="hint" id="signup-note" hidden></p>
-      </div>
-    </article>
+  <div class="swiper" id="gate-swiper" role="tablist" aria-label="How to start">
+    <span class="thumb" aria-hidden="true"></span>
+    <button role="tab" aria-controls="slide-new" aria-selected="true">Create a workspace</button>
+    <button role="tab" aria-controls="slide-key" aria-selected="false">I have a key</button>
+  </div>
 
-    <article class="panel glass">
-      <div class="ph"><span class="num">2</span><h3>Already have a key</h3></div>
-      <div class="pb">
-        <p class="hint">Paste an admin key. It is kept in this browser only and
-          never sent anywhere but your own gateway.</p>
-        <label class="lbl" for="key-in">Admin key</label>
-        <input id="key-in" name="key-in" placeholder="moat_..." autocomplete="off"
-               spellcheck="false" type="password">
-        <button class="btn ghost" id="signin">Open it</button>
-        <p class="hint" id="signin-note" hidden></p>
-      </div>
-    </article>
+  <div class="deck" id="gate-deck">
+    <div class="slide on" id="slide-new">
+      <article class="panel glass">
+        <div class="ph"><h3>Open a workspace</h3></div>
+        <div class="pb">
+          <p class="hint">A workspace holds your keys and every verdict made
+            with them. Pick an id you will recognise later; it cannot be
+            changed.</p>
+          <label class="lbl" for="new-id">Workspace id</label>
+          <input id="new-id" name="new-id" placeholder="aseer-cloud" autocomplete="off"
+                 spellcheck="false" maxlength="64">
+          <label class="lbl" for="new-name">Display name</label>
+          <input id="new-name" name="new-name" placeholder="Aseer Cloud Co" autocomplete="off"
+                 maxlength="120">
+          <button class="btn" id="create">Create workspace</button>
+          <p class="hint" id="signup-note" hidden></p>
+        </div>
+      </article>
+    </div>
+
+    <div class="slide" id="slide-key">
+      <article class="panel glass">
+        <div class="ph"><h3>Open one you have</h3></div>
+        <div class="pb">
+          <p class="hint">Paste an admin key. It is kept in this browser only
+            and never sent anywhere but your own gateway.</p>
+          <label class="lbl" for="key-in">Admin key</label>
+          <input id="key-in" name="key-in" placeholder="moat_..." autocomplete="off"
+                 spellcheck="false" type="password">
+          <button class="btn" id="signin">Open it</button>
+          <p class="hint" id="signin-note" hidden></p>
+        </div>
+      </article>
+    </div>
   </div>
 </section>
 
@@ -370,7 +381,7 @@ $("#create").addEventListener("click", async () => {
     $("#secret").textContent = out.secret;
     show("#gate", false); show("#hero", false); show("#minted", true);
     note("#signup-note", "");
-  } catch (e) { note("#signup-note", String(e.message || e), true); }
+  } catch (e) { note("#signup-note", String(e.message || e), true);  resize(); }
   finally { idle(btn); }
 });
 
@@ -380,7 +391,7 @@ $("#signin").addEventListener("click", async () => {
   hold(key);
   const btn = $("#signin"); working(btn, "Opening");
   try { await control("/v1/keys"); openWorkspace(); }
-  catch (e) { hold(null); note("#signin-note", String(e.message || e), true); }
+  catch (e) { hold(null); note("#signin-note", String(e.message || e), true);  resize(); }
   finally { idle(btn); }
 });
 
@@ -405,6 +416,11 @@ $("#mint").addEventListener("click", async () => {
 });
 
 $("#signout").addEventListener("click", () => { hold(null); location.hash = ""; location.reload(); });
+
+const gate = mountSwiper("#gate-swiper", "#gate-deck");
+/* A note appearing under a field makes its slide taller, and a deck with a
+   fixed height would clip it. */
+const resize = () => gate && gate.size();
 
 if (held()) openWorkspace();
 
