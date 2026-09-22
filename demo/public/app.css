@@ -379,7 +379,9 @@ footer.foot p{max-width:64ch;margin:0 auto}
 .tab-sp{flex:1 1 auto;min-width:8px}
 .tab-n{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;
   border-radius:999px;font-size:.7rem;background:rgba(255,255,255,.12);color:inherit}
-.tab[aria-selected="true"] .tab-n{background:rgba(0,0,0,.22)}
+/* the tab text goes black on orange when selected, and a black count on a
+   dark pill disappears, so the badge inverts with it */
+.tab[aria-selected="true"] .tab-n{background:rgba(0,0,0,.3);color:#fff}
 
 /* the numbers, and the one bar that shows how the verdicts split */
 .stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px}
