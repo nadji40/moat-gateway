@@ -56,6 +56,8 @@ export const LIMITS: SandboxLimits = {
 export interface Verdict {
   decision: "allow" | "deny" | "step_up";
   reasons: { id: string; passed: boolean; message: string }[];
+  /** On a step-up: the question a person is being asked, and why. */
+  prompt?: string;
   evidence_id?: string;
   /** Whether the mock provider actually took the payment. */
   paid: boolean;
@@ -425,6 +427,7 @@ export async function pay(
   let decision: Verdict["decision"] = "allow";
   let reasons: Verdict["reasons"] = [];
   let evidence_id: string | undefined;
+  let prompt: string | undefined;
   try {
     await s.client.callTool({ name: "stripe__pay", arguments: call });
   } catch (error) {
@@ -433,10 +436,16 @@ export async function pay(
     }
     decision = error.code === DENY ? "deny" : "step_up";
     const data = error.data as {
-      moat?: { reasons?: Verdict["reasons"]; evidence_id?: string };
+      moat?: { reasons?: Verdict["reasons"]; evidence_id?: string; prompt?: string };
     };
     reasons = (data.moat?.reasons ?? []).filter((r) => !r.passed);
     evidence_id = data.moat?.evidence_id;
+    // A step-up carries `prompt` where a deny carries `reasons`: the question
+    // a person is being asked, which already names the rule that could not be
+    // verified. Reading only `reasons` left every held payment answering the
+    // caller with an empty list, so the one verdict that exists to be acted on
+    // was the one that said least about itself.
+    prompt = data.moat?.prompt;
   }
 
   // The ledger is the only honest answer to "was anyone actually paid",
@@ -456,6 +465,7 @@ export async function pay(
   return {
     decision,
     reasons,
+    ...(prompt ? { prompt } : {}),
     ...(evidence_id ? { evidence_id } : {}),
     paid,
     ms: Date.now() - started,
