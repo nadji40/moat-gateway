@@ -47,10 +47,14 @@ nav{position:sticky;top:0;z-index:20;padding-top:14px}
     0 14px 30px -16px rgba(0,0,0,1)}
 .mark{width:32px;height:32px;flex:none;color:var(--ink)}
 .navlinks{display:flex;gap:22px;margin-inline:auto;font-size:.875rem;color:var(--ink-2);font-weight:600}
-.navlinks a{text-decoration:none;position:relative;transition:color .2s}
-.navlinks a:after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1.5px;background:var(--orange);transition:right .25s var(--ease)}
-.navlinks a:hover{color:var(--ink)}
-.navlinks a:hover:after{right:0}
+/* Colour alone carries state here: no rule sliding in underneath, no pill
+   behind the words. The active page and the one under the pointer are both
+   the brand orange, so a link reads as reachable and the current one reads as
+   where you are. */
+.navlinks a{text-decoration:none;transition:color .18s}
+.navlinks a:hover,
+.navlinks a:focus-visible{color:var(--orange)}
+.navlinks a[aria-current]{color:var(--orange)}
 /* The status of the gateway is a fact, not an event, so it sits still and
    links to the page that measures it. */
 .statusbtn{display:inline-flex;align-items:center;gap:8px;flex:none;text-decoration:none;white-space:nowrap;
@@ -501,8 +505,7 @@ select option{background:#101013;color:var(--ink)}
 }
 
 /* the link for the page you are on */
-.navlinks a[aria-current]{color:var(--ink)}
-.navlinks a[aria-current]:after{right:0}
+
 .navmark{display:block;line-height:0;flex:none}
 
 /* one row per endpoint, on the status page */

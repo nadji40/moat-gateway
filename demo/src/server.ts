@@ -216,7 +216,16 @@ const server = createServer(async (req, res) => {
 
     if (path.startsWith("/v1/")) return json(res, 404, { error: "no such endpoint" });
 
-    const wanted = path === "/" ? "/index.html" : path;
+    // Clean routes. /status is the address; status.html is an implementation
+    // detail of how it is stored, and putting a file extension in a URL makes
+    // the storage permanent. An extensionless path that matches a page is
+    // served as that page; the old .html paths still resolve, so a link
+    // already sent out does not break.
+    let wanted = path === "/" ? "/index.html" : path;
+    if (!extname(wanted)) {
+      const asPage = resolve(PUBLIC, `.${wanted}.html`);
+      if (asPage.startsWith(PUBLIC) && existsSync(asPage)) wanted = `${wanted}.html`;
+    }
     const file = resolve(PUBLIC, `.${wanted}`);
     if (!file.startsWith(PUBLIC) || !existsSync(file)) {
       res.writeHead(404, { "content-type": "text/plain" });
