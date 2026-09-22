@@ -162,6 +162,13 @@ const NAV_MARK = `<svg class="mark" viewBox="69 43 144 144" xmlns="http://www.w3
     </g>
   </svg>`;
 
+/* Three lines that become a cross. Both paths ship and CSS picks one, so
+   opening the menu cannot be a frame late while an icon is rebuilt. */
+const NAV_TOGGLE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+    <path class="i-open" d="M4 7h16M4 12h16M4 17h16"></path>
+    <path class="i-shut" d="M6 6l12 12M18 6L6 18"></path>
+  </svg>`;
+
 function mountNav() {
   const host = document.querySelector("nav");
   if (!host) return;
@@ -173,9 +180,61 @@ function mountNav() {
   host.innerHTML =
     '<div class="wrap"><div class="navbar glass">' +
     `<a class="navmark" href="/" aria-label="moat, home">${NAV_MARK}</a>` +
-    `<div class="navlinks">${links}</div>` +
+    `<div class="navlinks" id="navlinks">${links}</div>` +
+    '<button class="navtoggle" type="button" id="navtoggle" aria-controls="navlinks"' +
+    ` aria-expanded="false" aria-label="Pages">${NAV_TOGGLE}</button>` +
     "</div></div>";
   mountAuthButton();
+  mountNavToggle(host);
+}
+
+/**
+ * The narrow-screen menu.
+ *
+ * There is one copy of the links, not two: the same `.navlinks` that sits
+ * across the bar on a desktop becomes the panel under it on a phone. A second
+ * list would be a second place for `aria-current` to be wrong.
+ *
+ * Open state lives in one attribute on `<nav>`, which is what CSS reads, and
+ * `aria-expanded` follows it. The rest is the four ways a menu should close.
+ */
+function mountNavToggle(host) {
+  const btn = host.querySelector("#navtoggle");
+  const menu = host.querySelector("#navlinks");
+  if (!btn || !menu) return;
+
+  const open = (on) => {
+    host.toggleAttribute("data-open", on);
+    btn.setAttribute("aria-expanded", String(on));
+  };
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    open(!host.hasAttribute("data-open"));
+  });
+
+  // A link that scrolls to an anchor on this same page changes nothing the
+  // menu would notice, so it has to close itself.
+  menu.addEventListener("click", (e) => {
+    if (e.target instanceof Element && e.target.closest("a")) open(false);
+  });
+
+  addEventListener("click", (e) => {
+    if (!host.hasAttribute("data-open")) return;
+    if (e.target instanceof Node && host.contains(e.target)) return;
+    open(false);
+  });
+
+  addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || !host.hasAttribute("data-open")) return;
+    open(false);
+    btn.focus();
+  });
+
+  // Widening past the breakpoint puts the links back in the bar. Leaving the
+  // attribute set would then hold a panel open that is no longer a panel.
+  const wide = matchMedia("(min-width:761px)");
+  wide.addEventListener("change", (e) => { if (e.matches) open(false); });
 }
 
 function mountAuthButton() {

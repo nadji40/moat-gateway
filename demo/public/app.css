@@ -66,6 +66,7 @@ p{margin:0}
 /* nav */
 nav{position:sticky;top:0;z-index:20;padding-top:14px}
 .navbar{display:flex;align-items:center;gap:20px;border-radius:18px;padding:11px 16px 11px 14px;
+  position:relative;
   background:rgba(255,255,255,.055);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.17),
@@ -95,7 +96,42 @@ nav{position:sticky;top:0;z-index:20;padding-top:14px}
 .statusbtn b{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
 .statusbtn.on b{background:var(--green-l)}
 .statusbtn.bad b{background:var(--red-l)}
-@media(max-width:760px){.navlinks{display:none}.navbar{justify-content:center;gap:14px}}
+/* The menu button. Off on a desktop, where the links are already across the
+   bar and a button to reveal them would reveal nothing. */
+.navtoggle{display:none;align-items:center;justify-content:center;flex:none;
+  width:38px;height:38px;padding:0;border-radius:12px;cursor:pointer;color:var(--ink-2);
+  border:1px solid var(--line);background:rgba(255,255,255,.05);
+  box-shadow:0 3px 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.13);
+  transition:transform .12s var(--ease),box-shadow .12s var(--ease),color .2s,border-color .2s}
+.navtoggle svg{width:19px;height:19px}
+.navtoggle:hover{color:var(--ink);border-color:var(--line-2)}
+.navtoggle:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+.navtoggle .i-shut{display:none}
+nav[data-open] .navtoggle{color:var(--orange);border-color:var(--line-2)}
+nav[data-open] .navtoggle .i-open{display:none}
+nav[data-open] .navtoggle .i-shut{display:block}
+
+/* Narrow: the mark holds the left, the way in holds the right, and the links
+   move out of the bar into a panel under it rather than disappearing.
+   `visibility` rather than `display` so the panel can be animated and so a
+   closed menu is out of the tab order and out of the accessibility tree. */
+@media(max-width:760px){
+  .navbar{gap:10px;padding:10px 12px 10px 12px}
+  .navtoggle{display:inline-flex;margin-left:auto}
+  .navlinks{position:absolute;top:calc(100% + 9px);left:0;right:0;z-index:2;
+    display:block;margin:0;padding:6px;text-align:left;font-size:.95rem;
+    border-radius:16px;background:#0B0B0D;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.12),
+      0 1px 0 rgba(255,255,255,.05),
+      0 22px 44px -18px rgba(0,0,0,1);
+    opacity:0;visibility:hidden;transform:translateY(-8px);
+    transition:opacity .18s var(--ease),transform .18s var(--ease),visibility .18s}
+  nav[data-open] .navlinks{opacity:1;visibility:visible;transform:none}
+  .navlinks a{display:block;padding:12px 14px;border-radius:11px}
+  .navlinks a+a{border-top:1px solid var(--line)}
+  .navlinks a:hover,.navlinks a:focus-visible{background:rgba(255,255,255,.05)}
+}
 
 /* the mark turns over when you point at it. The load-in uses fill mode
    'both' rather than a base opacity of 0, so that replacing the animation
