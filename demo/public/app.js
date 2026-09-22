@@ -134,7 +134,6 @@ function signedIn() {
  * a URL should not name the file format it happens to be stored in.
  */
 const NAV = [
-  { href: "/#compose", label: "Compose one", page: "index" },
   { href: "/#api", label: "API", page: "index" },
   { href: "/compare", label: "Compare", page: "compare" },
   { href: "/tests", label: "The tests", page: "tests" },
