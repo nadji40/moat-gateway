@@ -16,6 +16,17 @@ payment_tools:
   - server: "*"
     tool: "propose"
 
+# Tools that move no money. A tool in neither list is refused and hidden
+# from the agent, so a server that grows a new way to pay cannot pay around
+# Moat.
+non_payment_tools:
+  - server: "wallet"
+    tool: "get_transaction"
+  - server: "wallet"
+    tool: "balances"
+  - server: "wallet"
+    tool: "inspect_wallet"
+
 fields:
   payee:       { args: ["counterparty"] }
   amount:      { args: ["amount"] }

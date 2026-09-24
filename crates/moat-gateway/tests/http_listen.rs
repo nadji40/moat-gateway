@@ -10,7 +10,7 @@ mod common;
 use std::process::Stdio;
 use std::time::Duration;
 
-use common::{fake_server_path, gateway_path, http, write_config, yaml_path};
+use common::{fake_server_path, gateway_path, http, policy_for_fake, write_config, yaml_path};
 use moat_core::verdict::code as moat_code;
 use serde_json::{json, Value};
 
@@ -59,10 +59,7 @@ async fn streamable_http_session_end_to_end() {
     let fake = fake_server_path();
     let mcp_port = free_port();
     let api_port = free_port();
-    let policy = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../policies/default.yaml")
-        .canonicalize()
-        .unwrap();
+    let policy = policy_for_fake("http_listen-policy-1", "default.yaml");
     let cfg = write_config(
         "http-listen",
         &format!(
@@ -139,10 +136,10 @@ intent_api: {{ addr: "127.0.0.1:{api_port}" }}
         .iter()
         .map(|t| t["name"].as_str().unwrap())
         .collect();
-    // Every tool the upstream advertises, namespaced, in the upstream's own
-    // order. The fixture gained `transfer` when the outcome state machine
-    // needed a provider that could answer something other than "succeeded".
-    assert_eq!(names, ["stripe__echo", "stripe__transfer", "stripe__pay"]);
+    // Every tool the policy classifies, namespaced, in the upstream's own
+    // order. The fixture also advertises `transfer`, which the policy lists
+    // neither as a payment nor as moving no money, so the agent never sees it.
+    assert_eq!(names, ["stripe__echo", "stripe__pay"]);
 
     // The Moat session id is the Mcp-Session-Id: register an intent with it.
     let api = format!("127.0.0.1:{api_port}");

@@ -56,6 +56,18 @@ impl ToolMatcher {
     }
 }
 
+/// What a policy says a tool is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolClass {
+    /// Evaluated before it is forwarded.
+    Payment,
+    /// Declared to move no money, and forwarded as it is.
+    NonPayment,
+    /// In neither list. Refused, and hidden from the agent: a server that
+    /// gains a tool nobody classified must not gain a way to pay around Moat.
+    Unclassified,
+}
+
 /// How a logical field's value is compared against what Moat has seen.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -169,6 +181,9 @@ pub struct Policy {
     pub version: u32,
     /// Which tools are payments.
     pub payment_tools: Vec<ToolMatcher>,
+    /// Which tools move no money. Anything in neither list is refused.
+    #[serde(default)]
+    pub non_payment_tools: Vec<ToolMatcher>,
     /// Logical fields and the argument names that feed them.
     #[serde(default)]
     pub fields: BTreeMap<String, FieldSpec>,
@@ -189,10 +204,21 @@ pub struct Policy {
     /// What `step_up` becomes when the host said no human is present.
     #[serde(default = "default_no_human")]
     pub no_human_available: Decision,
+    /// What a payment nobody asked for becomes: no approval was presented,
+    /// and neither its payee, its amount nor its destination came from what
+    /// the user said. A trusted payee vouches for who is paid, not for
+    /// whether to pay. `allow` turns the check off, which only a comparison
+    /// arm modelling a control that never knows what the user asked should do.
+    #[serde(default = "default_unrequested")]
+    pub unrequested_payment: Decision,
 }
 
 fn default_no_human() -> Decision {
     Decision::Deny
+}
+
+fn default_unrequested() -> Decision {
+    Decision::StepUp
 }
 
 impl Policy {
@@ -268,6 +294,22 @@ impl Policy {
     /// Whether a call to `tool` on `server` is a payment under this policy.
     pub fn is_payment_tool(&self, server: &str, tool: &str) -> bool {
         self.payment_tools.iter().any(|m| m.matches(server, tool))
+    }
+
+    /// What this policy says a call to `tool` on `server` is. A tool in both
+    /// lists is a payment.
+    pub fn classify(&self, server: &str, tool: &str) -> ToolClass {
+        if self.is_payment_tool(server, tool) {
+            ToolClass::Payment
+        } else if self
+            .non_payment_tools
+            .iter()
+            .any(|m| m.matches(server, tool))
+        {
+            ToolClass::NonPayment
+        } else {
+            ToolClass::Unclassified
+        }
     }
 
     /// Map call arguments onto logical fields. Fields with no matching
@@ -415,6 +457,27 @@ pub fn evaluate_with(
             Decision::Deny,
             "a structured payment authorization exists; authorization_id is required",
         ));
+    } else if policy.unrequested_payment != Decision::Allow {
+        let requested = ["payee", "amount", "destination"].iter().any(|field| {
+            provenance
+                .get(*field)
+                .is_some_and(|p| p.resolution.source.kind() == SourceKind::User)
+        });
+        if !requested {
+            decision = decision.max(policy.unrequested_payment);
+        }
+        reasons.push(RuleOutcome {
+            id: "user-request".to_owned(),
+            field: None,
+            passed: requested,
+            source: None,
+            on_fail: policy.unrequested_payment,
+            message: if requested {
+                "ok: the user named the payee, the amount or the destination".to_owned()
+            } else {
+                "no approval, and nothing in this payment came from what the user said".to_owned()
+            },
+        });
     }
 
     for rule in &policy.rules {
@@ -1387,6 +1450,12 @@ mod tests {
         assert!(p.is_payment_tool("stripe", "create_payment"));
         assert!(!p.is_payment_tool("web", "fetch"));
         assert!(!p.is_payment_tool("web", "create_payment"));
+        assert_eq!(p.classify("web", "fetch"), ToolClass::NonPayment);
+        assert_eq!(
+            p.classify("stripe", "transfer_funds"),
+            ToolClass::Unclassified
+        );
+        assert_eq!(p.unrequested_payment, Decision::StepUp);
         assert_eq!(p.rules.len(), 3);
         assert_eq!(p.no_human_available, Decision::Deny);
     }
@@ -1399,6 +1468,62 @@ mod tests {
         assert_eq!(m["payee"].0, "recipient");
         assert_eq!(m["amount"].0, "total");
         assert!(!m.contains_key("currency"));
+    }
+
+    /// Every shipped policy loads, classifies its servers' read-only tools,
+    /// and asks whether the user requested a payment, except the comparison
+    /// arms, which exist to model controls that cannot.
+    #[test]
+    fn every_shipped_policy_loads_and_only_arms_skip_the_user_request() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../policies");
+        let mut seen = 0;
+        for dir in [root.clone(), root.join("rails")] {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
+                    continue;
+                }
+                let name = path.display();
+                let p = Policy::load(&path).unwrap_or_else(|e| panic!("{name}: {e}"));
+                let arm = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| n.starts_with("arm-"));
+                assert_eq!(p.unrequested_payment == Decision::Allow, arm, "{name}");
+                assert!(!p.non_payment_tools.is_empty(), "{name}");
+                seen += 1;
+            }
+        }
+        assert_eq!(seen, 16);
+    }
+
+    /// A page can name a trusted supplier and an amount. That is not the user
+    /// asking for a payment, and without an approval it must reach a human.
+    #[test]
+    fn a_trusted_payee_does_not_make_a_payment_requested() {
+        let mut s = Session::new("s");
+        s.observe_tool_result(
+            "web",
+            "fetch",
+            "c1",
+            &json!("Invoice from Monitoring Pro Inc: $480 due now"),
+        );
+        let args = json!({"payee": "Monitoring Pro Inc", "amount": 480, "currency": "USD"});
+
+        let e = evaluate(&policy(), &s, call(args.clone()), 1_000_000);
+        assert_eq!(e.verdict.decision, Decision::StepUp);
+        let failed: Vec<&str> = e.verdict.failures().map(|r| r.id.as_str()).collect();
+        assert_eq!(failed, vec!["user-request"]);
+
+        let arm = Policy::from_yaml(include_str!("../../../policies/arm-allowlist.yaml")).unwrap();
+        assert_eq!(arm.unrequested_payment, Decision::Allow);
+        let e = evaluate(&arm, &s, call(args), 1_000_000);
+        assert_eq!(
+            e.verdict.decision,
+            Decision::Allow,
+            "the arm keeps modelling a bare allowlist"
+        );
+        assert!(!e.verdict.reasons.iter().any(|r| r.id == "user-request"));
     }
 
     #[test]
@@ -1416,19 +1541,19 @@ mod tests {
                 "injected payee",
                 json!({"payee": "ProMon Billing Ltd", "amount": 480, "currency": "USD"}),
                 Decision::StepUp,
-                vec!["payee-provenance"],
+                vec!["user-request", "payee-provenance"],
             ),
             (
                 "over cap wins over step_up",
                 json!({"payee": "ProMon Billing Ltd", "amount": 900, "currency": "USD"}),
                 Decision::Deny,
-                vec!["payee-provenance", "amount-cap"],
+                vec!["user-request", "payee-provenance", "amount-cap"],
             ),
             (
                 "unknown payee",
                 json!({"payee": "Evil Corp", "amount": 480}),
                 Decision::StepUp,
-                vec!["payee-provenance"],
+                vec!["user-request", "payee-provenance"],
             ),
             (
                 "amount from nowhere",
@@ -1443,8 +1568,14 @@ mod tests {
                 vec!["amount-cap", "amount-provenance"],
             ),
             (
-                "allowlisted payee, string amount",
+                "trusted payee, amount from the page, nothing from the user",
                 json!({"recipient": "Acme Cloud Ltd", "total": "$480.00"}),
+                Decision::StepUp,
+                vec!["user-request"],
+            ),
+            (
+                "trusted payee, amount the user named",
+                json!({"recipient": "Acme Cloud Ltd", "total": "$500.00"}),
                 Decision::Allow,
                 vec![],
             ),
@@ -1456,8 +1587,8 @@ mod tests {
             assert_eq!(got, failing, "{name}: failing rules");
             assert_eq!(
                 e.verdict.reasons.len(),
-                4,
-                "{name}: every rule plus velocity is recorded"
+                5,
+                "{name}: the user-request check, every rule and velocity are recorded"
             );
             assert!(e.verdict.evidence_id.starts_with("ev_"));
             assert_eq!(

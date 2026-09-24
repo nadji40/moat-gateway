@@ -12,6 +12,17 @@ payment_tools:
   - server: "stripe"
     tool: "create_payment"
 
+# Tools that move no money. A tool in neither list is refused and hidden
+# from the agent, so a server that grows a new way to pay cannot pay around
+# Moat.
+non_payment_tools:
+  - server: "stripe"
+    tool: "list_payments"
+  - server: "stripe"
+    tool: "inspect_accounts"
+  - server: "web"
+    tool: "fetch"
+
 fields:
   payee:    { args: ["payee", "recipient", "destination", "to"] }
   amount:   { args: ["amount", "total", "value"] }
@@ -30,3 +41,7 @@ rules:
     message: "payee is not on the allowlist"
 
 no_human_available: deny
+
+# This arm models a control that never knows what the user asked, so it
+# does not ask whether the user requested the payment.
+unrequested_payment: allow

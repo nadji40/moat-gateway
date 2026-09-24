@@ -20,7 +20,7 @@ mod common;
 use std::process::Stdio;
 use std::time::Duration;
 
-use common::{fake_server_path, gateway_path, write_config, yaml_path};
+use common::{fake_server_path, gateway_path, policy_for_fake, write_config, yaml_path};
 
 fn free_port() -> u16 {
     std::net::TcpListener::bind("127.0.0.1:0")
@@ -46,10 +46,7 @@ impl Gateway {
         let fake = fake_server_path();
         let port = free_port();
         let api_port = free_port();
-        let policy = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../policies/default.yaml")
-            .canonicalize()
-            .unwrap();
+        let policy = policy_for_fake(&format!("{name}-policy"), "default.yaml");
         let cfg = write_config(
             name,
             &format!(

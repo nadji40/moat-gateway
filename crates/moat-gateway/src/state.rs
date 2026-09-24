@@ -10,7 +10,7 @@ use moat_core::cosign::CosignKey;
 use moat_core::evidence::Record;
 use moat_core::keys::Keys;
 use moat_core::money::{Asset, AssetRegistry};
-use moat_core::policy::{Evaluation, Policy, PolicyError};
+use moat_core::policy::{Evaluation, Policy, PolicyError, ToolClass};
 use moat_core::session::{lock, Event, Session, SessionStore};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -18,8 +18,9 @@ use tokio::sync::Mutex as AsyncMutex;
 
 use crate::storage::DurableStore;
 
-/// Tool names treated as payments when no policy could be loaded. The
-/// gateway fails closed for these and open for everything else.
+/// Tool names treated as payments when no policy could be loaded, so they are
+/// denied with evidence. Every other tool is refused without it: with no
+/// policy, nothing can be declared safe to forward.
 pub const FALLBACK_PAYMENT_TOOLS: &[&str] = &[
     "pay",
     "create_payment",
@@ -35,7 +36,7 @@ pub const FALLBACK_PAYMENT_TOOLS: &[&str] = &[
 pub enum PolicyState {
     /// Loaded and validated.
     Loaded(Policy),
-    /// Could not be loaded; payment-looking tools are denied.
+    /// Could not be loaded; every tool is refused.
     Missing(String),
 }
 
@@ -45,7 +46,7 @@ impl PolicyState {
     pub fn load(path: Option<&Path>) -> PolicyState {
         let Some(path) = path else {
             let why = "no `policy` in config".to_owned();
-            tracing::error!("POLICY MISSING: {why}; payment tools will be DENIED");
+            tracing::error!("POLICY MISSING: {why}; every tool call will be REFUSED");
             return PolicyState::Missing(why);
         };
         match Policy::load(path) {
@@ -58,17 +59,18 @@ impl PolicyState {
                     PolicyError::Io { .. } => format!("{e}"),
                     other => format!("{other}"),
                 };
-                tracing::error!("POLICY UNUSABLE: {why}; payment tools will be DENIED, everything else forwarded");
+                tracing::error!("POLICY UNUSABLE: {why}; every tool call will be REFUSED");
                 PolicyState::Missing(why)
             }
         }
     }
 
-    /// Whether `tool` on `server` must go through evaluation.
-    pub fn is_payment_tool(&self, server: &str, tool: &str) -> bool {
+    /// What a call to `tool` on `server` is.
+    pub fn classify(&self, server: &str, tool: &str) -> ToolClass {
         match self {
-            PolicyState::Loaded(p) => p.is_payment_tool(server, tool),
-            PolicyState::Missing(_) => FALLBACK_PAYMENT_TOOLS.contains(&tool),
+            PolicyState::Loaded(p) => p.classify(server, tool),
+            PolicyState::Missing(_) if FALLBACK_PAYMENT_TOOLS.contains(&tool) => ToolClass::Payment,
+            PolicyState::Missing(_) => ToolClass::Unclassified,
         }
     }
 }
@@ -89,7 +91,7 @@ impl Policies {
     /// Load the default policy and every per-upstream override.
     ///
     /// Never fails: an unreadable policy becomes [`PolicyState::Missing`] for
-    /// whatever it governs, which denies payment-looking tools there.
+    /// whatever it governs, which refuses every tool there.
     pub fn load<'a, I>(default_path: Option<&Path>, upstreams: I) -> Policies
     where
         I: IntoIterator<Item = (&'a str, Option<&'a Path>)>,
@@ -125,10 +127,10 @@ impl Policies {
         self.per_upstream.get(upstream).unwrap_or(&self.default)
     }
 
-    /// Whether `tool` on `server` must go through evaluation, under whichever
-    /// policy governs `server`.
-    pub fn is_payment_tool(&self, server: &str, tool: &str) -> bool {
-        self.for_upstream(server).is_payment_tool(server, tool)
+    /// What a call to `tool` on `server` is, under whichever policy governs
+    /// `server`.
+    pub fn classify(&self, server: &str, tool: &str) -> ToolClass {
+        self.for_upstream(server).classify(server, tool)
     }
 
     /// Every asset any loaded policy declares, over the built-in table.
@@ -725,9 +727,13 @@ rules:
     #[test]
     fn an_upstream_without_its_own_policy_uses_the_default() {
         let policies = Policies::single(loaded(include_str!("../../../policies/default.yaml")));
-        assert!(policies.is_payment_tool("stripe", "pay"));
-        assert!(policies.is_payment_tool("anything", "pay"));
-        assert!(!policies.is_payment_tool("web", "fetch"));
+        assert_eq!(policies.classify("stripe", "pay"), ToolClass::Payment);
+        assert_eq!(policies.classify("anything", "pay"), ToolClass::Payment);
+        assert_eq!(policies.classify("web", "fetch"), ToolClass::NonPayment);
+        assert_eq!(
+            policies.classify("stripe", "transfer_funds"),
+            ToolClass::Unclassified
+        );
     }
 
     #[test]
@@ -737,13 +743,16 @@ rules:
             per_upstream: HashMap::from([("bank".to_owned(), loaded(BANK_POLICY))]),
         };
         // The bank policy knows `transfer` is a payment; the default does not.
-        assert!(policies.is_payment_tool("bank", "transfer"));
-        assert!(!policies.is_payment_tool("stripe", "transfer"));
+        assert_eq!(policies.classify("bank", "transfer"), ToolClass::Payment);
+        assert_eq!(
+            policies.classify("stripe", "transfer"),
+            ToolClass::Unclassified
+        );
         // And the default still governs the card upstream.
-        assert!(policies.is_payment_tool("stripe", "pay"));
+        assert_eq!(policies.classify("stripe", "pay"), ToolClass::Payment);
         // `pay` on the bank upstream is not a payment under the bank policy,
         // which lists only `transfer`. Each upstream is judged by its own.
-        assert!(!policies.is_payment_tool("bank", "pay"));
+        assert_eq!(policies.classify("bank", "pay"), ToolClass::Unclassified);
     }
 
     /// The reason policies are per upstream: one rail's unusable policy must
@@ -757,9 +766,13 @@ rules:
                 PolicyState::Missing("unreadable".to_owned()),
             )]),
         };
-        // The broken bank policy falls back to the fail-closed tool list, so
-        // payment-shaped tools there are still caught.
-        assert!(policies.is_payment_tool("bank", "transfer"));
+        // The broken bank policy still catches payment-shaped tools, so they
+        // are denied with evidence, and refuses everything else outright.
+        assert_eq!(policies.classify("bank", "transfer"), ToolClass::Payment);
+        assert_eq!(
+            policies.classify("bank", "get_transfer"),
+            ToolClass::Unclassified
+        );
         assert!(matches!(
             policies.for_upstream("bank"),
             PolicyState::Missing(_)
@@ -769,7 +782,10 @@ rules:
             policies.for_upstream("stripe"),
             PolicyState::Loaded(_)
         ));
-        assert!(policies.is_payment_tool("stripe", "pay"));
-        assert!(!policies.is_payment_tool("stripe", "fetch"));
+        assert_eq!(policies.classify("stripe", "pay"), ToolClass::Payment);
+        assert_eq!(
+            policies.classify("stripe", "list_payments"),
+            ToolClass::NonPayment
+        );
     }
 }

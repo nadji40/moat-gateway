@@ -46,7 +46,9 @@ payment is refused. This document specifies the record; the implementation is
     },
     "amount": { … }, "currency": { … }
   },
-  "rules": [                        // every rule evaluated, in policy order, then velocity
+  "rules": [                        // the mandate or user-request check, every rule in policy order, then velocity
+    { "id": "user-request", "passed": false, "on_fail": "step_up",
+      "message": "no approval, and nothing in this payment came from what the user said" },
     { "id": "payee-provenance", "field": "payee", "passed": false,
       "source": "ToolResult", "on_fail": "step_up",
       "message": "payee did not come from the user or the allowlist (…)" },

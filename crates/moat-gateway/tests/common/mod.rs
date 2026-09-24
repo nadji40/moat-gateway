@@ -115,6 +115,27 @@ pub fn write_config(name: &str, body: &str) -> PathBuf {
     path
 }
 
+/// A shipped policy with the fake server's `echo` declared as moving no
+/// money, written beside the test's config. `echo` stands in for a page
+/// fetch, and the shipped policies classify only tools real servers expose.
+/// The fixture's `transfer` stays unclassified, so it is refused.
+pub fn policy_for_fake(name: &str, shipped: &str) -> PathBuf {
+    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../policies")
+        .join(shipped);
+    let mut text = std::fs::read_to_string(&src).unwrap();
+    let at = text
+        .find("non_payment_tools:")
+        .expect("the policy lists non_payment_tools");
+    let eol = at + text[at..].find('\n').unwrap() + 1;
+    text.insert_str(eol, "  - { server: \"*\", tool: \"echo\" }\n");
+    let dir = std::env::temp_dir().join(format!("moat-test-{}-{}", name, std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("policy.yaml");
+    std::fs::write(&path, text).unwrap();
+    path
+}
+
 /// Render a path as a YAML single-quoted scalar, for interpolation into a
 /// config body.
 ///

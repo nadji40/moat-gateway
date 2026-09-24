@@ -85,9 +85,16 @@ async fn gateway_proxies_a_streamable_http_upstream() {
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
 
+    let policy = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../policies/default.yaml")
+        .canonicalize()
+        .unwrap();
     let cfg = write_config(
         "http-upstream",
-        &format!("upstreams:\n  - {{ name: web, transport: http, url: \"http://{addr}/mcp\" }}\n"),
+        &format!(
+            "upstreams:\n  - {{ name: web, transport: http, url: \"http://{addr}/mcp\" }}\npolicy: {}\nevidence: ./evidence.jsonl\n",
+            common::yaml_path(&policy)
+        ),
     );
     let mut gw = Peer::spawn(&gateway_path(), &["--config", cfg.to_str().unwrap()], &[]);
 

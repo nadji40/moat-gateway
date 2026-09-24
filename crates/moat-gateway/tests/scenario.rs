@@ -8,7 +8,9 @@ mod common;
 
 use std::time::Duration;
 
-use common::{fake_server_path, gateway_path, http, write_config, yaml_path, Peer};
+use common::{
+    fake_server_path, gateway_path, http, policy_for_fake, write_config, yaml_path, Peer,
+};
 use moat_core::verdict::code as moat_code;
 use moat_mcp::types::{method, PROTOCOL_VERSION_2025_11_25};
 use moat_mcp::{Message, Notification, Request};
@@ -64,10 +66,7 @@ async fn allow_step_up_resume_deny() {
     let fake = fake_server_path();
     let port = free_port();
     let api = format!("127.0.0.1:{port}");
-    let policy = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../policies/default.yaml")
-        .canonicalize()
-        .unwrap();
+    let policy = policy_for_fake("scenario-policy-1", "default.yaml");
     let cfg = write_config(
         "scenario",
         &format!(
@@ -276,10 +275,7 @@ async fn supplier_authorization_approval_outcome_and_duplicate() {
     let fake = fake_server_path();
     let port = free_port();
     let api = format!("127.0.0.1:{port}");
-    let policy = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../policies/supplier-invoice.yaml")
-        .canonicalize()
-        .unwrap();
+    let policy = policy_for_fake("scenario-policy-2", "supplier-invoice.yaml");
     let cfg = write_config(
         "supplier-workflow",
         &format!(
@@ -411,7 +407,7 @@ intent_api: {{ addr: "{api}" }}
 }
 
 #[tokio::test]
-async fn missing_policy_fails_closed_for_payments_and_open_otherwise() {
+async fn missing_policy_refuses_every_tool() {
     let fake = fake_server_path();
     let cfg = write_config(
         "nopolicy",
@@ -429,9 +425,14 @@ async fn missing_policy_fails_closed_for_payments_and_open_otherwise() {
             Some(json!({"name": "stripe__echo", "arguments": {"x": 1}})),
         ))
         .await;
-    assert!(
-        matches!(reply, Message::Response(_)),
-        "non-payment tool must pass: {reply:?}"
+    // With no policy nothing can be declared safe to forward.
+    let Message::Error(e) = reply else {
+        panic!("no tool may pass without a policy: {reply:?}");
+    };
+    assert_eq!(e.error.code, moat_code::DENY);
+    assert_eq!(
+        e.error.data.unwrap()["moat"]["reasons"][0],
+        "unclassified-tool"
     );
 
     let (_, reply) = gw.call(pay(2, "Monitoring Pro Inc", json!(1))).await;

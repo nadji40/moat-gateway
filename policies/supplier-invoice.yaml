@@ -4,6 +4,15 @@ payment_tools:
   - server: "stripe"
     tool: "pay"
 
+# Tools that move no money. A tool in neither list is refused and hidden
+# from the agent, so a server that grows a new way to pay cannot pay around
+# Moat.
+non_payment_tools:
+  - server: "stripe"
+    tool: "list_payments"
+  - server: "stripe"
+    tool: "inspect_accounts"
+
 fields:
   payee:    { args: ["payee"] }
   amount:   { args: ["amount"] }

@@ -1,11 +1,12 @@
-//! The gateway as a pure passthrough: one upstream, no policy, and a
-//! tools/call reply that reaches the client byte for byte.
+//! The gateway as a passthrough: one upstream, a policy that declares its
+//! read-only tool, and a tools/call reply that reaches the client byte for
+//! byte. A tool the policy does not classify is hidden and refused.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod common;
 
-use common::{fake_server_path, gateway_path, write_config, yaml_path, Peer};
+use common::{fake_server_path, gateway_path, policy_for_fake, write_config, yaml_path, Peer};
 use moat_mcp::types::{method, InitializeResult, ListToolsResult, PROTOCOL_VERSION_2025_11_25};
 use moat_mcp::{Message, Notification, Request};
 use serde_json::json;
@@ -21,6 +22,7 @@ fn init_params() -> serde_json::Value {
 #[tokio::test]
 async fn tools_call_reply_is_byte_identical() {
     let fake = fake_server_path();
+    let policy = policy_for_fake("passthrough-policy", "default.yaml");
     let cfg = write_config(
         "passthrough",
         &format!(
@@ -30,8 +32,11 @@ upstreams:
     transport: stdio
     command: [{}]
     env: {{ FAKE_MCP_PRETTY: "1" }}
+policy: {}
+evidence: ./evidence.jsonl
 "#,
-            yaml_path(&fake)
+            yaml_path(&fake),
+            yaml_path(&policy)
         ),
     );
 
@@ -77,7 +82,11 @@ upstreams:
     };
     let list: ListToolsResult = serde_json::from_value(r.result).unwrap();
     let names: Vec<&str> = list.tools.iter().map(|t| t.name.as_str()).collect();
-    assert_eq!(names, ["fake__echo", "fake__transfer", "fake__pay"]);
+    assert_eq!(
+        names,
+        ["fake__echo", "fake__pay"],
+        "the unclassified transfer is hidden"
+    );
     // By name rather than by position: the fixture gains tools over time
     // and what is being asserted is that this one's schema is untouched.
     let pay = list
@@ -102,6 +111,24 @@ upstreams:
     assert_eq!(
         raw, expected_raw,
         "gateway must relay the upstream reply byte for byte"
+    );
+
+    // A tool the policy does not classify is refused, not forwarded: a
+    // server that gains a way to move money cannot use it around Moat.
+    let (_, reply) = gw
+        .call(Request::new(
+            5,
+            method::TOOLS_CALL,
+            Some(json!({"name": "fake__transfer", "arguments": {"payee": "ProMon Billing Ltd", "amount": 480}})),
+        ))
+        .await;
+    let Message::Error(e) = reply else {
+        panic!("an unclassified tool must be refused: {reply:?}");
+    };
+    assert_eq!(e.error.code, moat_core::verdict::code::DENY);
+    assert_eq!(
+        e.error.data.unwrap()["moat"]["reasons"][0],
+        "unclassified-tool"
     );
 
     // Unknown namespace is a protocol error, not a crash.

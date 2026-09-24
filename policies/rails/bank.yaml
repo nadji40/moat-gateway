@@ -24,6 +24,15 @@ payment_tools:
   - server: "*"
     tool: "transfer"
 
+# Tools that move no money. A tool in neither list is refused and hidden
+# from the agent, so a server that grows a new way to pay cannot pay around
+# Moat.
+non_payment_tools:
+  - server: "bank"
+    tool: "get_transfer"
+  - server: "bank"
+    tool: "list_transfers"
+
 fields:
   payee:       { args: ["beneficiary_name"] }
   amount:      { args: ["amount"] }

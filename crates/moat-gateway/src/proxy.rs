@@ -13,6 +13,7 @@ use std::time::Duration;
 use anyhow::Result;
 use moat_core::money::Minor;
 use moat_core::outcome::OutcomeStatus;
+use moat_core::policy::ToolClass;
 use moat_core::rail::Rail;
 use moat_mcp::jsonrpc::code;
 use moat_mcp::stdio::{Frame, FrameReader, FrameWriter};
@@ -535,6 +536,12 @@ impl Gateway {
                             tracing::warn!(upstream = %u.name, "upstream has more tool pages; only the first is exposed");
                         }
                         for mut t in list.tools {
+                            if self.shared.policies.classify(&u.name, &t.name)
+                                == ToolClass::Unclassified
+                            {
+                                tracing::warn!(upstream = %u.name, tool = %t.name, "tool is in neither payment_tools nor non_payment_tools; hidden and refused");
+                                continue;
+                            }
                             t.name = format!("{}{}{}", u.name, self.separator, t.name);
                             tools.push(t);
                         }
@@ -631,8 +638,26 @@ impl Gateway {
         // Payment tools go through policy before anything is forwarded. Both
         // which policy applies and which rail the money leaves on come from
         // the upstream, never from the call.
-        let is_payment = self.shared.policies.is_payment_tool(&upstream.name, &tool);
-        let authorization = if is_payment {
+        let class = self.shared.policies.classify(&upstream.name, &tool);
+        if class == ToolClass::Unclassified {
+            tracing::warn!(upstream = %upstream.name, %tool, "refused a tool the policy does not classify");
+            self.emit_error(
+                req.id,
+                moat_core::verdict::code::DENY,
+                format!(
+                    "Moat refused {}{}{tool}: the policy lists it neither as a payment nor as moving no money",
+                    upstream.name, self.separator
+                ),
+                Some(json!({"moat": {
+                    "verdict": "deny",
+                    "reasons": ["unclassified-tool"],
+                    "evidence_id": null,
+                }})),
+            )
+            .await;
+            return;
+        }
+        let authorization = if class == ToolClass::Payment {
             let args = forwarded.arguments.clone().unwrap_or_default();
             match self
                 .authorize(&req.id, &upstream.name, &tool, upstream.rail, args)

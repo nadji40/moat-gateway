@@ -430,12 +430,16 @@ payload, resume token included — the `error.data` loss in ADR 0006 is the
 Agents SDK's tool-error wrapping, not the MCP transport.
 
 The gateway presents one MCP server to the client, aggregating every upstream
-tool under a namespaced name (`stripe__pay`). Everything it does not explicitly
-intercept is forwarded unchanged. If a policy file is missing or malformed it
-fails **closed for payment tools and open for everything else**, and says so
-loudly in the log: calls to tools named `pay`, `create_payment`, `charge`,
-`transfer`, `send_money`, `purchase`, `checkout` or `refund` are denied with an
-evidence record saying why, and every other tool passes through.
+tool under a namespaced name (`stripe__pay`). The policy classifies every tool:
+`payment_tools` are evaluated before anything is forwarded, `non_payment_tools`
+move no money and are forwarded unchanged, and a tool in neither list is hidden
+from `tools/list` and refused as `unclassified-tool`. A server that gains a new
+way to move money cannot be used around Moat before someone classifies it.
+Methods other than `tools/call` are forwarded unchanged. If a policy file is
+missing or malformed the gateway fails **closed**, and says so loudly in the
+log: calls to tools named `pay`, `create_payment`, `charge`, `transfer`,
+`send_money`, `purchase`, `checkout` or `refund` are denied with an evidence
+record saying why, and every other tool is refused.
 
 When a payment tool is called, the verdict comes back as a `tools/call`
 result (allow, the upstream's own reply) or as a JSON-RPC error:
@@ -476,10 +480,14 @@ POST /v1/session/{id}/headless  { "headless": true }
 GET  /v1/session/{id}/evidence
 ```
 
-**Without at least one registered intent, every payee resolves to `Unknown` or
-`ToolResult`, so every payment will step up or be denied.** That is the correct
-default, not a misconfiguration: a Moat that has never been told what the human
-wanted has no basis for believing any payee came from them.
+**Without at least one registered intent, nothing in a payment can have come
+from the user, so every payment will step up or be denied.** A payee on the
+allowlist is trusted as a recipient, not as a reason to pay: unless an approval
+is presented, the payee, the amount or the destination must trace to what the
+user said, or the payment steps up as `user-request` (the policy's
+`unrequested_payment`, `step_up` by default). That is the correct default, not a
+misconfiguration: a Moat that has never been told what the human wanted has no
+basis for believing they asked for a payment.
 
 - `intent` registers the human's text for the session; call it once per user
   turn. Returns the turn number.
