@@ -21,6 +21,8 @@ payment_tools:
 # from the agent, so a server that grows a new way to pay cannot pay around
 # Moat.
 non_payment_tools:
+  - server: "web"
+    tool: "fetch"
   - server: "wallet"
     tool: "get_transaction"
   - server: "wallet"
