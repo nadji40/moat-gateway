@@ -226,10 +226,11 @@ flowchart LR
     class user,core trusted
 ```
 
-The user's intent and authorization arrive on a separate loopback API, not
-through the agent — an agent that could mint its own authorization would not be
-a control. Payment calls are held until policy decides; everything else passes
-through untouched.
+The user's intent and authorization arrive on a separate API, not through the
+agent — an agent that could mint its own authorization would not be a control.
+Payment calls are held until policy decides; tools the policy declares as moving
+no money pass through untouched; a tool the policy names neither way is hidden
+and refused.
 
 ### What happens on a payment call
 
@@ -256,7 +257,7 @@ sequenceDiagram
     A->>M: pay Qassim Trading Est, 480 USD
     Note over M: payee resolves to ToolResult,<br/>policy requires User or Allowlist
     M--xP: never forwarded
-    M-->>A: deny, with an evidence id
+    M-->>A: step_up: held for a person, with an evidence id
 ```
 
 A verdict is `allow`, `step_up` or `deny`, and each one produces a signed,
@@ -264,6 +265,221 @@ hash-chained evidence record that can be verified offline with `moat-gateway
 verify`. `step_up` is the common case and the reason the control survives
 contact with users: a product that only blocks gets removed in a week, one that
 asks gets kept.
+
+### The whole gateway
+
+Everything a deployment runs, who may reach which part, and where each piece of
+state lives. Four kinds of caller hold four kinds of key, and no key opens
+another's door: the agent can pay but never say what the user asked for, the
+customer's application can say what the user asked for but never approve a held
+payment, and neither can manage keys.
+
+**The agent's path.** Every call the agent makes goes through the same
+checks. Only tools the policy names as moving no money are forwarded as they
+are; everything they return is remembered with where it came from, which is
+what a payment is later judged against.
+
+```mermaid
+flowchart TB
+    agent["AI agent<br/>agent key, scoped to rails"]
+
+    subgraph edge["Listener: MCP over stdio or Streamable HTTP"]
+        direction TB
+        auth["Bearer key<br/>role agent, tenant active"]
+        origin["Origin check<br/>no other website can drive it"]
+        rail["Rail scope<br/>the key holds the rail of the tool's server"]
+        auth --> origin --> rail
+    end
+    agent -->|"MCP JSON-RPC"| auth
+
+    kind{"tools/list<br/>or tools/call?"}
+    rail --> kind
+    list["Fanned out to every server<br/>names namespaced: stripe__pay<br/>unclassified tools hidden"]
+    kind -->|"tools/list"| list
+
+    classify{"What does the policy<br/>say this tool is?"}
+    kind -->|"tools/call"| classify
+    refuse["Refused: unclassified-tool<br/>a new way to pay cannot go around Moat"]
+    classify -->|"in neither list"| refuse
+
+    content["Content server<br/>web, inbox, files: untrusted"]
+    classify -->|"non_payment_tools"| content
+    observe["Result relayed byte for byte<br/>every value in it stored with the<br/>server, tool and call it came from"]
+    content --> observe
+    session[("Session state")]
+    observe --> session
+
+    evaluate["Evaluate the payment<br/>the pipeline below"]
+    classify -->|"payment_tools"| evaluate
+    session --> evaluate
+    evidence[("Signed evidence<br/>Ed25519, hash-chained")]
+    evaluate --> evidence
+
+    payserver["Payment server<br/>card, bank, EVM or Solana,<br/>rail declared in config"]
+    evaluate -->|"allow: forwarded"| payserver
+    payserver -->|"provider outcome"| session
+    back["step_up or deny<br/>returned to the agent with<br/>reasons and an evidence id"]
+    evaluate -->|"step_up or deny"| back
+
+    classDef untrusted stroke:#e5484d,stroke-width:2px
+    classDef money stroke:#f5a524,stroke-width:2px
+    class agent,content untrusted
+    class evaluate,payserver money
+```
+
+**The trusted side, and where state lives.** What the user said and what a
+person decided come in on the intent API, with keys the agent never holds.
+
+```mermaid
+flowchart TB
+    subgraph keys["Keys the agent never holds"]
+        app["Customer application<br/>approver key<br/>intent:write, authorizations:write"]
+        person["Person approving holds<br/>approver key<br/>holds:release, evidence:read"]
+        admin["Admin or dashboard<br/>admin key<br/>keys, usage, verdicts"]
+    end
+
+    intent["POST intent<br/>what the user typed"]
+    authz["POST authorizations<br/>what a person signed off: payee,<br/>account, amount, tolerance, currency, invoice"]
+    resume["POST resume<br/>a person's answer to a hold"]
+    evread["GET evidence, outcomes"]
+    control["Control plane<br/>issue and revoke keys, usage, verdict feed"]
+
+    app --> intent
+    app --> authz
+    person --> resume
+    person --> evread
+    admin --> control
+
+    session[("Session state<br/>intents, observed values, authorizations,<br/>approvals, event log")]
+    evidence[("Signed evidence<br/>JSONL, hash-chained")]
+    intent --> session
+    authz --> session
+    resume --> session
+    evread --> evidence
+
+    db[("PostgreSQL<br/>tenants, api_keys, sessions, evidence_records,<br/>payment_authorizations, payment_outcomes, resume_tokens")]
+    session --> db
+    evidence --> db
+    control --> db
+
+    classDef trustedside stroke:#30a46c,stroke-width:2px
+    class app,person,intent,authz,resume trustedside
+```
+
+The two things the agent cannot reach are the point of the design. What the
+user said and what a person approved come in on the intent API with an approver
+key the agent never holds, and whether a server moves money on a card, a bank
+or a chain is declared in the gateway config, not in the call. A compromised
+agent can emit any payment it likes; it cannot make that payment look asked for.
+
+### How one payment is decided
+
+Every payment call runs the same pipeline, in this order. Each check records an
+outcome whether it passes or not, so the evidence says what was looked at, not
+only what failed. The verdict is the most severe outcome: `deny` over `step_up`
+over `allow`.
+
+```mermaid
+flowchart TB
+    incoming(["Agent calls a payment tool<br/>stripe__pay: payee, amount, currency, ..."])
+    map["Map arguments to fields<br/>payee, amount, currency, destination"]
+    resolve["Resolve where each value came from, in trust order<br/>1. User: in what the user typed<br/>2. Allowlist: a payee the policy trusts<br/>3. ToolResult: seen in something the agent read<br/>4. Unknown: nowhere"]
+    incoming --> map --> resolve
+
+    hasauth{"authorization_id<br/>on the call?"}
+    resolve --> hasauth
+
+    structured["Structured authorization checks<br/>exists, active, not expired<br/>payee and recipient account match what was approved<br/>amount within approved amount plus tolerance<br/>currency, invoice, duplicates, aggregate, quarantine"]
+    hasauth -->|"yes"| structured
+
+    registered{"Is any authorization<br/>registered in this session?"}
+    hasauth -->|"no"| registered
+    required["deny: authorization-required<br/>once one exists, every payment must cite it"]
+    registered -->|"yes"| required
+
+    subgraph noapproval["Payment with no approval"]
+        direction TB
+        userreq["user-request<br/>payee, amount or destination came from the user,<br/>or a person approved this exact payment<br/>otherwise step_up"]
+        currency["intent-currency<br/>if the user wrote a currency code,<br/>the payment must be in it, otherwise step_up"]
+        total["session-total<br/>payments without approval, summed per currency,<br/>stay under max_amount_per_session, otherwise deny"]
+        userreq --> currency --> total
+    end
+    registered -->|"no"| userreq
+
+    rules["Policy rules, in the order the policy lists them<br/>payee-provenance: User or Allowlist, else step_up<br/>amount cap: 500, else deny<br/>amount-provenance: User, Allowlist or ToolResult, else step_up"]
+    structured --> rules
+    required --> rules
+    total --> rules
+
+    velocity["Velocity<br/>calls per session and per minute, else deny"]
+    rules --> velocity
+
+    worst{"Most severe outcome"}
+    velocity --> worst
+
+    headless{"Host said<br/>no person is present?"}
+    worst -->|"step_up"| headless
+    headless -->|"yes"| nohuman["no_human_available<br/>step_up becomes deny"]
+
+    sign["Write the signed evidence record<br/>if it cannot be written, the payment is refused"]
+    worst -->|"allow or deny"| sign
+    headless -->|"no"| sign
+    nohuman --> sign
+
+    allow(["allow<br/>forwarded to the payment server<br/>outcome recorded against the authorization"])
+    stepup(["step_up, JSON-RPC -31050<br/>held, with a prompt and a single-use resume token"])
+    deny(["deny, JSON-RPC -31051<br/>refused, with the reasons"])
+    sign --> allow
+    sign --> stepup
+    sign --> deny
+
+    classDef ok stroke:#30a46c,stroke-width:2px
+    classDef hold stroke:#f5a524,stroke-width:2px
+    classDef no stroke:#e5484d,stroke-width:2px
+    class allow ok
+    class stepup hold
+    class deny,required no
+```
+
+A value is matched by value, not by asking the model: an injection can make the
+agent emit "ProMon Billing Ltd", but it cannot make that string appear in what
+the user typed, because the user's words arrived on a different channel before
+the page was read ([ADR 0001](docs/adr/0001-provenance-by-value-matching.md)).
+Names match after trimming, case-folding and collapsing spaces, and nothing
+more: a provider pays the exact configured name, so a trailing full stop or a
+different letter can be a look-alike merchant.
+
+### What a person's approval unlocks
+
+A held payment carries a resume token. The person's answer arrives on the
+trusted side, never from the agent, and a yes covers the exact payment the
+person was shown, once.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Agent
+    participant M as Moat
+    participant H as Person, approval screen
+    participant P as Payment server
+
+    A->>M: pay ProMon Billing Ltd 480 USD
+    Note over M: payee came from a page:<br/>payee-provenance fails
+    M-->>A: step_up, resume token rt_...
+    M-->>H: shows payee, amount, currency and why
+    H->>M: resume: approved, with the token
+    Note over M: this exact proposal,<br/>server, tool and arguments,<br/>is approved once
+    A->>M: the same call again
+    M->>P: allow: forwarded
+    Note over M: the approval is spent<br/>evidence says: payee from a page,<br/>approved by a person
+    A->>M: the same call once more
+    M-->>A: step_up again
+    A->>M: ProMon Billing Ltd, a different amount
+    M-->>A: step_up: never covered by that approval
+```
+
+Approving does not register the approved values as things the user said, so a
+yes to one payment never opens that payee for the rest of the session.
 
 ## Status
 
