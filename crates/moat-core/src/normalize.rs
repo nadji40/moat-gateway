@@ -39,6 +39,13 @@ impl Normalized {
 }
 
 /// Trim, case-fold, collapse runs of whitespace to one space.
+///
+/// Nothing else is folded. A provider pays the merchant whose configured
+/// name is exactly the one it was given, so "Monitoring Pro Inc." and an
+/// Arabic name written with a tatweel can each be a different, look-alike
+/// merchant; folding them here would hand the look-alike the real one's
+/// provenance. Spelling variation is solved by approving an account, not by
+/// matching names more loosely.
 pub fn normalize_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut pending_space = false;
@@ -58,20 +65,59 @@ pub fn normalize_text(s: &str) -> String {
     out
 }
 
+/// Arabic-Indic and Persian digits as ASCII digits, and the Arabic decimal
+/// and thousands marks as `.` and `,`. A digit is a digit in any script;
+/// everything else passes through for the caller to judge.
+pub fn ascii_digits(s: &str) -> String {
+    s.chars()
+        .map(|ch| match ch {
+            '\u{0660}'..='\u{0669}' => char::from(b'0' + (ch as u32 - 0x0660) as u8),
+            '\u{06F0}'..='\u{06F9}' => char::from(b'0' + (ch as u32 - 0x06F0) as u8),
+            '\u{066B}' => '.',
+            '\u{066C}' => ',',
+            other => other,
+        })
+        .collect()
+}
+
+/// An integer part with its thousands separators removed, or `None` when a
+/// comma is anything but a separator between groups of three. "4,80" is not
+/// 480: read that way, a payment written in a comma-decimal locale would be
+/// judged at a hundred times what the provider pays.
+fn ungroup(int_part: &str) -> Option<String> {
+    if !int_part.contains(',') {
+        return Some(int_part.to_owned());
+    }
+    let mut groups = int_part.split(',');
+    let first = groups.next()?;
+    if first.is_empty() || first.len() > 3 {
+        return None;
+    }
+    let mut out = first.to_owned();
+    for group in groups {
+        if group.len() != 3 {
+            return None;
+        }
+        out.push_str(group);
+    }
+    Some(out)
+}
+
 /// Currency markers stripped before numeric parsing.
 const CURRENCY_CHARS: &[char] = &['$', '€', '£', '¥', '₹', '₩', '₽'];
 
 /// Parse a money-like string into a canonical numeric string, or `None`.
 ///
 /// Accepts an optional leading sign, currency symbols anywhere, thousands
-/// separators (`,`), a decimal point, and surrounding whitespace. Rejects
-/// anything with other characters: this is a number parser, not a search.
-/// The canonical form has no thousands separators, no trailing zeros and no
-/// exponent for the magnitudes money uses.
+/// separators (`,` between groups of three), a decimal point, digits in
+/// Arabic-Indic script, and surrounding whitespace. Rejects anything with
+/// other characters: this is a number parser, not a search. The canonical
+/// form has no thousands separators, no trailing zeros and no exponent for
+/// the magnitudes money uses.
 pub fn normalize_number(s: &str) -> Option<String> {
-    let cleaned: String = s
+    let cleaned: String = ascii_digits(s)
         .chars()
-        .filter(|c| !c.is_whitespace() && !CURRENCY_CHARS.contains(c) && *c != ',')
+        .filter(|c| !c.is_whitespace() && !CURRENCY_CHARS.contains(c))
         .collect();
     if cleaned.is_empty() {
         return None;
@@ -80,16 +126,25 @@ pub fn normalize_number(s: &str) -> Option<String> {
         Some(rest) => (true, rest),
         None => (false, cleaned.strip_prefix('+').unwrap_or(&cleaned)),
     };
-    if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit() || c == '.') {
+    if digits.is_empty()
+        || !digits
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == ',')
+    {
         return None;
     }
     if digits.matches('.').count() > 1 || !digits.chars().any(|c| c.is_ascii_digit()) {
         return None;
     }
     let (int_part, frac_part) = match digits.split_once('.') {
-        Some((i, f)) => (i, f.trim_end_matches('0')),
+        Some((i, f)) => (i, f),
         None => (digits, ""),
     };
+    if frac_part.contains(',') {
+        return None;
+    }
+    let frac_part = frac_part.trim_end_matches('0');
+    let int_part = ungroup(int_part)?;
     let int_part = int_part.trim_start_matches('0');
     let int_part = if int_part.is_empty() { "0" } else { int_part };
     let mut out = String::new();
@@ -110,7 +165,7 @@ pub fn normalize_number(s: &str) -> Option<String> {
 /// result ("Pay ProMon Billing Ltd $480 today") be attributed to that result.
 pub fn numbers_in_text(s: &str) -> Vec<String> {
     let mut out = Vec::new();
-    let chars: Vec<char> = s.chars().collect();
+    let chars: Vec<char> = ascii_digits(s).chars().collect();
     let mut i = 0;
     while i < chars.len() {
         if chars[i].is_ascii_digit() {
@@ -157,6 +212,33 @@ mod tests {
         }
     }
 
+    /// A provider pays the exact configured name, so each of these can be a
+    /// separately registered look-alike merchant and must stay a different
+    /// name. The arena's spoof-lookalike-name attack is the first of them.
+    #[test]
+    fn look_alike_names_stay_different() {
+        let pairs = [
+            (
+                "Monitoring Pro Inc.",
+                "Monitoring Pro Inc",
+                "trailing full stop",
+            ),
+            ("Al Noor L.L.C.", "Al Noor LLC", "dotted legal form"),
+            ("عسـير", "عسير", "tatweel"),
+            ("أحمد", "احمد", "alef with hamza"),
+            ("علی", "علي", "Persian yeh"),
+            ("کمال", "كمال", "Persian keheh"),
+            (
+                "M\u{043E}nitoring Pro Inc",
+                "Monitoring Pro Inc",
+                "Cyrillic o",
+            ),
+        ];
+        for (a, b, what) in pairs {
+            assert_ne!(normalize_text(a), normalize_text(b), "{what}");
+        }
+    }
+
     #[test]
     fn number_cases() {
         let cases = [
@@ -180,6 +262,18 @@ mod tests {
             ("1.2.3", None),
             ("1e3", None),
             ("ProMon Billing Ltd", None),
+            ("٤٫٨٠", Some("4.8")),
+            ("٤.٨٠", Some("4.8")),
+            ("4٫80", Some("4.8")),
+            ("۴.۸۰", Some("4.8")),
+            ("١٬٢٥٠", Some("1250")),
+            ("12,345,678", Some("12345678")),
+            ("4,80", None),
+            ("4.800,00", None),
+            ("1,2,3", None),
+            ("12,34,567", None),
+            ("1234,567", None),
+            (",5", None),
         ];
         for (input, want) in cases {
             assert_eq!(normalize_number(input).as_deref(), want, "input {input:?}");
@@ -194,6 +288,8 @@ mod tests {
             ("no numbers here", vec![]),
             ("v2 costs 19.99.", vec!["2", "19.99"]),
             ("ids 007 and 42", vec!["7", "42"]),
+            ("المبلغ ٤٫٨٠ ريال", vec!["4.8"]),
+            ("items 3,4 and 5", vec!["5"]),
         ];
         for (input, want) in cases {
             assert_eq!(numbers_in_text(input), want, "input {input:?}");

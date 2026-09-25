@@ -485,7 +485,9 @@ from the user, so every payment will step up or be denied.** A payee on the
 allowlist is trusted as a recipient, not as a reason to pay: unless an approval
 is presented, the payee, the amount or the destination must trace to what the
 user said, or the payment steps up as `user-request` (the policy's
-`unrequested_payment`, `step_up` by default). That is the correct default, not a
+`unrequested_payment`, `step_up` by default). If the user wrote a currency
+code, a payment without an approval must be in it, or it steps up as
+`intent-currency`. That is the correct default, not a
 misconfiguration: a Moat that has never been told what the human wanted has no
 basis for believing they asked for a payment.
 

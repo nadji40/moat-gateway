@@ -479,6 +479,14 @@ pub fn evaluate_with(
             },
         });
     }
+    if !has_authorization_id && !structured_authorization_required {
+        if let Some(outcome) = intent_currency(policy, session, &mapped) {
+            if !outcome.passed {
+                decision = decision.max(outcome.on_fail);
+            }
+            reasons.push(outcome);
+        }
+    }
 
     for rule in &policy.rules {
         // Validated at load; an unparseable `when` cannot reach here.
@@ -542,6 +550,48 @@ pub fn evaluate_with(
         unix_ms: now_unix_ms,
         rail: ctx.rail,
     }
+}
+
+/// Whether a payment with no approval is in a currency the user named.
+///
+/// Names and amounts are traced to what the user said; a currency is three
+/// letters, too short to trace, and without this "4.80 AED" could leave as
+/// 4.80 KWD at a dozen times the value. `None` when the check has nothing to
+/// go on: the policy maps no currency, or the user named none.
+fn intent_currency(
+    policy: &Policy,
+    session: &Session,
+    mapped: &BTreeMap<String, (String, &Value)>,
+) -> Option<RuleOutcome> {
+    if !policy.fields.contains_key("currency") {
+        return None;
+    }
+    let named: std::collections::BTreeSet<String> = session
+        .intents()
+        .iter()
+        .flat_map(|intent| crate::money::currencies_named_in(&intent.text))
+        .collect();
+    if named.is_empty() {
+        return None;
+    }
+    let paid = mapped
+        .get("currency")
+        .and_then(|(_, value)| value.as_str())
+        .map(|code| code.trim().to_ascii_uppercase());
+    let passed = paid.as_ref().is_some_and(|code| named.contains(code));
+    let listed = named.into_iter().collect::<Vec<_>>().join(", ");
+    Some(RuleOutcome {
+        id: "intent-currency".to_owned(),
+        field: Some("currency".to_owned()),
+        passed,
+        source: None,
+        on_fail: Decision::StepUp,
+        message: match (passed, paid) {
+            (true, Some(code)) => format!("ok: {code} is a currency the user named"),
+            (_, Some(code)) => format!("the user named {listed}; this payment is in {code}"),
+            (_, None) => format!("the user named {listed}; this payment names no currency"),
+        },
+    })
 }
 
 /// Stable identity of a payment proposal. JSON-RPC ids are deliberately not
@@ -1524,6 +1574,82 @@ mod tests {
             "the arm keeps modelling a bare allowlist"
         );
         assert!(!e.verdict.reasons.iter().any(|r| r.id == "user-request"));
+    }
+
+    /// Meriem's A-024 family: the user said AED, the agent paid in SAR, and
+    /// nothing was approved.
+    #[test]
+    fn a_payment_in_a_currency_the_user_did_not_name_is_held() {
+        let mut s = Session::new("s");
+        s.register_intent("Pay the Monitoring Pro Inc invoice INV-4471 for 4.80 AED.");
+        let pay = |currency: &str| {
+            evaluate(
+                &policy(),
+                &s,
+                call(json!({"payee": "Monitoring Pro Inc", "amount": 4.80, "currency": currency})),
+                1_000_000,
+            )
+        };
+
+        let swapped = pay("SAR");
+        assert_eq!(swapped.verdict.decision, Decision::StepUp);
+        let failed: Vec<&str> = swapped.verdict.failures().map(|r| r.id.as_str()).collect();
+        assert_eq!(failed, vec!["intent-currency"]);
+
+        for same in ["AED", "aed"] {
+            let e = pay(same);
+            assert_eq!(e.verdict.decision, Decision::Allow, "{same}");
+            assert!(e
+                .verdict
+                .reasons
+                .iter()
+                .any(|r| r.id == "intent-currency" && r.passed));
+        }
+
+        let mut vague = Session::new("s");
+        vague.register_intent("Pay Monitoring Pro Inc 4.80 via the CEO's card");
+        let e = evaluate(
+            &policy(),
+            &vague,
+            call(json!({"payee": "Monitoring Pro Inc", "amount": 4.80, "currency": "SAR"})),
+            1_000_000,
+        );
+        assert!(
+            !e.verdict.reasons.iter().any(|r| r.id == "intent-currency"),
+            "no currency named, nothing to compare"
+        );
+    }
+
+    /// Meriem's M-003 and tatweel rows look like false rejects, but the
+    /// provider pays the exact configured name: "Monitoring Pro Inc." or the
+    /// Arabic name with a tatweel can be a look-alike merchant. Refusing them
+    /// is the control working.
+    #[test]
+    fn a_look_alike_spelling_of_an_approved_payee_is_refused() {
+        let mut session = authorized_session(20_000);
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-ar".into(),
+                payee: "مؤسسة عسير للحلول السحابية".into(),
+                invoice_id: "INV-200".into(),
+                ..session.payment_authorization("auth-1").unwrap().clone()
+            })
+            .unwrap();
+        for (auth, invoice, payee) in [
+            ("auth-1", "INV-100", "Monitoring Pro Inc."),
+            ("auth-ar", "INV-200", "مؤسسة عسـير للحلول السحابية"),
+        ] {
+            let e = evaluate(
+                &policy(),
+                &session,
+                call(json!({"authorization_id": auth, "invoice_id": invoice,
+                            "payee": payee, "amount": 100.0, "currency": "USD"})),
+                11_000,
+            );
+            assert_eq!(e.verdict.decision, Decision::Deny, "{payee}");
+            let failed: Vec<&str> = e.verdict.failures().map(|r| r.id.as_str()).collect();
+            assert_eq!(failed, vec!["authorization-payee"], "{payee}");
+        }
     }
 
     #[test]

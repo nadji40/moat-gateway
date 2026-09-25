@@ -93,6 +93,38 @@ const TOKENS: &[(&str, u8)] = &[
     ("BTC", 8),
 ];
 
+/// Active ISO 4217 codes. [`AssetRegistry::lookup`] accepts any three
+/// letters as a currency so an unlisted one keeps working; reading a currency
+/// out of what a user typed cannot, or "LLC" and "INV" would be currencies.
+const ISO_4217: &[&str] = &[
+    "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD", "AWG", "AZN", "BAM", "BBD", "BDT",
+    "BGN", "BHD", "BIF", "BMD", "BND", "BOB", "BRL", "BSD", "BTN", "BWP", "BYN", "BZD", "CAD",
+    "CDF", "CHF", "CLP", "CNY", "COP", "CRC", "CUP", "CVE", "CZK", "DJF", "DKK", "DOP", "DZD",
+    "EGP", "ERN", "ETB", "EUR", "FJD", "FKP", "GBP", "GEL", "GHS", "GIP", "GMD", "GNF", "GTQ",
+    "GYD", "HKD", "HNL", "HTG", "HUF", "IDR", "ILS", "INR", "IQD", "IRR", "ISK", "JMD", "JOD",
+    "JPY", "KES", "KGS", "KHR", "KMF", "KPW", "KRW", "KWD", "KYD", "KZT", "LAK", "LBP", "LKR",
+    "LRD", "LSL", "LYD", "MAD", "MDL", "MGA", "MKD", "MMK", "MNT", "MOP", "MRU", "MUR", "MVR",
+    "MWK", "MXN", "MYR", "MZN", "NAD", "NGN", "NIO", "NOK", "NPR", "NZD", "OMR", "PAB", "PEN",
+    "PGK", "PHP", "PKR", "PLN", "PYG", "QAR", "RON", "RSD", "RUB", "RWF", "SAR", "SBD", "SCR",
+    "SDG", "SEK", "SGD", "SHP", "SLE", "SOS", "SRD", "SSP", "STN", "SVC", "SYP", "SZL", "THB",
+    "TJS", "TMT", "TND", "TOP", "TRY", "TTD", "TWD", "TZS", "UAH", "UGX", "USD", "UYU", "UZS",
+    "VES", "VND", "VUV", "WST", "XAF", "XCD", "XOF", "XPF", "YER", "ZAR", "ZMW", "ZWL",
+];
+
+/// The currency and token codes written in capitals in `text`.
+///
+/// Only capitals count: "pay all invoices" does not name the Albanian lek,
+/// while "4.80 SAR" names the riyal.
+pub fn currencies_named_in(text: &str) -> std::collections::BTreeSet<String> {
+    text.split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|word| {
+            (3..=5).contains(&word.len()) && word.bytes().all(|b| b.is_ascii_uppercase())
+        })
+        .filter(|word| ISO_4217.contains(word) || TOKENS.iter().any(|(code, _)| code == word))
+        .map(str::to_owned)
+        .collect()
+}
+
 /// The assets a deployment can name, built in plus whatever its policy adds.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AssetRegistry {
@@ -278,6 +310,7 @@ pub fn parse_major(value: &Value, asset: &Asset, allow_zero: bool) -> Result<Min
 
 /// [`parse_major`] for an amount already in hand as text.
 pub fn parse_major_str(text: &str, asset: &Asset, allow_zero: bool) -> Result<Minor, AmountError> {
+    let text = crate::normalize::ascii_digits(text);
     let text = text.trim();
     if text.starts_with('-') {
         return Err(AmountError::NotPositive);
@@ -328,6 +361,30 @@ pub fn format_major(minor: Minor, asset: &Asset) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn currencies_are_read_only_from_real_codes_in_capitals() {
+        let named = |t: &str| currencies_named_in(t).into_iter().collect::<Vec<_>>();
+        assert_eq!(
+            named("Pay the Aseer Cloud Co invoice INV-4471 for 4.80 SAR."),
+            ["SAR"]
+        );
+        assert_eq!(
+            named("Send 5 USDC, or 4.80 EUR if that fails"),
+            ["EUR", "USDC"]
+        );
+        assert!(named("Pay Al Noor LLC 4.80 via the CEO").is_empty());
+        assert!(named("pay all invoices, 4.80 sar").is_empty());
+        assert!(named("Pay Monitoring Pro Inc $480").is_empty());
+    }
+
+    #[test]
+    fn arabic_indic_digits_are_digits() {
+        let sar = Asset::fiat("SAR", 2);
+        assert_eq!(parse_major_str("٤٫٨٠", &sar, false), Ok(Minor(480)));
+        assert_eq!(parse_major_str("٤.٨٠", &sar, false), Ok(Minor(480)));
+        assert_eq!(parse_major_str("4٫80", &sar, false), Ok(Minor(480)));
+    }
 
     fn usd() -> Asset {
         AssetRegistry::new().lookup("USD", None).unwrap()
