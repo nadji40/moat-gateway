@@ -744,24 +744,6 @@ fn structured_authorization_checks(
         },
     ));
 
-    let payee = mapped
-        .get("payee")
-        .and_then(|(_, value)| value.as_str())
-        .unwrap_or("");
-    outcomes.push(structured_outcome(
-        "authorization-payee",
-        crate::normalize::normalize_text(payee)
-            == crate::normalize::normalize_text(&authorization.payee),
-        Decision::Deny,
-        if crate::normalize::normalize_text(payee)
-            == crate::normalize::normalize_text(&authorization.payee)
-        {
-            "ok: recipient matches authorization".to_owned()
-        } else {
-            "recipient does not match authorization".to_owned()
-        },
-    ));
-
     // Where the money goes is whichever argument the policy declared as the
     // destination field, because that is the argument the rail's provider
     // actually credits: `recipient_account_id` on a card, `beneficiary_iban`
@@ -783,6 +765,38 @@ fn structured_authorization_checks(
         .is_none_or(|expected| {
             Destination::parse(recipient_account_id).same_as(&Destination::parse(expected))
         });
+
+    // The name the provider is given must be the approved name. When the
+    // approval also pins the account and the payment carries that account,
+    // the money can only reach it, so the name may differ in how it is
+    // spelled: a tatweel, an alef, a full stop, "Co" for "Company". Without a
+    // pinned account a spelling is an identity, and a look-alike one is refused.
+    let payee = mapped
+        .get("payee")
+        .and_then(|(_, value)| value.as_str())
+        .unwrap_or("");
+    let exact_name = crate::normalize::normalize_text(payee)
+        == crate::normalize::normalize_text(&authorization.payee);
+    let spelled_name = authorization.recipient_account_id.is_some()
+        && account_matches
+        && crate::normalize::spelling_key(payee)
+            == crate::normalize::spelling_key(&authorization.payee);
+    outcomes.push(structured_outcome(
+        "authorization-payee",
+        exact_name || spelled_name,
+        Decision::Deny,
+        if exact_name {
+            "ok: recipient matches authorization".to_owned()
+        } else if spelled_name {
+            format!(
+                "ok: the approved account matches; {payee:?} is a spelling of {:?}",
+                authorization.payee
+            )
+        } else {
+            "recipient does not match authorization".to_owned()
+        },
+    ));
+
     outcomes.push(structured_outcome(
         "authorization-recipient-account",
         account_matches,
@@ -1749,6 +1763,57 @@ mod tests {
             different.verdict.decision,
             Decision::StepUp,
             "it never covered this one"
+        );
+    }
+
+    /// Meriem's Gulf false rejects, where they can safely be fixed: an
+    /// approval that pins the account accepts the payee's other spellings,
+    /// and only when the payment carries that account.
+    #[test]
+    fn an_approved_account_lets_the_name_be_spelled_differently() {
+        let mut session = authorized_session(20_000);
+        let base = session.payment_authorization("auth-1").unwrap().clone();
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-acct".into(),
+                payee: "مؤسسة عسير للحلول السحابية".into(),
+                recipient_account_id: Some("acct_aseer".into()),
+                invoice_id: "INV-300".into(),
+                ..base
+            })
+            .unwrap();
+        let failures = |payee: &str, account: &str| {
+            let e = evaluate(
+                &policy(),
+                &session,
+                call(
+                    json!({"authorization_id": "auth-acct", "invoice_id": "INV-300",
+                            "payee": payee, "recipient_account_id": account,
+                            "amount": 100.0, "currency": "USD"}),
+                ),
+                11_000,
+            );
+            e.verdict
+                .failures()
+                .map(|r| r.id.clone())
+                .collect::<Vec<_>>()
+        };
+        for spelling in [
+            "مؤسسة عسـير للحلول السحابية",
+            "مؤسسه عسير للحلول السحابيه",
+            "مُؤَسَّسَة عسير للحلول السحابية",
+        ] {
+            assert!(failures(spelling, "acct_aseer").is_empty(), "{spelling}");
+        }
+        let elsewhere = failures("مؤسسة عسـير للحلول السحابية", "acct_attacker");
+        assert!(
+            elsewhere.contains(&"authorization-payee".to_owned()),
+            "{elsewhere:?}"
+        );
+        assert!(elsewhere.contains(&"authorization-recipient-account".to_owned()));
+        assert_eq!(
+            failures("ProMon Billing Ltd", "acct_aseer"),
+            vec!["authorization-payee"]
         );
     }
 

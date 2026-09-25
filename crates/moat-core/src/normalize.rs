@@ -103,6 +103,42 @@ fn ungroup(int_part: &str) -> Option<String> {
     Some(out)
 }
 
+/// A name as a person reads it, for comparing two spellings of one payee.
+///
+/// Folds what [`normalize_text`] deliberately keeps: punctuation and hyphens,
+/// the Arabic tatweel and diacritics, the forms of alef, teh marbuta and heh,
+/// alef maksura and yeh, the Persian yeh and keheh a different keyboard types,
+/// and the long and short forms of common legal suffixes. Only safe where the
+/// money's destination is pinned some other way: the policy uses it for an
+/// approved payee only when the approved account also matches, because a
+/// look-alike merchant has its own account.
+pub fn spelling_key(s: &str) -> String {
+    let folded: String = s
+        .chars()
+        .filter_map(|ch| match ch {
+            '.' | '\u{0640}' | '\u{064B}'..='\u{065F}' | '\u{0670}' => None,
+            ',' | '\u{060C}' | '-' | '_' => Some(' '),
+            '\u{0622}' | '\u{0623}' | '\u{0625}' | '\u{0671}' => Some('\u{0627}'),
+            '\u{0629}' => Some('\u{0647}'),
+            '\u{0649}' | '\u{06CC}' => Some('\u{064A}'),
+            '\u{06A9}' => Some('\u{0643}'),
+            other => Some(other),
+        })
+        .collect();
+    normalize_text(&folded)
+        .split(' ')
+        .map(|word| match word {
+            "co" => "company",
+            "est" => "establishment",
+            "ltd" => "limited",
+            "corp" => "corporation",
+            "inc" => "incorporated",
+            other => other,
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Currency markers stripped before numeric parsing.
 const CURRENCY_CHARS: &[char] = &['$', '€', '£', '¥', '₹', '₩', '₽'];
 
@@ -210,6 +246,30 @@ mod tests {
         for (input, want) in cases {
             assert_eq!(normalize_text(input), want, "input {input:?}");
         }
+    }
+
+    #[test]
+    fn spellings_of_one_name_share_a_key() {
+        let same = [
+            ("Monitoring Pro Inc.", "Monitoring Pro Inc"),
+            (
+                "Al Noor General Trading L.L.C.",
+                "Al Noor General Trading LLC",
+            ),
+            ("Al-Noor Trading Co", "Al Noor Trading Company"),
+            ("Qassim Trading Est.", "Qassim Trading Establishment"),
+            ("مؤسسة عسـير", "مؤسسه عسير"),
+            ("أحمد", "احمد"),
+            ("علی", "علي"),
+        ];
+        for (a, b) in same {
+            assert_eq!(spelling_key(a), spelling_key(b), "{a} / {b}");
+        }
+        assert_ne!(
+            spelling_key("Al Noor Holding"),
+            spelling_key("Al Noor Trading")
+        );
+        assert_ne!(spelling_key("Qassim"), spelling_key("Qasim"));
     }
 
     /// A provider pays the exact configured name, so each of these can be a

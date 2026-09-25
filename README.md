@@ -445,9 +445,19 @@ A value is matched by value, not by asking the model: an injection can make the
 agent emit "ProMon Billing Ltd", but it cannot make that string appear in what
 the user typed, because the user's words arrived on a different channel before
 the page was read ([ADR 0001](docs/adr/0001-provenance-by-value-matching.md)).
+What the user typed is read as a sentence, not searched as a string: a payee
+counts as named only as whole words, as a whole capitalized name rather than a
+piece of a longer one, and not after "don't pay" or "instead of" in the same
+clause. An invoice number or a day of the month is never an amount the user
+asked for.
+
 Names match after trimming, case-folding and collapsing spaces, and nothing
 more: a provider pays the exact configured name, so a trailing full stop or a
-different letter can be a look-alike merchant.
+different letter can be a look-alike merchant. The exception is an approval
+that pins the recipient's account. When the payment carries that account, the
+money can only reach it, so the payee may be spelled differently: a tatweel,
+another form of alef, a Persian yeh, a full stop, "Co" for "Company". **For
+Gulf payees, approve the account, not only the name.**
 
 ### What a person's approval unlocks
 

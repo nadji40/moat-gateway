@@ -10,7 +10,7 @@ use serde_json::Value;
 use crate::extract::extract_leaves;
 use crate::hash::sha256_hex;
 use crate::money::Minor;
-use crate::normalize::{normalize_text, numbers_in_text, Normalized};
+use crate::normalize::{normalize_text, Normalized};
 use crate::outcome::{may_reconcile, OutcomeStatus};
 use crate::rail::Rail;
 use crate::source::Source;
@@ -427,7 +427,7 @@ impl Session {
             turn,
             text: text.to_owned(),
             normalized: normalize_text(text),
-            numbers: numbers_in_text(text),
+            numbers: crate::said::amounts(text),
         });
         self.log_at(
             Event::IntentRegistered {

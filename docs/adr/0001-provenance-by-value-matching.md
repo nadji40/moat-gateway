@@ -125,3 +125,29 @@ account.
 
 This is the "revisitable per field" clause above being used, not an exception
 to it. Everything that is a name still matches as text.
+
+## Addendum, September 2026: the user's words are read, not searched
+
+Substring matching against the user's own text over-read it. Any four
+characters of a name the user typed counted as the user naming a payee, so
+"Pro Inc" rode on "Monitoring Pro Inc"; "do not pay ProMon Billing Ltd" named
+ProMon Billing Ltd; and an invoice number or a day of the month counted as an
+amount the user asked for.
+
+The intent side now reads the sentence (`moat-core/src/said.rs`). A payee
+must be whole words of it; when the writer capitalizes names, a whole
+capitalized name and not part of a longer one; and not governed by a negation
+earlier in its clause. A number glued to letters is an identifier, and when the
+sentence has an amount beside a currency or with a decimal point, a bare number
+elsewhere is not the price. Tool results are still matched as text: they only
+ever supply `ToolResult`, which the payee rule does not accept.
+
+Every value this declines resolves to another source or to `Unknown`, which is
+a step-up. Being stricter here costs a person a question, never a payment.
+
+What it cannot do: a writer who never capitalizes, and Arabic, which has no
+capitals, are read by whole words only, so a whole-word fragment of their name
+still counts. The complete answer to spelling and fragments is an approval
+that pins the recipient's account: then the name may differ in spelling
+(tatweel, alef forms, a full stop, "Co" for "Company"), because the money can
+only reach the approved account.

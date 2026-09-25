@@ -5,10 +5,13 @@
 //! earliest observation wins), else `Unknown`. Every match in every source is
 //! recorded, not just the winner, so evidence shows the whole picture.
 //!
-//! Strings match by substring after normalization, with a minimum length of
-//! [`MIN_SUBSTRING_LEN`] characters; shorter strings only match exactly.
-//! Numbers match exactly after normalization, whether they arrived as JSON
-//! numbers or as strings like `"$480.00"`.
+//! Against what the user typed, a string matches when it is the whole text or
+//! a name the sentence asks for, read by [`crate::said`]: whole words, not a
+//! fragment of a longer name, not one the user said not to pay. Against tool
+//! results, strings match by substring after normalization, with a minimum
+//! length of [`MIN_SUBSTRING_LEN`] characters. Numbers match exactly after
+//! normalization; from the user's text only the numbers `said` reads as
+//! amounts count.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -216,8 +219,13 @@ fn resolve_text(session: &Session, allowlist: &[String], value: &Value) -> Resol
                 .iter()
                 .any(|m| m == n)
                 .then_some(MatchKind::Exact)
+        } else if !text.is_empty() && intent.normalized == text {
+            Some(MatchKind::Exact)
         } else {
-            match_text(text, &intent.normalized, long_enough)
+            // What the user typed is read as a sentence, not searched as a
+            // string: whole words of a whole name, and not one they said not
+            // to pay (see `said`).
+            (long_enough && crate::said::names(&intent.text, text)).then_some(MatchKind::Substring)
         };
         if let Some(kind) = kind {
             matches.push(Match {

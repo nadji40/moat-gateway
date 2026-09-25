@@ -111,6 +111,12 @@ const ISO_4217: &[&str] = &[
     "VES", "VND", "VUV", "WST", "XAF", "XCD", "XOF", "XPF", "YER", "ZAR", "ZMW", "ZWL",
 ];
 
+/// Whether `code`, in any case, is a real currency or token code.
+pub fn is_currency_code(code: &str) -> bool {
+    let upper = code.trim().to_ascii_uppercase();
+    ISO_4217.contains(&upper.as_str()) || TOKENS.iter().any(|(token, _)| *token == upper)
+}
+
 /// The currency and token codes written in capitals in `text`.
 ///
 /// Only capitals count: "pay all invoices" does not name the Albanian lek,
