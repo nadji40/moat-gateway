@@ -43,6 +43,9 @@ rules:
 velocity:
   max_calls_per_session: 50
   max_calls_per_minute: 30
+  # Payments without an approval are also capped in total: the same amount
+  # split into pieces under the per-payment cap stops adding up here.
+  max_amount_per_session: 1000
   on_exceed: deny
 
 no_human_available: deny

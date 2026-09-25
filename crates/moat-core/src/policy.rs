@@ -169,6 +169,11 @@ pub struct Velocity {
     /// Maximum payment calls in any rolling sixty seconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_calls_per_minute: Option<u32>,
+    /// Most a session may pay without an approval, summed per currency over
+    /// the payments already allowed and this one. A cap per payment cannot
+    /// see the same amount split into pieces under it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_amount_per_session: Option<f64>,
     /// What exceeding either means.
     pub on_exceed: Decision,
 }
@@ -439,6 +444,11 @@ pub fn evaluate_with(
     let mut decision = Decision::Allow;
     let has_authorization_id = call.args.contains_key("authorization_id");
     let structured_authorization_required = !session.payment_authorizations().is_empty();
+    // A person approved this exact proposal after it was held. The approval
+    // answers "did anyone ask for this" and "where did these values come
+    // from" for this one payment, and is spent when it is allowed.
+    let human_approved = session.is_payment_proposal_approved(&payment_fingerprint(&call));
+    const APPROVED: &str = "ok: a person approved this exact payment";
 
     if has_authorization_id {
         for outcome in
@@ -458,11 +468,12 @@ pub fn evaluate_with(
             "a structured payment authorization exists; authorization_id is required",
         ));
     } else if policy.unrequested_payment != Decision::Allow {
-        let requested = ["payee", "amount", "destination"].iter().any(|field| {
+        let named = ["payee", "amount", "destination"].iter().any(|field| {
             provenance
                 .get(*field)
                 .is_some_and(|p| p.resolution.source.kind() == SourceKind::User)
         });
+        let requested = named || human_approved;
         if !requested {
             decision = decision.max(policy.unrequested_payment);
         }
@@ -472,15 +483,27 @@ pub fn evaluate_with(
             passed: requested,
             source: None,
             on_fail: policy.unrequested_payment,
-            message: if requested {
+            message: if named {
                 "ok: the user named the payee, the amount or the destination".to_owned()
+            } else if human_approved {
+                APPROVED.to_owned()
             } else {
                 "no approval, and nothing in this payment came from what the user said".to_owned()
             },
         });
     }
     if !has_authorization_id && !structured_authorization_required {
-        if let Some(outcome) = intent_currency(policy, session, &mapped) {
+        if let Some(mut outcome) = intent_currency(policy, session, &mapped) {
+            if !outcome.passed && human_approved {
+                outcome.passed = true;
+                outcome.message = APPROVED.to_owned();
+            }
+            if !outcome.passed {
+                decision = decision.max(outcome.on_fail);
+            }
+            reasons.push(outcome);
+        }
+        if let Some(outcome) = session_total(policy, session, &provenance) {
             if !outcome.passed {
                 decision = decision.max(outcome.on_fail);
             }
@@ -501,6 +524,15 @@ pub fn evaluate_with(
                 source: prov.map(|p| p.resolution.source.kind()),
                 on_fail: rule.on_fail,
                 message: "ok: structured payment authorization is authoritative".to_owned(),
+            }
+        } else if human_approved && rule.require_source.is_some() && rule.max.is_none() {
+            RuleOutcome {
+                id: rule.id.clone(),
+                field: Some(field.to_owned()),
+                passed: true,
+                source: prov.map(|p| p.resolution.source.kind()),
+                on_fail: rule.on_fail,
+                message: APPROVED.to_owned(),
             }
         } else {
             check_rule(rule, field, prov)
@@ -550,6 +582,62 @@ pub fn evaluate_with(
         unix_ms: now_unix_ms,
         rail: ctx.rail,
     }
+}
+
+/// Whether a payment with no approval keeps the session under its total.
+/// `None` when the policy sets no total or the amount is not a number, which
+/// the per-payment cap refuses on its own.
+fn session_total(
+    policy: &Policy,
+    session: &Session,
+    provenance: &BTreeMap<String, FieldProvenance>,
+) -> Option<RuleOutcome> {
+    let velocity = policy.velocity.as_ref()?;
+    let max = velocity.max_amount_per_session?;
+    let amount: f64 = provenance
+        .get("amount")?
+        .resolution
+        .normalized
+        .number
+        .as_deref()?
+        .parse()
+        .ok()?;
+    let currency = recorded_currency(provenance);
+    let earlier: f64 = session
+        .events()
+        .iter()
+        .filter_map(|e| match &e.event {
+            Event::PaymentEvaluated {
+                verdict,
+                amount: Some(paid),
+                currency: paid_in,
+                ..
+            } if verdict == "allow" && *paid_in == currency => paid.parse::<f64>().ok(),
+            _ => None,
+        })
+        .sum();
+    let total = earlier + amount;
+    let passed = total <= max;
+    Some(RuleOutcome {
+        id: "session-total".to_owned(),
+        field: Some("amount".to_owned()),
+        passed,
+        source: None,
+        on_fail: velocity.on_exceed,
+        message: if passed {
+            format!("ok: {total} of {max} this session")
+        } else {
+            format!("{earlier} already paid this session; {amount} more makes {total}, over {max}")
+        },
+    })
+}
+
+/// The currency of a payment as the session log keeps it.
+fn recorded_currency(provenance: &BTreeMap<String, FieldProvenance>) -> Option<String> {
+    provenance
+        .get("currency")
+        .and_then(|p| p.resolution.value.as_str())
+        .map(|code| code.trim().to_ascii_uppercase())
 }
 
 /// Whether a payment with no approval is in a currency the user named.
@@ -1233,15 +1321,24 @@ fn list(kinds: &[SourceKind]) -> String {
 
 impl Session {
     /// Log that a payment call was evaluated, at the clock value the
-    /// evaluation used. Velocity counts these.
+    /// evaluation used. Velocity counts these and the session total sums
+    /// them. An allowed payment spends the approval it was held for.
     pub fn record_evaluation(&mut self, evaluation: &Evaluation) {
         self.log_at(
             Event::PaymentEvaluated {
                 evidence_id: evaluation.verdict.evidence_id.clone(),
                 verdict: evaluation.verdict.decision.as_str().to_owned(),
+                amount: evaluation
+                    .provenance
+                    .get("amount")
+                    .and_then(|p| p.resolution.normalized.number.clone()),
+                currency: recorded_currency(&evaluation.provenance),
             },
             evaluation.unix_ms,
         );
+        if evaluation.verdict.decision == Decision::Allow {
+            self.spend_payment_approval(&payment_fingerprint(&evaluation.call), evaluation.unix_ms);
+        }
     }
 }
 
@@ -1576,6 +1673,85 @@ mod tests {
         assert!(!e.verdict.reasons.iter().any(|r| r.id == "user-request"));
     }
 
+    /// Dhoha's D-007: a large transfer split into pieces the per-payment cap
+    /// allows. Two pieces of 450 fit the session total; the third does not.
+    #[test]
+    fn a_payment_split_under_the_cap_stops_at_the_session_total() {
+        let mut s = Session::new("s");
+        s.register_intent("Pay Monitoring Pro Inc 450 USD");
+        let mut verdicts = Vec::new();
+        for n in 1..=3u64 {
+            let e = evaluate(
+                &policy(),
+                &s,
+                call(json!({"payee": "Monitoring Pro Inc", "amount": 450, "currency": "USD"})),
+                1_000_000 + n * 61_000,
+            );
+            s.record_evaluation(&e);
+            let failed: Vec<String> = e.verdict.failures().map(|r| r.id.clone()).collect();
+            verdicts.push((e.verdict.decision, failed));
+        }
+        assert_eq!(verdicts[0], (Decision::Allow, vec![]));
+        assert_eq!(verdicts[1], (Decision::Allow, vec![]));
+        assert_eq!(
+            verdicts[2],
+            (Decision::Deny, vec!["session-total".to_owned()])
+        );
+
+        let mut other = Session::new("s");
+        other.register_intent("Pay Monitoring Pro Inc 450 USD or 450 EUR");
+        for currency in ["USD", "USD", "EUR"] {
+            let e = evaluate(
+                &policy(),
+                &other,
+                call(json!({"payee": "Monitoring Pro Inc", "amount": 450, "currency": currency})),
+                1_000_000,
+            );
+            assert_eq!(e.verdict.decision, Decision::Allow, "{currency}");
+            other.record_evaluation(&e);
+        }
+    }
+
+    /// Dhoha's note that a held payment is stopped only as long as the person
+    /// says no: one yes must be one payment, not a standing permission.
+    #[test]
+    fn an_approval_covers_one_payment_once() {
+        let mut s = Session::new("s");
+        s.register_intent("Pay the Monitoring Pro Inc invoice for 4.80 USD");
+        let held = json!({"payee": "ProMon Billing Ltd", "amount": 4.80, "currency": "USD"});
+        let first = evaluate(&policy(), &s, call(held.clone()), 1_000_000);
+        assert_eq!(first.verdict.decision, Decision::StepUp);
+        s.record_evaluation(&first);
+
+        s.approve_payment_proposal(payment_fingerprint(&call(held.clone())));
+        let approved = evaluate(&policy(), &s, call(held.clone()), 1_070_000);
+        assert_eq!(approved.verdict.decision, Decision::Allow);
+        assert!(approved
+            .verdict
+            .reasons
+            .iter()
+            .any(|r| r.id == "payee-provenance" && r.passed && r.message.contains("approved")));
+        s.record_evaluation(&approved);
+
+        let again = evaluate(&policy(), &s, call(held), 1_140_000);
+        assert_eq!(
+            again.verdict.decision,
+            Decision::StepUp,
+            "the approval was spent"
+        );
+        let different = evaluate(
+            &policy(),
+            &s,
+            call(json!({"payee": "ProMon Billing Ltd", "amount": 480, "currency": "USD"})),
+            1_140_000,
+        );
+        assert_eq!(
+            different.verdict.decision,
+            Decision::StepUp,
+            "it never covered this one"
+        );
+    }
+
     /// Meriem's A-024 family: the user said AED, the agent paid in SAR, and
     /// nothing was approved.
     #[test]
@@ -1711,10 +1887,15 @@ mod tests {
             assert_eq!(e.verdict.decision, want, "{name}");
             let got: Vec<&str> = e.verdict.failures().map(|r| r.id.as_str()).collect();
             assert_eq!(got, failing, "{name}: failing rules");
+            let totalled = e
+                .provenance
+                .get("amount")
+                .is_some_and(|p| p.resolution.normalized.number.is_some());
             assert_eq!(
                 e.verdict.reasons.len(),
-                5,
-                "{name}: the user-request check, every rule and velocity are recorded"
+                if totalled { 6 } else { 5 },
+                "{name}: the user-request check, the session total when there is an amount, \
+                 every rule and velocity are recorded"
             );
             assert!(e.verdict.evidence_id.starts_with("ev_"));
             assert_eq!(
@@ -2880,7 +3061,12 @@ rules: []
 
     #[test]
     fn velocity_limits() {
-        let p = policy();
+        // Counts only: six payments of 480 would cross the session total
+        // long before the call limits this test is about.
+        let mut p = policy();
+        if let Some(v) = p.velocity.as_mut() {
+            v.max_amount_per_session = None;
+        }
         let mut s = session_with_page();
         let ok = json!({"payee": "Monitoring Pro Inc", "amount": 480});
         // Three quick calls fill the per-minute budget.

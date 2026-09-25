@@ -259,8 +259,16 @@ pub enum Event {
         evidence_id: String,
         /// `allow`, `step_up` or `deny`.
         verdict: String,
+        /// The amount in canonical form, when it was a number. Absent in
+        /// logs written before sessions had a total.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        amount: Option<String>,
+        /// The currency, upper-cased, when the call named one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        currency: Option<String>,
     },
-    /// The host confirmed a step-up; the confirmed values are now `User`.
+    /// The host answered a step-up. An approval covers the one proposal the
+    /// human was shown, once.
     StepUpResolved {
         /// The resume token that was presented.
         resume_token: String,
@@ -286,6 +294,11 @@ pub enum Event {
     },
     /// Human approval was granted for one exact payment proposal.
     PaymentProposalApproved {
+        /// SHA-256 over server, tool and canonical arguments.
+        fingerprint: String,
+    },
+    /// An approved proposal was allowed, which used its approval up.
+    PaymentProposalSpent {
         /// SHA-256 over server, tool and canonical arguments.
         fingerprint: String,
     },
@@ -674,6 +687,24 @@ impl Session {
                 fingerprint: fingerprint.clone(),
             });
             self.approved_payment_fingerprints.push(fingerprint);
+        }
+    }
+
+    /// Use up the approval for this exact proposal, if there is one. One
+    /// "yes" is one payment: the next identical call is held again.
+    pub fn spend_payment_approval(&mut self, fingerprint: &str, unix_ms: u64) {
+        if let Some(at) = self
+            .approved_payment_fingerprints
+            .iter()
+            .position(|approved| approved == fingerprint)
+        {
+            self.approved_payment_fingerprints.remove(at);
+            self.log_at(
+                Event::PaymentProposalSpent {
+                    fingerprint: fingerprint.to_owned(),
+                },
+                unix_ms,
+            );
         }
     }
 

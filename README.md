@@ -493,10 +493,12 @@ basis for believing they asked for a payment.
 
 - `intent` registers the human's text for the session; call it once per user
   turn. Returns the turn number.
-- `resume` answers a step-up. With `approved: true`, every field value the
-  human was shown is registered as an intent, so the **next identical call**
-  resolves to `User` and proceeds. Tokens are single-use and bound to the
-  session. Moat does not replay the original call; the host retries it.
+- `resume` answers a step-up. With `approved: true`, the exact proposal the
+  human was shown is allowed **once**: the next identical call proceeds, and
+  the one after it is held again. The approved values are not registered as
+  things the user said, so approving one payment to a payee does not open
+  that payee for the rest of the session. Tokens are single-use and bound to
+  the session. Moat does not replay the original call; the host retries it.
 - `headless` tells Moat no human is present; `step_up` then degrades to the
   policy's `no_human_available` (deny in the example policy).
 - `evidence` returns the session's records in order.

@@ -172,6 +172,20 @@ intent_api: {{ addr: "{api}" }}
         "resumed payment not allowed: {reply:?}"
     );
 
+    // One approval is one payment: the same call again fails the payee check
+    // it passed a moment ago. (It is denied outright here because the
+    // session has also reached its per-minute and total limits.)
+    let (_, reply) = gw.call(pay(50, "ProMon Billing Ltd", json!(480))).await;
+    let Message::Error(e) = reply else {
+        panic!("a second payment rode on one approval: {reply:?}");
+    };
+    let data = e.error.data.unwrap();
+    assert!(data["moat"]["reasons"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["id"] == "payee-provenance"));
+
     // A token is single use.
     let (status, _) = http::post(
         &api,
@@ -209,7 +223,7 @@ intent_api: {{ addr: "{api}" }}
     };
     assert_eq!(e.error.code, moat_code::DENY);
 
-    // 8. Evidence: five verdicts, in order, over the API and in the file.
+    // 8. Evidence: six verdicts, in order, over the API and in the file.
     let (status, body) = http::get(&api, &format!("/v1/session/{SESSION}/evidence")).await;
     assert_eq!(status, 200);
     let verdicts: Vec<&str> = body
@@ -218,18 +232,33 @@ intent_api: {{ addr: "{api}" }}
         .iter()
         .map(|r| r["verdict"].as_str().unwrap())
         .collect();
-    assert_eq!(verdicts, ["allow", "step_up", "allow", "deny", "deny"]);
+    assert_eq!(
+        verdicts,
+        ["allow", "step_up", "allow", "deny", "deny", "deny"]
+    );
     assert_eq!(body[1]["id"], step_up_evidence);
     assert_eq!(
         body[1]["provenance"]["payee"]["source"]["kind"],
         "tool_result"
     );
-    assert_eq!(body[2]["provenance"]["payee"]["source"]["kind"], "user");
+    // The approved payment still says where its payee came from, and that a
+    // person approved it, rather than claiming the user typed it.
+    assert_eq!(
+        body[2]["provenance"]["payee"]["source"]["kind"],
+        "tool_result"
+    );
+    assert!(body[2]["rules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["id"] == "payee-provenance"
+            && r["passed"] == true
+            && r["message"].as_str().unwrap().contains("approved")));
     assert!(body[0]["prev"].is_null());
     assert!(body[1]["prev"].is_string());
 
     let file = std::fs::read_to_string(&evidence_path).unwrap();
-    assert_eq!(file.lines().count(), 5);
+    assert_eq!(file.lines().count(), 6);
     for line in file.lines() {
         let v: Value = serde_json::from_str(line).unwrap();
         assert_eq!(v["session"], SESSION);
@@ -250,7 +279,7 @@ intent_api: {{ addr: "{api}" }}
         .unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success(), "verify failed:\n{stdout}");
-    assert!(stdout.contains("OK: 5 records, 0 problems"), "{stdout}");
+    assert!(stdout.contains("OK: 6 records, 0 problems"), "{stdout}");
 
     // Tamper with one byte and verify again: must fail and say where.
     let tampered = file.replacen("\"verdict\":\"allow\"", "\"verdict\":\"deny\"", 1);

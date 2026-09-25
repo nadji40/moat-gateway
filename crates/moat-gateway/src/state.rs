@@ -670,9 +670,10 @@ impl Shared {
         }
     }
 
-    /// Apply the host's answer to a step-up: on approval every value the
-    /// human saw is registered as an intent, so the same call resolves to
-    /// `User` next time. Returns what was confirmed.
+    /// Apply the host's answer to a step-up. An approval covers the exact
+    /// proposal the human was shown, once: its values are not registered as
+    /// things the user said, or approving one payment to a payee would let
+    /// every later payment to that payee through. Returns what was confirmed.
     pub fn resolve_step_up(
         session: &mut Session,
         pending: PendingResume,
@@ -682,13 +683,11 @@ impl Shared {
         let mut confirmed = Vec::new();
         if approved {
             session.approve_payment_proposal(pending.payment_fingerprint);
-            for (field, value) in &pending.values {
-                let text = match value {
+            for (_, value) in &pending.values {
+                confirmed.push(match value {
                     Value::String(t) => t.clone(),
                     other => other.to_string(),
-                };
-                session.register_intent(&format!("confirmed {field}: {text}"));
-                confirmed.push(text);
+                });
             }
         }
         session.log(Event::StepUpResolved {
