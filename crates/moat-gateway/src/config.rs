@@ -65,6 +65,12 @@ pub enum Listen {
     Http {
         /// `host:port` to bind.
         addr: String,
+        /// How long a session may go without a request before its upstreams
+        /// are shut down and it is dropped from memory. Its durable snapshot
+        /// is restored by the next request that names it; without durable
+        /// storage nothing is dropped.
+        #[serde(default = "default_idle_timeout_secs")]
+        idle_timeout_secs: u64,
     },
 }
 
@@ -164,6 +170,9 @@ fn default_database_url_env() -> String {
 fn default_max_connections() -> usize {
     16
 }
+fn default_idle_timeout_secs() -> u64 {
+    30 * 60
+}
 
 impl Config {
     /// Read and validate a config file. Relative paths inside it are resolved
@@ -205,6 +214,15 @@ impl Config {
             anyhow::ensure!(
                 self.storage.is_some(),
                 "auth.required needs durable storage for tenant API keys"
+            );
+        }
+        if let Listen::Http {
+            idle_timeout_secs, ..
+        } = &self.listen
+        {
+            anyhow::ensure!(
+                *idle_timeout_secs > 0,
+                "listen.idle_timeout_secs must be positive"
             );
         }
         if let Some(storage) = &self.storage {

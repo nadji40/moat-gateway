@@ -611,7 +611,7 @@ auth: { required: true }
 
 | Key | Meaning | Default |
 | --- | --- | --- |
-| `listen` | `{ transport: stdio }` or `{ transport: http, addr }` | stdio |
+| `listen` | `{ transport: stdio }` or `{ transport: http, addr, idle_timeout_secs }` | stdio |
 | `upstreams[].name` | Tool namespace prefix; must be unique | required |
 | `upstreams[].transport` | `stdio` with `command` (and optional `env`), or `http` with `url` | required |
 | `policy` | Path to the policy YAML | none → payments denied |
@@ -638,6 +638,10 @@ shape the MCP TypeScript SDK's `StreamableHTTPClientTransport` speaks:
   **That id is the one to use with the intent API.**
 - `GET /mcp` with the session header opens the SSE stream for server-initiated
   notifications; one per session.
+- A session no request has named for `idle_timeout_secs` (default 1800) has
+  its upstreams shut down and is dropped from memory. With `storage`
+  configured, the next request that names it restores it from its durable
+  snapshot; without, nothing is dropped.
 - `DELETE /mcp` ends the session and stops its upstreams.
 - `Authorization: Bearer <key>` is mandatory when `auth.required` is true.
   Agent-plane and approver-plane keys are separate, SHA-256 hashed in the

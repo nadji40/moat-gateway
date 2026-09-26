@@ -18,9 +18,10 @@
 //! `Origin` is validated as the spec requires: absent is fine (non-browser
 //! clients), loopback is fine, anything else is refused.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::convert::Infallible;
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError};
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use axum::body::{Body, Bytes};
@@ -51,16 +52,36 @@ struct Session {
     /// Server-initiated lines, taken by the GET stream when a client opens
     /// one. `None` once taken.
     notifications: Mutex<Option<mpsc::Receiver<String>>>,
+    /// When a request last named this session.
+    last_used: std::sync::Mutex<Instant>,
+}
+
+impl Session {
+    fn touch(&self) {
+        *self
+            .last_used
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Instant::now();
+    }
+
+    fn idle_for(&self) -> Duration {
+        self.last_used
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .elapsed()
+    }
 }
 
 struct Listener {
     cfg: Config,
     shared: Arc<Shared>,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
-    /// Sessions explicitly terminated during this process lifetime. Durable
-    /// state remains available for audit/recovery after a process restart, but
-    /// DELETE must not immediately resurrect the session in the same process.
-    ended_sessions: Mutex<HashSet<String>>,
+    /// Sessions explicitly terminated during this process lifetime, and
+    /// when. Durable state remains available for audit and recovery after a
+    /// process restart, but DELETE must not immediately resurrect the
+    /// session in the same process. Forgotten after the idle timeout, like
+    /// everything else here.
+    ended_sessions: Mutex<HashMap<String, Instant>>,
     default_session: Mutex<Option<Arc<Session>>>,
 }
 
@@ -78,16 +99,18 @@ impl Listener {
             gw,
             tenant_id,
             notifications: Mutex::new(Some(rx)),
+            last_used: std::sync::Mutex::new(Instant::now()),
         });
         self.sessions.lock().await.insert(id, Arc::clone(&s));
         Ok(s)
     }
 
     async fn session(&self, tenant_id: &str, id: &str) -> Result<Option<Arc<Session>>> {
-        if self.ended_sessions.lock().await.contains(id) {
+        if self.ended_sessions.lock().await.contains_key(id) {
             return Ok(None);
         }
         if let Some(session) = self.sessions.lock().await.get(id).cloned() {
+            session.touch();
             return Ok((session.tenant_id == tenant_id).then_some(session));
         }
         if self
@@ -106,6 +129,7 @@ impl Listener {
     async fn default_session(&self) -> Result<Arc<Session>> {
         let mut slot = self.default_session.lock().await;
         if let Some(s) = slot.as_ref() {
+            s.touch();
             return Ok(Arc::clone(s));
         }
         let id = self
@@ -129,12 +153,50 @@ impl Listener {
         match removed {
             Some(s) => {
                 s.gw.shutdown().await;
-                self.ended_sessions.lock().await.insert(id.to_owned());
+                self.ended_sessions
+                    .lock()
+                    .await
+                    .insert(id.to_owned(), Instant::now());
                 tracing::info!(session = %id, "http session ended");
                 true
             }
             None => false,
         }
+    }
+
+    /// Shut down and forget every session no request has named for `idle`,
+    /// and forget ended sessions older than that.
+    ///
+    /// A session holds its upstream processes and its document in memory
+    /// for as long as it exists, and an HTTP client that goes away does not
+    /// say so. The durable snapshot is the session; what is dropped here is
+    /// restored by the next request that names it. A session a request is
+    /// using right now is left alone, however long ago it was last named.
+    async fn evict_idle(&self, idle: Duration) -> usize {
+        let mut evicted = Vec::new();
+        {
+            let mut sessions = self.sessions.lock().await;
+            let stale: Vec<String> = sessions
+                .iter()
+                .filter(|(_, s)| s.idle_for() >= idle && Arc::strong_count(s) == 1)
+                .map(|(id, _)| id.clone())
+                .collect();
+            for id in stale {
+                if let Some(s) = sessions.remove(&id) {
+                    evicted.push((id, s));
+                }
+            }
+        }
+        for (id, s) in &evicted {
+            s.gw.shutdown().await;
+            self.shared.forget_session(&s.tenant_id, id).await;
+            tracing::info!(session = %id, "idle http session dropped");
+        }
+        self.ended_sessions
+            .lock()
+            .await
+            .retain(|_, ended| ended.elapsed() < idle);
+        evicted.len()
     }
 }
 
@@ -449,15 +511,17 @@ async fn ready(State(listener): State<Arc<Listener>>) -> StatusCode {
     }
 }
 
-/// Build the router. Exposed for tests.
-pub fn router(cfg: Config, shared: Arc<Shared>) -> Router {
-    let l = Arc::new(Listener {
+fn listener(cfg: Config, shared: Arc<Shared>) -> Arc<Listener> {
+    Arc::new(Listener {
         cfg,
         shared,
         sessions: Mutex::new(HashMap::new()),
-        ended_sessions: Mutex::new(HashSet::new()),
+        ended_sessions: Mutex::new(HashMap::new()),
         default_session: Mutex::new(None),
-    });
+    })
+}
+
+fn router_for(l: Arc<Listener>) -> Router {
     Router::new()
         .route(MCP_PATH, get(get_mcp).post(post_mcp).delete(delete_mcp))
         .route("/health/live", get(live))
@@ -863,18 +927,32 @@ async fn revoke_key(
 }
 
 /// Bind and serve until the process exits.
-pub async fn serve(addr: &str, cfg: Config, shared: Arc<Shared>) -> Result<()> {
-    let listener = tokio::net::TcpListener::bind(addr)
+pub async fn serve(addr: &str, idle: Duration, cfg: Config, shared: Arc<Shared>) -> Result<()> {
+    let socket = tokio::net::TcpListener::bind(addr)
         .await
         .with_context(|| format!("binding MCP listener on {addr}"))?;
-    let local = listener
-        .local_addr()
-        .context("MCP listener local address")?;
+    let local = socket.local_addr().context("MCP listener local address")?;
     if !local.ip().is_loopback() && !shared.auth_required() {
         tracing::warn!(%local, "MCP listener is not loopback and authentication is disabled");
     }
-    tracing::info!(%local, path = MCP_PATH, "streamable http listener ready");
-    axum::serve(listener, router(cfg, shared))
+    tracing::info!(
+        %local, path = MCP_PATH, idle_timeout_secs = idle.as_secs(),
+        "streamable http listener ready"
+    );
+    let l = listener(cfg, shared);
+    let sweeper = Arc::clone(&l);
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(
+            idle.min(Duration::from_secs(60))
+                .max(Duration::from_secs(1)),
+        );
+        tick.tick().await;
+        loop {
+            tick.tick().await;
+            sweeper.evict_idle(idle).await;
+        }
+    });
+    axum::serve(socket, router_for(l))
         .await
         .context("MCP http server")
 }

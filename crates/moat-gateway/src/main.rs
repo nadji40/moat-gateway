@@ -137,6 +137,7 @@ fn main() -> Result<()> {
                 .context("starting tokio runtime")?;
             rt.block_on(async move {
                 let shared = build_shared(&cfg).await?;
+                start_reservation_reaper(&shared);
                 start_intent_api(&cfg, &shared);
                 match cfg.listen.clone() {
                     config::Listen::Stdio => {
@@ -146,11 +147,20 @@ fn main() -> Result<()> {
                         let stdout = tokio::io::stdout();
                         proxy::Gateway::run(cfg, shared, session_id, stdin, stdout).await
                     }
-                    config::Listen::Http { addr } => {
+                    config::Listen::Http {
+                        addr,
+                        idle_timeout_secs,
+                    } => {
                         tracing::info!(
                             "each MCP session's id is returned in the Mcp-Session-Id header; use it with the intent API"
                         );
-                        http_listen::serve(&addr, cfg, shared).await
+                        http_listen::serve(
+                            &addr,
+                            std::time::Duration::from_secs(idle_timeout_secs),
+                            cfg,
+                            shared,
+                        )
+                        .await
                     }
                 }
             })
@@ -236,6 +246,36 @@ fn start_intent_api(cfg: &config::Config, shared: &Arc<state::Shared>) {
             "no intent_api configured: nothing can register intents, so every payee will be untrusted"
         ),
     }
+}
+
+/// Clear abandoned ledger reservations now and every minute after.
+///
+/// A session that dies between allowing a payment and hearing its outcome
+/// leaves its reservation holding value against the mandate for every other
+/// session under the tenant. The store knows how old is too old; this is
+/// only the clock.
+fn start_reservation_reaper(shared: &Arc<state::Shared>) {
+    if shared.storage().is_none() {
+        return;
+    }
+    let shared = Arc::clone(shared);
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            tick.tick().await;
+            let Some(storage) = shared.storage() else {
+                return;
+            };
+            match storage.expire_reservations().await {
+                Ok(0) => {}
+                Ok(reaped) => tracing::warn!(
+                    reaped,
+                    "cleared reservations that no payment could still be in flight for"
+                ),
+                Err(error) => tracing::error!(%error, "could not clear abandoned reservations"),
+            }
+        }
+    });
 }
 
 fn generate_session_id() -> String {

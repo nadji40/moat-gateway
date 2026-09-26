@@ -226,6 +226,26 @@ pub struct PaymentReservation {
     pub invoice_fingerprint: Option<String>,
     /// Proposed value in the authorization currency's minor unit.
     pub amount_minor: Minor,
+    /// When the proposal was reserved. Absent in documents written before
+    /// reservations aged, which reads as long ago.
+    #[serde(default)]
+    pub reserved_unix_ms: u64,
+}
+
+/// How long a reservation stands before it is taken to have been abandoned.
+///
+/// A reservation is released by the outcome of the payment it holds value
+/// for. A process that dies between the two never releases it, and the
+/// mandate then holds value against a payment nobody is making. A payment
+/// reaches its provider in seconds, and the longest co-signature Moat will
+/// issue lives fifteen minutes, so nothing older than this is in flight.
+pub const RESERVATION_MAX_AGE_MS: u64 = 15 * 60 * 1000;
+
+impl PaymentReservation {
+    /// Whether this reservation is older than [`RESERVATION_MAX_AGE_MS`].
+    pub fn is_stale(&self, now_unix_ms: u64) -> bool {
+        now_unix_ms.saturating_sub(self.reserved_unix_ms) > RESERVATION_MAX_AGE_MS
+    }
 }
 
 /// Something that happened in a session. The evidence `context_hash` is
@@ -338,6 +358,16 @@ pub enum Event {
         /// Provider transaction identifier, if reconciliation supplied one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         receipt: Option<String>,
+    },
+    /// A reservation outlived [`RESERVATION_MAX_AGE_MS`] without an outcome
+    /// and was dropped, so the mandate no longer holds value for it.
+    PaymentReservationExpired {
+        /// Authorization the reservation was held against.
+        authorization_id: String,
+        /// The proposal that was reserved.
+        fingerprint: String,
+        /// How much it held.
+        amount_minor: Minor,
     },
 }
 
@@ -578,6 +608,30 @@ impl Session {
         self.payment_reservations.len() != before
     }
 
+    /// Drop every reservation older than [`RESERVATION_MAX_AGE_MS`], logging
+    /// each one. Returns how many were dropped.
+    pub fn expire_payment_reservations(&mut self, now_unix_ms: u64) -> usize {
+        let stale: Vec<PaymentReservation> = self
+            .payment_reservations
+            .iter()
+            .filter(|reservation| reservation.is_stale(now_unix_ms))
+            .cloned()
+            .collect();
+        self.payment_reservations
+            .retain(|reservation| !reservation.is_stale(now_unix_ms));
+        for reservation in &stale {
+            self.log_at(
+                Event::PaymentReservationExpired {
+                    authorization_id: reservation.authorization_id.clone(),
+                    fingerprint: reservation.fingerprint.clone(),
+                    amount_minor: reservation.amount_minor,
+                },
+                now_unix_ms,
+            );
+        }
+        stale.len()
+    }
+
     /// Outcomes somebody has to do something about.
     ///
     /// Two kinds. One Moat cannot account for at all, which is blocking its
@@ -793,6 +847,13 @@ impl SessionStore {
         map.get(id).map(Arc::clone)
     }
 
+    /// Forget the session with this id. Whoever still holds it keeps it;
+    /// the next `get_or_create` starts afresh.
+    pub fn remove(&self, id: &str) -> bool {
+        let mut map = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
+        map.remove(id).is_some()
+    }
+
     /// Ids of all sessions.
     pub fn ids(&self) -> Vec<String> {
         let map = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
@@ -870,5 +931,53 @@ mod tests {
         let b = store2.get("x").unwrap();
         assert_eq!(lock(&b).intents().len(), 1);
         assert!(store.get("nope").is_none());
+    }
+
+    #[test]
+    fn a_forgotten_session_starts_afresh() {
+        let store = SessionStore::new();
+        let a = store.get_or_create("x");
+        lock(&a).register_intent("hi");
+        assert!(store.remove("x"));
+        assert!(!store.remove("x"));
+        assert!(store.get("x").is_none());
+        assert_eq!(lock(&a).intents().len(), 1, "the holder keeps its copy");
+        assert!(lock(&store.get_or_create("x")).intents().is_empty());
+    }
+
+    fn reservation(fingerprint: &str, reserved_unix_ms: u64) -> PaymentReservation {
+        PaymentReservation {
+            fingerprint: fingerprint.to_owned(),
+            authorization_id: "auth-1".to_owned(),
+            invoice_id: "INV-1".to_owned(),
+            invoice_fingerprint: None,
+            amount_minor: Minor(5_000),
+            reserved_unix_ms,
+        }
+    }
+
+    /// A reservation that outlives the longest possible payment was left by
+    /// a process that died; one inside that window may still be in flight.
+    #[test]
+    fn an_abandoned_reservation_expires_and_a_live_one_does_not() {
+        let now = 10 * RESERVATION_MAX_AGE_MS;
+        let mut s = Session::new("s1");
+        assert!(s.reserve_payment(reservation("old", now - RESERVATION_MAX_AGE_MS - 1)));
+        assert!(s.reserve_payment(reservation("live", now - RESERVATION_MAX_AGE_MS)));
+        assert!(s.reserve_payment(reservation("undated", 0)));
+        assert_eq!(s.expire_payment_reservations(now), 2);
+        let left: Vec<&str> = s
+            .payment_reservations()
+            .iter()
+            .map(|r| r.fingerprint.as_str())
+            .collect();
+        assert_eq!(left, vec!["live"]);
+        let expired = s
+            .events()
+            .iter()
+            .filter(|e| matches!(e.event, Event::PaymentReservationExpired { .. }))
+            .count();
+        assert_eq!(expired, 2, "each expiry is on the record");
+        assert_eq!(s.expire_payment_reservations(now), 0);
     }
 }

@@ -641,7 +641,15 @@ async fn cosign_verdict(
 
     // The verdict, as recorded. Not as described by whoever is asking.
     let Some(record) = shared
-        .evidence_for(&id)
+        .evidence_for_tenant(&tenant_id, &id)
+        .await
+        .map_err(|error| {
+            tracing::error!(%error, session = %id, "evidence could not be read");
+            err(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "the evidence for this session could not be read",
+            )
+        })?
         .into_iter()
         .find(|record| record.id == body.evidence_id)
     else {

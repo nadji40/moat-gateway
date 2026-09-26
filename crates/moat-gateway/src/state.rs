@@ -165,7 +165,6 @@ pub struct PendingResume {
 
 struct EvidenceLog {
     path: PathBuf,
-    records: Vec<Record>,
     last_hash: Option<String>,
 }
 
@@ -226,7 +225,6 @@ impl Shared {
             session_gates: AsyncMutex::new(HashMap::new()),
             evidence: Mutex::new(EvidenceLog {
                 path: evidence_path,
-                records: Vec::new(),
                 last_hash,
             }),
             storage,
@@ -318,7 +316,14 @@ impl Shared {
         }
 
         if let Some(storage) = &self.storage {
-            if let Some((session, version)) = storage.load_session(tenant_id, id).await? {
+            if let Some((mut session, version)) = storage.load_session(tenant_id, id).await? {
+                let expired = session.expire_payment_reservations(crate::proxy::now_unix_ms());
+                if expired > 0 {
+                    tracing::warn!(
+                        tenant = %tenant_id, session = %id, expired,
+                        "restored session held reservations no payment could still be in flight for"
+                    );
+                }
                 let session = self.store.insert(session);
                 self.session_tenants
                     .lock()
@@ -351,7 +356,8 @@ impl Shared {
         Ok(Some(session))
     }
 
-    /// Persist the current complete session snapshot.
+    /// Persist the current complete session snapshot, and with it the
+    /// ledger rows its mandates imply.
     pub async fn persist_session(&self, tenant_id: &str, id: &str) -> Result<()> {
         let Some(storage) = &self.storage else {
             return Ok(());
@@ -387,38 +393,7 @@ impl Shared {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(id.to_owned(), version);
-        self.mirror_payment_ledger(storage, tenant_id, &snapshot)
-            .await;
         Ok(())
-    }
-
-    /// Mirror the session's mandates into the payment ledger.
-    ///
-    /// A mirror, not the source: the gateway still evaluates from the
-    /// session document, and this keeps the tenant-scoped tables in step so
-    /// a later session can find a mandate and an operator can see every
-    /// open outcome. Deliberately non-fatal -- the session snapshot is
-    /// already committed by the time this runs, and failing the caller's
-    /// request over a bookkeeping write would turn a reporting problem into
-    /// a payment outage. It is logged loudly instead.
-    async fn mirror_payment_ledger(
-        &self,
-        storage: &DurableStore,
-        tenant_id: &str,
-        snapshot: &Session,
-    ) {
-        if snapshot.payment_authorizations().is_empty() {
-            return;
-        }
-        if let Err(error) = storage.save_payment_ledger(tenant_id, snapshot).await {
-            tracing::error!(
-                %error, tenant = %tenant_id, session = %snapshot.id,
-                concat!(
-                    "payment ledger mirror failed; the session is saved ",
-                    "and the tenant-scoped tables are now behind",
-                )
-            );
-        }
     }
 
     /// Apply a control-plane mutation and its durable snapshot as one logical
@@ -477,7 +452,6 @@ impl Shared {
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
                         .insert(id.to_owned(), version);
-                    self.mirror_payment_ledger(storage, tenant_id, &after).await;
                 }
                 Err(error) => {
                     *lock(&session) = before;
@@ -498,48 +472,91 @@ impl Shared {
     /// was granted a minute ago or last week.
     ///
     /// Silent when there is no storage, when the session already has it, or
-    /// when the ledger does not. A miss here is not an error: most calls
-    /// carry an authorization the session registered itself.
+    /// when the ledger does not. A miss is not an error: most calls carry
+    /// an authorization the session registered itself. A ledger that cannot
+    /// be read is, and the caller refuses the payment: an allow issued
+    /// without the ledger is an allow issued without the check.
     pub async fn hydrate_authorization(
         &self,
         tenant_id: &str,
         session: &std::sync::Arc<std::sync::Mutex<Session>>,
         authorization_id: &str,
-    ) {
-        let Some(storage) = &self.storage else { return };
+    ) -> Result<()> {
+        let Some(storage) = &self.storage else {
+            return Ok(());
+        };
         {
             let session = lock(session);
             if session.payment_authorization(authorization_id).is_some() {
-                return;
+                return Ok(());
             }
         }
-        match storage
+        let authorization = storage
             .payment_authorization(tenant_id, authorization_id)
             .await
-        {
-            Ok(Some(authorization)) => {
-                let mut session = lock(session);
-                if let Err(error) = session.register_payment_authorization(authorization) {
-                    tracing::warn!(
-                        %error, tenant = %tenant_id, authorization_id,
-                        "an authorization from the ledger was refused by this session"
-                    );
-                } else {
-                    tracing::info!(
-                        tenant = %tenant_id, authorization_id,
-                        concat!(
-                            "authorization loaded from the payment ledger; ",
-                            "it outlived the session that registered it",
-                        )
-                    );
-                }
+            .context("reading the payment ledger")?;
+        if let Some(authorization) = authorization {
+            let mut session = lock(session);
+            if let Err(error) = session.register_payment_authorization(authorization) {
+                tracing::warn!(
+                    %error, tenant = %tenant_id, authorization_id,
+                    "an authorization from the ledger was refused by this session"
+                );
+            } else {
+                tracing::info!(
+                    tenant = %tenant_id, authorization_id,
+                    concat!(
+                        "authorization loaded from the payment ledger; ",
+                        "it outlived the session that registered it",
+                    )
+                );
             }
-            Ok(None) => {}
-            Err(error) => tracing::warn!(
-                %error, tenant = %tenant_id, authorization_id,
-                "could not read the payment ledger; evaluating on this session alone"
-            ),
         }
+        Ok(())
+    }
+
+    /// Drop a session from memory. Its durable snapshot is what the next
+    /// request for it restores from.
+    ///
+    /// Whoever holds the session already keeps it; the maps stop pointing at
+    /// it. Without durable storage nothing is dropped, because there would
+    /// be nowhere to restore it from.
+    pub async fn forget_session(&self, tenant_id: &str, id: &str) -> bool {
+        if self.storage.is_none() {
+            return false;
+        }
+        let gate = self.session_gate(tenant_id, id).await;
+        let forgotten = {
+            let _guard = gate.lock().await;
+            let bound = self
+                .session_tenants
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(id)
+                .cloned();
+            if bound.as_deref() != Some(tenant_id) {
+                return false;
+            }
+            self.session_tenants
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(id);
+            self.session_versions
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(id);
+            self.store.remove(id)
+        };
+        drop(gate);
+        let key = format!("{tenant_id}\0{id}");
+        let mut gates = self.session_gates.lock().await;
+        if gates
+            .get(&key)
+            .is_some_and(|gate| std::sync::Arc::strong_count(gate) == 1)
+        {
+            gates.remove(&key);
+        }
+        forgotten
     }
 
     /// Persist signed evidence in PostgreSQL as well as the append-only file.
@@ -588,32 +605,53 @@ impl Shared {
             .and_then(|_| f.flush())
             .with_context(|| format!("appending to {}", log.path.display()))?;
         log.last_hash = Some(record.hash());
-        log.records.push(record.clone());
         lock(session).record_evaluation(eval);
         Ok(record)
     }
 
-    /// Evidence records for one session, in order.
-    pub fn evidence_for(&self, session_id: &str) -> Vec<Record> {
-        let log = self.evidence.lock().unwrap_or_else(PoisonError::into_inner);
-        log.records
-            .iter()
-            .filter(|r| r.session == session_id)
-            .cloned()
-            .collect()
-    }
-
-    /// Evidence for one authenticated tenant session, restored from durable
-    /// storage when configured.
+    /// Evidence for one tenant session, in order: from durable storage when
+    /// configured, otherwise from the append-only file.
+    ///
+    /// Read back rather than kept: a gateway that held every record it ever
+    /// wrote would grow with its own history, and a record it wrote before
+    /// its last restart would be one it could no longer find.
     pub async fn evidence_for_tenant(
         &self,
         tenant_id: &str,
         session_id: &str,
     ) -> Result<Vec<Record>> {
-        match &self.storage {
-            Some(storage) => storage.evidence_for(tenant_id, session_id).await,
-            None => Ok(self.evidence_for(session_id)),
+        if let Some(storage) = &self.storage {
+            return storage.evidence_for(tenant_id, session_id).await;
         }
+        let path = self
+            .evidence
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .path
+            .clone();
+        let read = tokio::task::spawn_blocking({
+            let path = path.clone();
+            move || std::fs::read_to_string(path)
+        })
+        .await
+        .context("reading evidence")?;
+        let text = match read {
+            Ok(text) => text,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(e).with_context(|| format!("reading {}", path.display())),
+        };
+        let mut records = Vec::new();
+        for (n, line) in text.lines().enumerate() {
+            if line.trim().is_empty() {
+                continue;
+            }
+            let record: Record = serde_json::from_str(line)
+                .with_context(|| format!("{}:{}: decoding evidence", path.display(), n + 1))?;
+            if record.session == session_id {
+                records.push(record);
+            }
+        }
+        Ok(records)
     }
 
     /// Mint a resume token for a step-up.

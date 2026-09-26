@@ -139,7 +139,14 @@ impl DurableStore {
         .transpose()
     }
 
-    /// Insert or update a complete session snapshot.
+    /// Insert or update a complete session snapshot, and the ledger rows it
+    /// implies, in one transaction.
+    ///
+    /// One transaction, because the two are one fact. The session document
+    /// is what this gateway evaluates and the ledger is what every other
+    /// session under the tenant counts; a snapshot that committed without
+    /// its ledger rows would let the aggregate read low until the next
+    /// save, and a payment could be allowed in that gap.
     pub async fn save_session(
         &self,
         tenant_id: &str,
@@ -147,13 +154,17 @@ impl DurableStore {
         expected_version: Option<i64>,
     ) -> Result<i64> {
         let state = Json(serde_json::to_value(session).context("encoding session")?);
-        let client = self
+        let mut client = self
             .pool
             .get()
             .await
             .context("session database connection")?;
+        let tx = client
+            .transaction()
+            .await
+            .context("opening session transaction")?;
         let row = match expected_version {
-            Some(version) => client
+            Some(version) => tx
                 .query_opt(
                     "UPDATE moat.sessions
                          SET state = $3, version = version + 1, updated_at = now()
@@ -163,7 +174,7 @@ impl DurableStore {
                 )
                 .await
                 .context("updating session")?,
-            None => client
+            None => tx
                 .query_opt(
                     "INSERT INTO moat.sessions (tenant_id, id, state)
                          VALUES ($1, $2, $3)
@@ -179,7 +190,12 @@ impl DurableStore {
                 "session version conflict for tenant {tenant_id}; reload before retrying"
             )
         })?;
-        Ok(row.get(0))
+        let version: i64 = row.get(0);
+        if !session.payment_authorizations().is_empty() {
+            write_payment_ledger(&tx, tenant_id, session).await?;
+        }
+        tx.commit().await.context("committing session")?;
+        Ok(version)
     }
 
     /// Persist one signed evidence record alongside its JSONL copy.
@@ -688,9 +704,145 @@ fn stamp(value: Option<SystemTime>) -> Option<String> {
 // Postgres infer the parameter's type as numeric, and tokio-postgres then
 // refuses to send a String for it. Naming `text` first fixes the inferred
 // type at the one thing we can serialize, and the second cast converts it
-// server-side. Written the obvious way, every ledger write failed -- and
-// because the mirror is deliberately non-fatal, it failed by logging and
-// carrying on, leaving the tables empty and the aggregate reading zero.
+// server-side.
+
+/// Upsert a session's authorizations and outcomes, and replace its
+/// reservations, inside `tx`.
+///
+/// Upserts rather than replaces: another session under the same tenant may
+/// have written rows for the same authorization, and this one's snapshot is
+/// not entitled to delete them. Reservations that this session no longer
+/// holds are removed, because a reservation is a claim about right now and a
+/// stale one blocks a payment nobody is making. One this session still holds
+/// but has outlived [`moat_core::session::RESERVATION_MAX_AGE_MS`] is not
+/// written back for the same reason.
+async fn write_payment_ledger(
+    tx: &tokio_postgres::Transaction<'_>,
+    tenant_id: &str,
+    session: &Session,
+) -> Result<()> {
+    for authorization in session.payment_authorizations() {
+        let body = Json(serde_json::to_value(authorization).context("encoding authorization")?);
+        tx.execute(
+            "INSERT INTO moat.payment_authorizations (
+                 tenant_id, id, origin_session_id, payee, destination, network,
+                 asset_contract, currency, amount_minor, tolerance_minor,
+                 aggregate_limit_minor, invoice_id, invoice_fingerprint,
+                 require_invoice_fingerprint, repeat_payments, max_payments,
+                 expires_unix_ms, cancelled, body
+             ) VALUES (
+                 $1, $2, $3, $4, $5, $6, $7, $8, $9::text::numeric, $10::text::numeric,
+                 $11::text::numeric, $12, $13, $14, $15, $16, $17, $18, $19
+             )
+             ON CONFLICT (tenant_id, id) DO UPDATE SET
+                 cancelled = moat.payment_authorizations.cancelled OR EXCLUDED.cancelled,
+                 body = EXCLUDED.body,
+                 updated_at = now()",
+            &[
+                &tenant_id,
+                &authorization.id,
+                &session.id,
+                &authorization.payee,
+                &authorization.recipient_account_id,
+                &authorization.network,
+                &authorization.asset_contract,
+                &authorization.currency,
+                &authorization.amount_minor.0.to_string(),
+                &authorization.tolerance_minor.0.to_string(),
+                &authorization
+                    .aggregate_limit_minor
+                    .map(|limit| limit.0.to_string()),
+                &authorization.invoice_id,
+                &authorization.invoice_fingerprint,
+                &authorization.require_invoice_fingerprint,
+                &authorization.repeat_payments,
+                &i32::try_from(authorization.max_payments).unwrap_or(i32::MAX),
+                &i64::try_from(authorization.expires_unix_ms).unwrap_or(i64::MAX),
+                &authorization.cancelled,
+                &body,
+            ],
+        )
+        .await
+        .with_context(|| format!("saving authorization {}", authorization.id))?;
+    }
+
+    for outcome in session.payment_outcomes() {
+        let body = Json(serde_json::to_value(outcome).context("encoding outcome")?);
+        tx.execute(
+            "INSERT INTO moat.payment_outcomes (
+                 tenant_id, evidence_id, authorization_id, session_id, rail, provider,
+                 invoice_id, status, status_kind, committed, terminal, quarantined,
+                 amount_minor, receipt, body
+             ) VALUES (
+                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::text::numeric, $14, $15
+             )
+             ON CONFLICT (tenant_id, evidence_id) DO UPDATE SET
+                 status = EXCLUDED.status,
+                 status_kind = EXCLUDED.status_kind,
+                 committed = EXCLUDED.committed,
+                 terminal = EXCLUDED.terminal,
+                 quarantined = EXCLUDED.quarantined,
+                 receipt = COALESCE(EXCLUDED.receipt, moat.payment_outcomes.receipt),
+                 body = EXCLUDED.body,
+                 updated_at = now()",
+            &[
+                &tenant_id,
+                &outcome.evidence_id,
+                &outcome.authorization_id,
+                &session.id,
+                &outcome.rail.as_str(),
+                &outcome.provider,
+                &outcome.invoice_id,
+                &outcome.status,
+                &outcome.status_kind.as_str(),
+                &outcome.committed,
+                &outcome.status_kind.terminal(),
+                &outcome.quarantined,
+                &outcome.amount_minor.0.to_string(),
+                &outcome.receipt,
+                &body,
+            ],
+        )
+        .await
+        .with_context(|| format!("saving outcome {}", outcome.evidence_id))?;
+    }
+
+    // This session's reservations, and only this session's: a claim
+    // that a payment is in flight belongs to the process making it.
+    tx.execute(
+        "DELETE FROM moat.payment_reservations WHERE tenant_id = $1 AND session_id = $2",
+        &[&tenant_id, &session.id],
+    )
+    .await
+    .context("clearing stale reservations")?;
+    let now_unix_ms = SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
+        .unwrap_or(0);
+    for reservation in session
+        .payment_reservations()
+        .iter()
+        .filter(|reservation| !reservation.is_stale(now_unix_ms))
+    {
+        tx.execute(
+            "INSERT INTO moat.payment_reservations (
+                 tenant_id, fingerprint, authorization_id, session_id, amount_minor
+             ) VALUES ($1, $2, $3, $4, $5::text::numeric)
+             ON CONFLICT (tenant_id, fingerprint) DO NOTHING",
+            &[
+                &tenant_id,
+                &reservation.fingerprint,
+                &reservation.authorization_id,
+                &session.id,
+                &reservation.amount_minor.0.to_string(),
+            ],
+        )
+        .await
+        .context("saving reservation")?;
+    }
+
+    Ok(())
+}
 
 /// A `Minor` from a `numeric` column returned as text.
 fn minor_from_text(text: &str) -> Result<Minor> {
@@ -720,14 +872,12 @@ impl Aggregate {
 
 impl DurableStore {
     /// Write a session's authorizations, outcomes and reservations to the
-    /// ledger, in one transaction.
+    /// ledger, in a transaction of their own.
     ///
-    /// Upserts rather than replaces: another session under the same tenant
-    /// may have written rows for the same authorization, and this one's
-    /// snapshot is not entitled to delete them. Reservations that this
-    /// session no longer holds are removed, because a reservation is a
-    /// claim about right now and a stale one blocks a payment nobody is
-    /// making.
+    /// [`DurableStore::save_session`] writes the same rows inside the
+    /// session's transaction, which is the path a running gateway takes.
+    /// This is for writing the ledger without a session snapshot.
+    #[cfg(test)]
     pub async fn save_payment_ledger(&self, tenant_id: &str, session: &Session) -> Result<()> {
         let mut client = self
             .pool
@@ -738,121 +888,35 @@ impl DurableStore {
             .transaction()
             .await
             .context("opening payment ledger transaction")?;
-
-        for authorization in session.payment_authorizations() {
-            let body = Json(serde_json::to_value(authorization).context("encoding authorization")?);
-            tx.execute(
-                "INSERT INTO moat.payment_authorizations (
-                     tenant_id, id, origin_session_id, payee, destination, network,
-                     asset_contract, currency, amount_minor, tolerance_minor,
-                     aggregate_limit_minor, invoice_id, invoice_fingerprint,
-                     require_invoice_fingerprint, repeat_payments, max_payments,
-                     expires_unix_ms, cancelled, body
-                 ) VALUES (
-                     $1, $2, $3, $4, $5, $6, $7, $8, $9::text::numeric, $10::text::numeric,
-                     $11::text::numeric, $12, $13, $14, $15, $16, $17, $18, $19
-                 )
-                 ON CONFLICT (tenant_id, id) DO UPDATE SET
-                     cancelled = moat.payment_authorizations.cancelled OR EXCLUDED.cancelled,
-                     body = EXCLUDED.body,
-                     updated_at = now()",
-                &[
-                    &tenant_id,
-                    &authorization.id,
-                    &session.id,
-                    &authorization.payee,
-                    &authorization.recipient_account_id,
-                    &authorization.network,
-                    &authorization.asset_contract,
-                    &authorization.currency,
-                    &authorization.amount_minor.0.to_string(),
-                    &authorization.tolerance_minor.0.to_string(),
-                    &authorization
-                        .aggregate_limit_minor
-                        .map(|limit| limit.0.to_string()),
-                    &authorization.invoice_id,
-                    &authorization.invoice_fingerprint,
-                    &authorization.require_invoice_fingerprint,
-                    &authorization.repeat_payments,
-                    &i32::try_from(authorization.max_payments).unwrap_or(i32::MAX),
-                    &i64::try_from(authorization.expires_unix_ms).unwrap_or(i64::MAX),
-                    &authorization.cancelled,
-                    &body,
-                ],
-            )
-            .await
-            .with_context(|| format!("saving authorization {}", authorization.id))?;
-        }
-
-        for outcome in session.payment_outcomes() {
-            let body = Json(serde_json::to_value(outcome).context("encoding outcome")?);
-            tx.execute(
-                "INSERT INTO moat.payment_outcomes (
-                     tenant_id, evidence_id, authorization_id, session_id, rail, provider,
-                     invoice_id, status, status_kind, committed, terminal, quarantined,
-                     amount_minor, receipt, body
-                 ) VALUES (
-                     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::text::numeric, $14, $15
-                 )
-                 ON CONFLICT (tenant_id, evidence_id) DO UPDATE SET
-                     status = EXCLUDED.status,
-                     status_kind = EXCLUDED.status_kind,
-                     committed = EXCLUDED.committed,
-                     terminal = EXCLUDED.terminal,
-                     quarantined = EXCLUDED.quarantined,
-                     receipt = COALESCE(EXCLUDED.receipt, moat.payment_outcomes.receipt),
-                     body = EXCLUDED.body,
-                     updated_at = now()",
-                &[
-                    &tenant_id,
-                    &outcome.evidence_id,
-                    &outcome.authorization_id,
-                    &session.id,
-                    &outcome.rail.as_str(),
-                    &outcome.provider,
-                    &outcome.invoice_id,
-                    &outcome.status,
-                    &outcome.status_kind.as_str(),
-                    &outcome.committed,
-                    &outcome.status_kind.terminal(),
-                    &outcome.quarantined,
-                    &outcome.amount_minor.0.to_string(),
-                    &outcome.receipt,
-                    &body,
-                ],
-            )
-            .await
-            .with_context(|| format!("saving outcome {}", outcome.evidence_id))?;
-        }
-
-        // This session's reservations, and only this session's: a claim
-        // that a payment is in flight belongs to the process making it.
-        tx.execute(
-            "DELETE FROM moat.payment_reservations WHERE tenant_id = $1 AND session_id = $2",
-            &[&tenant_id, &session.id],
-        )
-        .await
-        .context("clearing stale reservations")?;
-        for reservation in session.payment_reservations() {
-            tx.execute(
-                "INSERT INTO moat.payment_reservations (
-                     tenant_id, fingerprint, authorization_id, session_id, amount_minor
-                 ) VALUES ($1, $2, $3, $4, $5::text::numeric)
-                 ON CONFLICT (tenant_id, fingerprint) DO NOTHING",
-                &[
-                    &tenant_id,
-                    &reservation.fingerprint,
-                    &reservation.authorization_id,
-                    &session.id,
-                    &reservation.amount_minor.0.to_string(),
-                ],
-            )
-            .await
-            .context("saving reservation")?;
-        }
-
+        write_payment_ledger(&tx, tenant_id, session).await?;
         tx.commit().await.context("committing payment ledger")?;
         Ok(())
+    }
+
+    /// Delete every reservation older than
+    /// [`moat_core::session::RESERVATION_MAX_AGE_MS`], across every tenant.
+    /// Returns how many were deleted.
+    ///
+    /// A session releases its own reservations when their payments settle
+    /// and drops the ones it finds abandoned. A session that died mid-payment
+    /// does neither, and its rows would hold value against the mandate for
+    /// every other session until somebody noticed. This is the somebody.
+    pub async fn expire_reservations(&self) -> Result<u64> {
+        let client = self
+            .pool
+            .get()
+            .await
+            .context("reservation database connection")?;
+        let max_age_ms =
+            i64::try_from(moat_core::session::RESERVATION_MAX_AGE_MS).unwrap_or(i64::MAX);
+        client
+            .execute(
+                "DELETE FROM moat.payment_reservations
+                 WHERE created_at < now() - ($1::bigint * interval '1 millisecond')",
+                &[&max_age_ms],
+            )
+            .await
+            .context("expiring abandoned reservations")
     }
 
     /// An authorization from the ledger, whatever session registered it.
@@ -1147,6 +1211,27 @@ mod ledger_tests {
         format!("{prefix}-{nanos}")
     }
 
+    fn now_ms() -> u64 {
+        u64::try_from(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("clock")
+                .as_millis(),
+        )
+        .expect("fits")
+    }
+
+    fn reservation(fingerprint: &str, amount: u128, reserved_unix_ms: u64) -> PaymentReservation {
+        PaymentReservation {
+            fingerprint: fingerprint.to_owned(),
+            authorization_id: "auth-age".to_owned(),
+            invoice_id: "INV-auth-age".to_owned(),
+            invoice_fingerprint: None,
+            amount_minor: Minor(amount),
+            reserved_unix_ms,
+        }
+    }
+
     /// A tenant of our own, so a test never touches another's rows.
     async fn tenant(store: &DurableStore, id: &str) {
         exec(
@@ -1288,6 +1373,7 @@ mod ledger_tests {
             invoice_id: "INV-auth-agg".into(),
             invoice_fingerprint: None,
             amount_minor: Minor(5_000),
+            reserved_unix_ms: now_ms(),
         });
         store
             .save_payment_ledger(&id, &session)
@@ -1302,6 +1388,118 @@ mod ledger_tests {
         assert_eq!(aggregate.reserved, Minor(5_000), "the open reservation");
         assert_eq!(aggregate.payments, 2, "the failed one is not a payment");
         assert_eq!(aggregate.total(), Minor(45_000));
+
+        cleanup(&store, &id).await;
+    }
+
+    /// The path a running gateway takes: the session snapshot and its
+    /// ledger rows land together, so nothing can read the one without the
+    /// other.
+    #[tokio::test]
+    async fn saving_a_session_writes_its_ledger_with_it() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-with", 10_000, Some(100_000)))
+            .expect("registering");
+        session.record_payment_outcome(outcome(
+            "ev-with",
+            "auth-with",
+            10_000,
+            OutcomeStatus::Succeeded,
+        ));
+        let version = store
+            .save_session(&id, &session, None)
+            .await
+            .expect("saving");
+
+        assert!(store
+            .payment_authorization(&id, "auth-with")
+            .await
+            .expect("reading")
+            .is_some());
+        let aggregate = store
+            .aggregate_for(&id, "auth-with")
+            .await
+            .expect("aggregate");
+        assert_eq!(aggregate.committed, Minor(10_000));
+        assert_eq!(aggregate.payments, 1);
+
+        // And the second save, through the optimistic-version path.
+        session.record_payment_outcome(outcome(
+            "ev-with-2",
+            "auth-with",
+            20_000,
+            OutcomeStatus::Confirmed,
+        ));
+        store
+            .save_session(&id, &session, Some(version))
+            .await
+            .expect("saving again");
+        let aggregate = store
+            .aggregate_for(&id, "auth-with")
+            .await
+            .expect("aggregate");
+        assert_eq!(aggregate.committed, Minor(30_000));
+
+        cleanup(&store, &id).await;
+    }
+
+    /// A reservation a dead process left behind stops counting: the session
+    /// that still holds a stale one does not write it back, and the reaper
+    /// clears the row of a session that never came back at all.
+    #[tokio::test]
+    async fn an_abandoned_reservation_stops_holding_value() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-age", 10_000, Some(100_000)))
+            .expect("registering");
+        assert!(session.reserve_payment(reservation("fp-stale", 7_000, 0)));
+        assert!(session.reserve_payment(reservation("fp-live", 5_000, now_ms())));
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+        let aggregate = store
+            .aggregate_for(&id, "auth-age")
+            .await
+            .expect("aggregate");
+        assert_eq!(
+            aggregate.reserved,
+            Minor(5_000),
+            "the stale one was not written"
+        );
+
+        // Nothing to reap yet: the live one is fresh.
+        store.expire_reservations().await.expect("reaping");
+        let aggregate = store
+            .aggregate_for(&id, "auth-age")
+            .await
+            .expect("aggregate");
+        assert_eq!(aggregate.reserved, Minor(5_000));
+
+        // The process that held it dies, and time passes.
+        exec(
+            &store,
+            "UPDATE moat.payment_reservations SET created_at = now() - interval '1 day'
+             WHERE tenant_id = $1",
+            &[&id],
+        )
+        .await;
+        let reaped = store.expire_reservations().await.expect("reaping");
+        assert!(reaped >= 1, "ours was among the reaped");
+        let aggregate = store
+            .aggregate_for(&id, "auth-age")
+            .await
+            .expect("aggregate");
+        assert_eq!(aggregate.reserved, Minor(0));
 
         cleanup(&store, &id).await;
     }

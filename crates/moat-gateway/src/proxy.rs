@@ -926,8 +926,6 @@ impl Gateway {
         }
     }
 
-    /// Evaluate a payment call. Returns its evidence context if it may be forwarded; on
-    /// `step_up` or `deny` the error has already been sent to the client.
     /// Release a reservation from the session and from the tenant ledger.
     ///
     /// Both, always. A reservation released in only one of the two leaves
@@ -1025,6 +1023,9 @@ impl Gateway {
         }
     }
 
+    /// Evaluate a payment call. Returns its evidence context if it may be
+    /// forwarded; on `step_up` or `deny` the error has already been sent to
+    /// the client.
     async fn authorize(
         &self,
         id: &RequestId,
@@ -1046,20 +1047,52 @@ impl Gateway {
             args,
         };
         let session = self.shared.store.get_or_create(&self.session_id);
+        let now = now_unix_ms();
+        {
+            let expired = moat_core::session::lock(&session).expire_payment_reservations(now);
+            if expired > 0 {
+                tracing::warn!(
+                    session = %self.session_id, expired,
+                    "dropped reservations no payment could still be in flight for"
+                );
+            }
+        }
         // A mandate registered in an earlier session lives in the ledger,
         // not in this session's document. Fetch it before evaluating, or
         // this call is judged against an authorization Moat has simply not
         // looked for -- which fails closed, but fails closed on a mandate
         // the user really did grant.
+        let mut ledger_failure = None;
         if let Some(authorization_id) = call.args.get("authorization_id").and_then(Value::as_str) {
-            self.shared
+            if let Err(error) = self
+                .shared
                 .hydrate_authorization(&self.tenant_id, &session, authorization_id)
-                .await;
+                .await
+            {
+                tracing::error!(
+                    %error, tenant = %self.tenant_id, authorization_id,
+                    "could not read the payment ledger; denying"
+                );
+                ledger_failure = Some(format!("{error:#}"));
+            }
         }
-        let now = now_unix_ms();
 
         let (eval, reservation_fingerprint, proposed_minor) =
             match self.shared.policies.for_upstream(server) {
+                PolicyState::Loaded(_) if ledger_failure.is_some() => (
+                    refused_evaluation(
+                        call,
+                        "ledger-unavailable",
+                        format!(
+                        "the payment ledger could not be reached to look up the authorization: {}",
+                        ledger_failure.unwrap_or_default()
+                    ),
+                        now,
+                        rail,
+                    ),
+                    None,
+                    None,
+                ),
                 PolicyState::Loaded(policy) => {
                     let mut s = moat_core::session::lock(&session);
                     let mut eval =
@@ -1088,6 +1121,7 @@ impl Gateway {
                                     .and_then(Value::as_str)
                                     .map(|value| value.trim().to_ascii_lowercase()),
                                 amount_minor,
+                                reserved_unix_ms: now,
                             });
                             // Two different failures used to share one message
                             // here, and the shared message named neither. A
@@ -1374,6 +1408,24 @@ fn policy_missing_evaluation(
     now: u64,
     rail: Rail,
 ) -> moat_core::policy::Evaluation {
+    refused_evaluation(
+        call,
+        "policy-unavailable",
+        format!("no usable policy: {why}"),
+        now,
+        rail,
+    )
+}
+
+/// A deny that no rule produced: the gateway could not evaluate at all, and
+/// says so with evidence rather than with silence.
+fn refused_evaluation(
+    call: moat_core::policy::PaymentCall,
+    rule_id: &str,
+    message: String,
+    now: u64,
+    rail: Rail,
+) -> moat_core::policy::Evaluation {
     use moat_core::verdict::{Decision, RuleOutcome, Verdict};
     let seed = format!("{}|{}|{}|{now}", call.server, call.tool, call.call_id);
     let evidence_id = format!("ev_{}", &moat_core::hash::sha256_hex(seed.as_bytes())[..24]);
@@ -1383,12 +1435,12 @@ fn policy_missing_evaluation(
         verdict: Verdict {
             decision: Decision::Deny,
             reasons: vec![RuleOutcome {
-                id: "policy-unavailable".to_owned(),
+                id: rule_id.to_owned(),
                 field: None,
                 passed: false,
                 source: None,
                 on_fail: Decision::Deny,
-                message: format!("no usable policy: {why}"),
+                message,
             }],
             step_up_prompt: None,
             evidence_id,

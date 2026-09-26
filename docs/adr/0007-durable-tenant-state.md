@@ -121,10 +121,25 @@ start rather than running with an unenforced aggregate. That is the right
 failure, and it means the database is migrated before the binary is
 replaced, not after.
 
-The mirror write is non-fatal by design: the session snapshot is already
-committed when it runs, and failing a payment over a bookkeeping write
-would turn a reporting problem into an outage. It logs at error level, and
-a deployment that sees those lines has tables drifting behind the documents.
+The mirror write was non-fatal at first: the session snapshot was already
+committed when it ran, and failing a payment over a bookkeeping write
+looked like turning a reporting problem into an outage. That reasoning was
+wrong in the one case that matters. A snapshot committed without its
+ledger rows leaves the aggregate reading low until the next save, and a
+payment in that gap is allowed against a limit that is not being counted.
+**Amended 2026-09-26:** the ledger rows are written inside the session
+snapshot's own transaction. Either both land or neither does, and a
+failure refuses the payment the way any other failed decision write does.
+
+**Amended 2026-09-26, reservations expire.** A session releases its own
+reservations when their payments settle. A process that dies between
+allowing a payment and hearing its outcome never does, and the row held
+value against the mandate for every other session under the tenant until
+somebody deleted it by hand. A reservation now carries the time it was
+taken; nothing older than `RESERVATION_MAX_AGE_MS` (fifteen minutes, the
+longest a co-signature lives) is written back to the ledger, a restored
+session drops what it finds abandoned, and the gateway deletes ledger rows
+that old at startup and once a minute after.
 
 What this does not do. Mandates are tenant-scoped, not global, and nothing
 expires or archives them yet. The unique index on `(tenant, provider,
@@ -184,9 +199,9 @@ bare `$n::numeric` makes Postgres infer the parameter as numeric, and
 tokio-postgres will not send a String for it; the cast has to be
 `$n::text::numeric`. Every ledger write failed on its first parameter.
 
-The way it failed is the part worth remembering. The mirror is
-deliberately non-fatal -- a bookkeeping write should not fail a
-customer's payment -- so in production it would have logged an error and
+The way it failed is the part worth remembering. The mirror was then
+non-fatal -- a bookkeeping write should not fail a customer's payment, the
+thinking went -- so in production it would have logged an error and
 carried on. The tables would have stayed empty, `aggregate_for` would
 have read zero, and `authorization-tenant-aggregate` would have allowed
 everything while appearing to work. A cross-session limit that silently

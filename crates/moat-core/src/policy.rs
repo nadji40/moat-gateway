@@ -3038,6 +3038,7 @@ rules: []
             invoice_id: "INV-A".into(),
             invoice_fingerprint: Some(FP_A.into()),
             amount_minor: Minor(6_000),
+            reserved_unix_ms: 10_000,
         }));
 
         let concurrent_split = evaluate(
