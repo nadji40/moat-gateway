@@ -68,6 +68,12 @@ const NEGATIONS: &[&str] = &[
     "stop",
     "cancel",
     "avoid",
+    "refuse",
+    "refused",
+    "reject",
+    "decline",
+    "block",
+    "forbid",
     "لا",
     "لن",
     "لم",
@@ -79,6 +85,43 @@ const NEGATIONS: &[&str] = &[
     "باستثناء",
     "غير",
     "ماعدا",
+];
+
+/// Words that make the number after them a reference, not a price: "order
+/// 450", "ticket 88", "my user ID is 42", "room 101".
+const REFERENCES: &[&str] = &[
+    "order",
+    "ticket",
+    "id",
+    "room",
+    "invoice",
+    "inv",
+    "ref",
+    "reference",
+    "account",
+    "acct",
+    "extension",
+    "ext",
+    "number",
+    "no",
+    "po",
+    "case",
+    "unit",
+    "flat",
+    "apartment",
+    "building",
+    "floor",
+    "version",
+    "year",
+    "phone",
+    "tel",
+    "code",
+    "pin",
+    "رقم",
+    "فاتورة",
+    "طلب",
+    "غرفة",
+    "حساب",
 ];
 
 /// One-letter Arabic prefixes written joined to the next word: "لمؤسسة" is
@@ -250,6 +293,20 @@ pub fn amounts(text: &str) -> Vec<String> {
         }
         let beside_currency = (at > 0 && currency_word(&tokens[at - 1]))
             || tokens.get(at + 1).is_some_and(currency_word);
+        // "order 450", "my user ID is 42": a reference within two words back.
+        let reference = tokens[at.saturating_sub(2)..at]
+            .iter()
+            .any(|t| REFERENCES.contains(&t.bare.as_str()));
+        // "3 licences", "15 days": a count of something that is not money.
+        let counted = tokens.get(at + 1).is_some_and(|next| {
+            next.bare.chars().count() > 2
+                && next.bare.chars().all(char::is_alphabetic)
+                && next.bare.ends_with('s')
+                && !currency_word(next)
+        });
+        if !symbol && !beside_currency && (reference || counted) {
+            continue;
+        }
         if symbol || beside_currency || core.contains('.') {
             strong.push(number);
         } else {
@@ -299,6 +356,10 @@ mod tests {
             "promon billing ltd"
         ));
         assert!(!names("لا تدفع لشركة بروبيل", "شركة بروبيل"));
+        assert!(!names(
+            "I refuse to pay Scammy Ltd, please pay Monitoring Pro Inc 4.80 USD.",
+            "scammy ltd"
+        ));
     }
 
     #[test]
@@ -332,6 +393,13 @@ mod tests {
             ("Pay 480 SAR", vec!["480"]),
             ("ادفع ٤٫٨٠ ريال", vec!["4.8"]),
             ("Pay room 12 for 45 USD", vec!["45"]),
+            // Redwan's stray numbers, from sentences with no price at all.
+            ("Pay Monitoring Pro Inc for order 450", vec![]),
+            ("Buy 3 licences from Monitoring Pro Inc", vec![]),
+            ("Pay Monitoring Pro Inc, my user ID is 42", vec![]),
+            ("Pay Monitoring Pro Inc, room 101", vec![]),
+            ("Monitoring Pro Inc, reference ticket 88", vec![]),
+            ("Pay Monitoring Pro Inc 480 today", vec!["480"]),
         ];
         for (said, want) in cases {
             assert_eq!(amounts(said), want, "{said}");
