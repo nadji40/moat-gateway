@@ -45,6 +45,10 @@ allowlist:
 rules:
   - id: payee-provenance
     when: field == payee
+    # The name beside an address is a label nothing on chain checks. A
+    # payment that gives one must give the right one; a payment that gives
+    # none is judged by the destination rule, which is the one that matters.
+    optional: true
     require_source: [User, Allowlist]
     on_fail: step_up
     message: "counterparty label did not come from the user or the allowlist"

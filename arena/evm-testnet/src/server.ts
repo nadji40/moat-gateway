@@ -81,7 +81,8 @@ server.registerTool(
     inputSchema: {
       counterparty: z
         .string()
-        .describe("Who the address is believed to belong to. A label: the chain does not check it"),
+        .optional()
+        .describe("Who the address is believed to belong to. Optional, and a label: the chain does not check it"),
       to_address: z.string().describe("Destination address"),
       token: z
         .string()
@@ -154,7 +155,7 @@ server.registerTool(
         network: NETWORK,
         destination: record.to.toLowerCase(),
         destination_display: record.to,
-        counterparty: args.counterparty,
+        ...(args.counterparty ? { counterparty: args.counterparty } : {}),
         counterparty_verified: false,
         amount: record.amount,
         currency: record.asset,
@@ -248,7 +249,7 @@ server.registerTool(
       "what is intended so the verdict can be co-signed, and the guarded contract will not " +
       "execute without that signature.",
     inputSchema: {
-      counterparty: z.string().describe("Who the address is believed to belong to"),
+      counterparty: z.string().optional().describe("Who the address is believed to belong to. Optional"),
       to_address: z.string().describe("Destination address"),
       token: z.string().describe("Asset symbol, e.g. ETH"),
       token_address: TokenAddress,

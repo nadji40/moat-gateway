@@ -130,6 +130,12 @@ pub struct Rule {
     /// Explanation on failure. Defaults to something derived from the checks.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// Apply the rule only when the call carries the field. For a field
+    /// that is a label rather than a control, such as the name beside a
+    /// chain address: a call that names someone must name the right one,
+    /// and a call that names nobody is judged by the rules that matter.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub optional: bool,
 }
 
 impl Rule {
@@ -216,6 +222,13 @@ pub struct Policy {
     /// arm modelling a control that never knows what the user asked should do.
     #[serde(default = "default_unrequested")]
     pub unrequested_payment: Decision,
+    /// Every payment this policy governs names an invoice, and every
+    /// authorization it is paid under covers one. Off by default, because on
+    /// a chain most payments have no bill behind them; on for a rail where
+    /// every payment settles a bill, so that no integration can leave the
+    /// invoice out and lose the duplicate-invoice check with it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub require_invoice: bool,
 }
 
 fn default_no_human() -> Decision {
@@ -450,6 +463,14 @@ pub fn evaluate_with(
     let human_approved = session.is_payment_proposal_approved(&payment_fingerprint(&call));
     const APPROVED: &str = "ok: a person approved this exact payment";
 
+    if policy.require_invoice {
+        let outcome = invoice_required(session, &call);
+        if !outcome.passed {
+            decision = decision.max(outcome.on_fail);
+        }
+        reasons.push(outcome);
+    }
+
     if has_authorization_id {
         for outcome in
             structured_authorization_checks(session, &call, &mapped, now_unix_ms, &policy.assets())
@@ -493,7 +514,11 @@ pub fn evaluate_with(
         });
     }
     if !has_authorization_id && !structured_authorization_required {
-        if let Some(mut outcome) = intent_currency(policy, session, &mapped) {
+        let named_checks = [
+            intent_currency(policy, session, &mapped),
+            intent_invoice(session, &call, &mapped),
+        ];
+        for mut outcome in named_checks.into_iter().flatten() {
             if !outcome.passed && human_approved {
                 outcome.passed = true;
                 outcome.message = APPROVED.to_owned();
@@ -655,9 +680,12 @@ fn intent_currency(
         return None;
     }
     let named: std::collections::BTreeSet<String> = session
-        .intents()
+        .live_intents()
         .iter()
-        .flat_map(|intent| crate::money::currencies_named_in(&intent.text))
+        .flat_map(|intent| match &intent.fields {
+            Some(fields) => fields.currencies.iter().cloned().collect(),
+            None => crate::money::currencies_named_in(&intent.text),
+        })
         .collect();
     if named.is_empty() {
         return None;
@@ -680,6 +708,110 @@ fn intent_currency(
             (_, None) => format!("the user named {listed}; this payment names no currency"),
         },
     })
+}
+
+/// Whether a payment's invoice is one the user named.
+///
+/// The payee and the amount are traced to what the user said, and a payment
+/// to the right supplier for the right amount can still settle the wrong
+/// bill: an invoice id swapped by a page, one already paid, one belonging to
+/// someone else. Where the user named references, an invoice the payment
+/// carries must be one of them. `None` when there is nothing to compare: the
+/// payment names no invoice, or the user named no reference.
+fn intent_invoice(
+    session: &Session,
+    call: &PaymentCall,
+    mapped: &BTreeMap<String, (String, &Value)>,
+) -> Option<RuleOutcome> {
+    let paid = mapped
+        .get("invoice")
+        .map(|(_, value)| *value)
+        .or_else(|| call.args.get("invoice_id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|invoice| !invoice.is_empty())?;
+    let named: Vec<&str> = session
+        .live_intents()
+        .iter()
+        .filter_map(|intent| intent.fields.as_ref())
+        .flat_map(|fields| fields.references.iter().map(String::as_str))
+        .collect();
+    if named.is_empty() {
+        return None;
+    }
+    let passed = named
+        .iter()
+        .any(|reference| same_reference(reference, paid));
+    Some(RuleOutcome {
+        id: "intent-invoice".to_owned(),
+        field: Some("invoice".to_owned()),
+        passed,
+        source: None,
+        on_fail: Decision::StepUp,
+        message: if passed {
+            format!("ok: {paid} is a reference the user named")
+        } else {
+            format!(
+                "the user named {}; this payment settles {paid}",
+                named.join(", ")
+            )
+        },
+    })
+}
+
+/// Whether two references name the same thing: equal once case, spaces and
+/// punctuation are set aside, or equal in their number where one of them is
+/// only a number. "INV-100", "inv 100" and "100" are one invoice; "INV-100"
+/// and "PO-100" are not, and neither are "100" and "1000".
+fn same_reference(named: &str, paid: &str) -> bool {
+    let key = |s: &str| -> String {
+        s.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(char::to_uppercase)
+            .collect()
+    };
+    let (named, paid) = (key(named), key(paid));
+    if named.is_empty() || paid.is_empty() {
+        return false;
+    }
+    if named == paid {
+        return true;
+    }
+    let number = |s: &str| {
+        s.trim_start_matches(|c: char| !c.is_ascii_digit())
+            .to_owned()
+    };
+    let bare = |s: &str| s.chars().all(|c| c.is_ascii_digit());
+    (bare(&named) || bare(&paid)) && !number(&named).is_empty() && number(&named) == number(&paid)
+}
+
+/// The policy's `require_invoice`: the payment names an invoice, and the
+/// authorization it cites covers one.
+///
+/// Denies rather than holds. A missing invoice is not something a person
+/// can approve their way past; it is an integration that left out the one
+/// value that lets a bill be paid only once.
+fn invoice_required(session: &Session, call: &PaymentCall) -> RuleOutcome {
+    let named = call
+        .args
+        .get("invoice_id")
+        .and_then(Value::as_str)
+        .is_some_and(|invoice| !invoice.trim().is_empty());
+    let unbound = call
+        .args
+        .get("authorization_id")
+        .and_then(Value::as_str)
+        .and_then(|id| session.payment_authorization(id))
+        .is_some_and(|authorization| authorization.invoice_id.is_none());
+    let (passed, message) = match (named, unbound) {
+        (false, _) => (false, "this rail requires every payment to name an invoice"),
+        (true, true) => (
+            false,
+            "this rail requires every payment to settle an invoice, and the authorization covers none",
+        ),
+        (true, false) => (true, "ok: the payment names an invoice"),
+    };
+    structured_outcome("invoice-required", passed, Decision::Deny, message)
 }
 
 /// Stable identity of a payment proposal. JSON-RPC ids are deliberately not
@@ -775,23 +907,34 @@ fn structured_authorization_checks(
         .get("payee")
         .and_then(|(_, value)| value.as_str())
         .unwrap_or("");
-    let exact_name = crate::normalize::normalize_text(payee)
-        == crate::normalize::normalize_text(&authorization.payee);
-    let spelled_name = authorization.recipient_account_id.is_some()
-        && account_matches
-        && crate::normalize::spelling_key(payee)
-            == crate::normalize::spelling_key(&authorization.payee);
+    let approved_name = authorization.payee.as_deref().unwrap_or("");
+    let exact_name = !approved_name.is_empty()
+        && crate::normalize::normalize_text(payee)
+            == crate::normalize::normalize_text(approved_name);
+    let pinned_account = authorization.recipient_account_id.is_some() && account_matches;
+    let spelled_name = pinned_account
+        && !approved_name.is_empty()
+        && crate::normalize::spelling_key(payee) == crate::normalize::spelling_key(approved_name);
+    // Where the account is pinned and matches, the account is the payee. A
+    // name is then only a label: an authorization need not carry one, and a
+    // payment need not repeat it. A payment that does name somebody else is
+    // still refused when the authorization named somebody.
+    let unnamed = pinned_account && (approved_name.is_empty() || payee.trim().is_empty());
     outcomes.push(structured_outcome(
         "authorization-payee",
-        exact_name || spelled_name,
+        exact_name || spelled_name || unnamed,
         Decision::Deny,
         if exact_name {
             "ok: recipient matches authorization".to_owned()
         } else if spelled_name {
             format!(
-                "ok: the approved account matches; {payee:?} is a spelling of {:?}",
-                authorization.payee
+                "ok: the approved account matches; {payee:?} is a spelling of {approved_name:?}"
             )
+        } else if unnamed && approved_name.is_empty() {
+            "ok: the authorization binds the account, not a name, and the account matches"
+                .to_owned()
+        } else if unnamed {
+            "ok: the approved account matches; the payment names no payee".to_owned()
         } else {
             "recipient does not match authorization".to_owned()
         },
@@ -902,18 +1045,22 @@ fn structured_authorization_checks(
         },
     ));
 
-    let invoice_matches = authorization.repeat_payments || invoice_id == authorization.invoice_id;
+    let (invoice_ok, invoice_message) = match authorization.invoice_id.as_deref() {
+        None => (
+            true,
+            "ok: authorization does not bind an invoice".to_owned(),
+        ),
+        Some(_) if invoice_id.is_empty() => (false, "invoice_id is required".to_owned()),
+        Some(expected) if authorization.repeat_payments || invoice_id == expected => {
+            (true, "ok: invoice is covered by authorization".to_owned())
+        }
+        Some(_) => (false, "invoice does not match authorization".to_owned()),
+    };
     outcomes.push(structured_outcome(
         "authorization-invoice",
-        !invoice_id.is_empty() && invoice_matches,
+        invoice_ok,
         Decision::Deny,
-        if invoice_id.is_empty() {
-            "invoice_id is required".to_owned()
-        } else if invoice_matches {
-            "ok: invoice is covered by authorization".to_owned()
-        } else {
-            "invoice does not match authorization".to_owned()
-        },
+        invoice_message,
     ));
 
     let invoice_fingerprint = call
@@ -1042,13 +1189,17 @@ fn structured_authorization_checks(
         .count();
     let used_for_authorization =
         succeeded_for_authorization.saturating_add(reserved_for_authorization);
-    let duplicate = session.payment_outcomes().iter().any(|outcome| {
-        outcome.authorization_id == authorization.id
-            && outcome.invoice_id == invoice_id
-            && outcome.committed
-    }) || session.payment_reservations().iter().any(|reservation| {
-        reservation.authorization_id == authorization.id && reservation.invoice_id == invoice_id
-    });
+    // Keyed by invoice, so only a payment that names one can repeat one.
+    // Without an invoice the payment count below is what stops a second
+    // payment, and the fingerprint reservation stops the same one twice.
+    let duplicate = !invoice_id.is_empty()
+        && (session.payment_outcomes().iter().any(|outcome| {
+            outcome.authorization_id == authorization.id
+                && outcome.invoice_id == invoice_id
+                && outcome.committed
+        }) || session.payment_reservations().iter().any(|reservation| {
+            reservation.authorization_id == authorization.id && reservation.invoice_id == invoice_id
+        }));
     let duplicate_fingerprint = !invoice_fingerprint.is_empty()
         && (session.payment_outcomes().iter().any(|outcome| {
             outcome.committed
@@ -1166,6 +1317,16 @@ pub fn payment_amount(policy: &Policy, call: &PaymentCall) -> Option<(Asset, Min
 }
 
 fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleOutcome {
+    if rule.optional && prov.is_none() {
+        return RuleOutcome {
+            id: rule.id.clone(),
+            field: Some(field.to_owned()),
+            passed: true,
+            source: None,
+            on_fail: rule.on_fail,
+            message: format!("ok: the call does not carry {field}, and the rule is optional"),
+        };
+    }
     let source = prov.map(|p| p.resolution.source.kind());
     let mut failures: Vec<String> = Vec::new();
 
@@ -1395,14 +1556,14 @@ mod tests {
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-1".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: None,
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(500),
                 currency: "USD".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-100".into(),
+                invoice_id: Some("INV-100".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -1776,9 +1937,9 @@ mod tests {
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-acct".into(),
-                payee: "مؤسسة عسير للحلول السحابية".into(),
+                payee: Some("مؤسسة عسير للحلول السحابية".into()),
                 recipient_account_id: Some("acct_aseer".into()),
-                invoice_id: "INV-300".into(),
+                invoice_id: Some("INV-300".into()),
                 ..base
             })
             .unwrap();
@@ -1871,8 +2032,8 @@ mod tests {
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-ar".into(),
-                payee: "مؤسسة عسير للحلول السحابية".into(),
-                invoice_id: "INV-200".into(),
+                payee: Some("مؤسسة عسير للحلول السحابية".into()),
+                invoice_id: Some("INV-200".into()),
                 ..session.payment_authorization("auth-1").unwrap().clone()
             })
             .unwrap();
@@ -2044,14 +2205,14 @@ mod tests {
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-price-regression".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: None,
                 amount_minor: Minor(9_900),
                 tolerance_minor: Minor(500),
                 currency: "USD".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-PRICE".into(),
+                invoice_id: Some("INV-PRICE".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2109,6 +2270,527 @@ rules:
 
     fn destination_policy() -> Policy {
         Policy::from_yaml(DESTINATION_POLICY).unwrap()
+    }
+
+    fn fields(
+        pay: &[&str],
+        refused: &[&str],
+        amounts: &[&str],
+        currencies: &[&str],
+    ) -> crate::session::IntentFields {
+        let own = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect();
+        crate::session::IntentFields {
+            pay: own(pay),
+            refused: own(refused),
+            amounts: own(amounts),
+            currencies: own(currencies),
+            ..Default::default()
+        }
+    }
+
+    fn pay_decision(session: &Session, payee: &str, amount: f64, currency: &str) -> Decision {
+        evaluate(
+            &policy(),
+            session,
+            call(json!({"payee": payee, "amount": amount, "currency": currency})),
+            10_000,
+        )
+        .verdict
+        .decision
+    }
+
+    /// Fields are matched exactly and the text beside them is never read.
+    /// The Italian sentence the rules reader misread as asking for the
+    /// company it refuses is decided by the fields alone.
+    #[test]
+    fn an_intent_given_as_fields_is_matched_by_its_fields_not_its_text() {
+        let mut s = Session::new("s");
+        s.register_intent_fields(
+            "Non pagare Orbit Labs Srl, paga Vega Cloud Srl 480 euro",
+            fields(&["Vega Cloud Srl"], &["Orbit Labs Srl"], &["480"], &["EUR"]),
+        );
+        assert_eq!(
+            pay_decision(&s, "Vega Cloud Srl", 480.0, "EUR"),
+            Decision::Allow
+        );
+        assert_ne!(
+            pay_decision(&s, "Orbit Labs Srl", 480.0, "EUR"),
+            Decision::Allow
+        );
+        // Exact, not a fragment of the name the user gave.
+        assert_ne!(
+            pay_decision(&s, "Vega Cloud", 480.0, "EUR"),
+            Decision::Allow
+        );
+        // The currency the fields name is the one that counts.
+        assert_ne!(
+            pay_decision(&s, "Vega Cloud Srl", 480.0, "KWD"),
+            Decision::Allow
+        );
+    }
+
+    /// "Actually, don't pay Orbit": a refusal withdraws what an earlier turn
+    /// asked for, whether that turn was text or fields.
+    #[test]
+    fn a_refusal_in_a_later_turn_withdraws_an_earlier_request() {
+        for first_as_text in [true, false] {
+            let mut s = Session::new("s");
+            if first_as_text {
+                s.register_intent("Pay Orbit Labs Srl 480 USD");
+            } else {
+                s.register_intent_fields("", fields(&["Orbit Labs Srl"], &[], &["480"], &["USD"]));
+            }
+            assert_eq!(
+                pay_decision(&s, "Orbit Labs Srl", 480.0, "USD"),
+                Decision::Allow
+            );
+            // Shortened, as people do when they take something back.
+            s.register_intent_fields(
+                "Actually don't pay Orbit Labs",
+                fields(&[], &["Orbit Labs"], &[], &[]),
+            );
+            assert_ne!(
+                pay_decision(&s, "Orbit Labs Srl", 480.0, "USD"),
+                Decision::Allow,
+                "first turn as text: {first_as_text}"
+            );
+        }
+    }
+
+    /// The user changed their mind twice. The last word stands.
+    #[test]
+    fn asking_again_after_a_refusal_stands() {
+        let mut s = Session::new("s");
+        s.register_intent_fields("", fields(&[], &["Orbit Labs Srl"], &[], &[]));
+        s.register_intent_fields("", fields(&["Orbit Labs Srl"], &[], &["480"], &["USD"]));
+        assert_eq!(
+            pay_decision(&s, "Orbit Labs Srl", 480.0, "USD"),
+            Decision::Allow
+        );
+    }
+
+    /// "Wait, cancel that" names nobody, and still withdraws everything
+    /// asked for before it.
+    #[test]
+    fn cancelling_withdraws_every_earlier_turn() {
+        let mut s = Session::new("s");
+        s.register_intent("Pay Orbit Labs Srl 480 USD");
+        s.register_intent_fields(
+            "Wait, cancel that",
+            crate::session::IntentFields {
+                cancels_previous: true,
+                ..Default::default()
+            },
+        );
+        assert_ne!(
+            pay_decision(&s, "Orbit Labs Srl", 480.0, "USD"),
+            Decision::Allow
+        );
+        // And a new request after the cancellation is honoured.
+        s.register_intent_fields("", fields(&["Vega Cloud Ltd"], &[], &["480"], &["USD"]));
+        assert_eq!(
+            pay_decision(&s, "Vega Cloud Ltd", 480.0, "USD"),
+            Decision::Allow
+        );
+        assert_ne!(
+            pay_decision(&s, "Orbit Labs Srl", 480.0, "USD"),
+            Decision::Allow
+        );
+    }
+
+    /// A destination given as a field is matched as a destination: the same
+    /// IBAN however it is spaced, and nothing else.
+    #[test]
+    fn a_destination_given_as_a_field_is_the_users() {
+        let p = destination_policy();
+        let mut s = Session::new("s");
+        s.register_intent_fields(
+            "",
+            crate::session::IntentFields {
+                pay: vec!["Monitoring Pro Inc".into()],
+                destinations: vec!["DE89 3704 0044 0532 0130 00".into()],
+                ..Default::default()
+            },
+        );
+        let source = |iban: &str| {
+            evaluate(
+                &p,
+                &s,
+                call(json!({"payee": "Monitoring Pro Inc", "amount": 10, "currency": "EUR", "iban": iban})),
+                10_000,
+            )
+            .provenance["destination"]
+            .resolution
+            .source
+            .kind()
+        };
+        assert_eq!(
+            source("DE89370400440532013000"),
+            crate::source::SourceKind::User
+        );
+        assert_ne!(
+            source("DE44500105175407324931"),
+            crate::source::SourceKind::User
+        );
+    }
+
+    const EVM: &str = include_str!("../../../policies/rails/evm.yaml");
+    const WALLET: &str = "0x864cc95dcD3a5d88401CB951b670874a17092302";
+
+    fn chain_authorization(
+        id: &str,
+        payee: Option<&str>,
+        invoice: Option<&str>,
+        max_payments: u32,
+    ) -> PaymentAuthorization {
+        PaymentAuthorization {
+            id: id.into(),
+            payee: payee.map(str::to_owned),
+            recipient_account_id: Some(WALLET.into()),
+            amount_minor: Minor(10_000_000_000_000_000),
+            tolerance_minor: Minor(0),
+            currency: "ETH".into(),
+            network: Some("eip155:84532".into()),
+            asset_contract: None,
+            invoice_id: invoice.map(str::to_owned),
+            invoice_fingerprint: None,
+            require_invoice_fingerprint: false,
+            aggregate_limit_minor: None,
+            expires_unix_ms: 20_000,
+            repeat_payments: max_payments > 1,
+            max_payments,
+            cancelled: false,
+        }
+    }
+
+    fn send(
+        authorization_id: &str,
+        to: &str,
+        counterparty: Option<&str>,
+        invoice: Option<&str>,
+    ) -> PaymentCall {
+        let mut args = json!({
+            "authorization_id": authorization_id, "amount": "0.01", "token": "ETH",
+            "network": "eip155:84532", "to_address": to
+        });
+        if let Some(label) = counterparty {
+            args["counterparty"] = json!(label);
+        }
+        if let Some(invoice) = invoice {
+            args["invoice_id"] = json!(invoice);
+        }
+        PaymentCall {
+            server: "wallet".into(),
+            tool: "send".into(),
+            call_id: "1".into(),
+            args: args.as_object().cloned().unwrap(),
+        }
+    }
+
+    fn failing(e: &Evaluation) -> Vec<String> {
+        e.verdict.failures().map(|r| r.id.clone()).collect()
+    }
+
+    /// On a chain the address is the payee. An authorization that pins it
+    /// needs no name and no invoice, and a payment under it needs no label.
+    #[test]
+    fn a_chain_authorization_needs_neither_a_name_nor_an_invoice() {
+        let p = Policy::from_yaml(EVM).unwrap();
+        let mut s = Session::new("s");
+        s.register_payment_authorization(chain_authorization("auth-chain", None, None, 1))
+            .unwrap();
+        for label in [None, Some("Monitoring Pro Inc"), Some("anything at all")] {
+            let e = evaluate(&p, &s, send("auth-chain", WALLET, label, None), 10_000);
+            assert_eq!(
+                e.verdict.decision,
+                Decision::Allow,
+                "{label:?}: {:?}",
+                failing(&e)
+            );
+        }
+        // The address is still the whole of the check.
+        let other = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+        let e = evaluate(&p, &s, send("auth-chain", other, None, None), 10_000);
+        assert!(failing(&e).contains(&"authorization-recipient-account".to_owned()));
+        assert_eq!(e.verdict.decision, Decision::Deny);
+    }
+
+    /// Where the authorization does name the payee, a payment may leave the
+    /// label out, but may not name somebody else.
+    #[test]
+    fn a_named_chain_authorization_refuses_a_different_name() {
+        let p = Policy::from_yaml(EVM).unwrap();
+        let mut s = Session::new("s");
+        s.register_payment_authorization(chain_authorization(
+            "auth-named",
+            Some("Monitoring Pro Inc"),
+            None,
+            1,
+        ))
+        .unwrap();
+        let unlabelled = evaluate(&p, &s, send("auth-named", WALLET, None, None), 10_000);
+        assert_eq!(
+            unlabelled.verdict.decision,
+            Decision::Allow,
+            "{:?}",
+            failing(&unlabelled)
+        );
+        let other = evaluate(
+            &p,
+            &s,
+            send("auth-named", WALLET, Some("Evil Corp"), None),
+            10_000,
+        );
+        assert!(failing(&other).contains(&"authorization-payee".to_owned()));
+    }
+
+    /// Without an invoice to key on, the payment count is what stops a
+    /// second payment, and two payments without invoices are not mistaken
+    /// for the same invoice paid twice.
+    #[test]
+    fn without_an_invoice_the_payment_count_stops_a_second_payment() {
+        let p = Policy::from_yaml(EVM).unwrap();
+        let paid = |s: &mut Session, id: &str, evidence: &str| {
+            s.record_payment_outcome(PaymentOutcome {
+                authorization_id: id.into(),
+                invoice_id: String::new(),
+                invoice_fingerprint: None,
+                amount_minor: Minor(10_000_000_000_000_000),
+                evidence_id: evidence.into(),
+                provider: "wallet".into(),
+                receipt: Some(format!("0x{evidence}")),
+                status: "confirmed".into(),
+                succeeded: true,
+                status_kind: OutcomeStatus::Confirmed,
+                committed: true,
+                quarantined: false,
+                rail: crate::rail::Rail::Crypto,
+                unix_ms: 1,
+                reconciled_unix_ms: None,
+            });
+        };
+
+        let mut once = Session::new("once");
+        once.register_payment_authorization(chain_authorization("auth-once", None, None, 1))
+            .unwrap();
+        paid(&mut once, "auth-once", "ev1");
+        let second = evaluate(&p, &once, send("auth-once", WALLET, None, None), 10_000);
+        assert!(failing(&second).contains(&"authorization-usage".to_owned()));
+        assert!(!failing(&second).contains(&"authorization-duplicate".to_owned()));
+
+        let mut thrice = Session::new("thrice");
+        thrice
+            .register_payment_authorization(chain_authorization("auth-thrice", None, None, 3))
+            .unwrap();
+        paid(&mut thrice, "auth-thrice", "ev1");
+        let second = evaluate(&p, &thrice, send("auth-thrice", WALLET, None, None), 10_000);
+        assert_eq!(
+            second.verdict.decision,
+            Decision::Allow,
+            "{:?}",
+            failing(&second)
+        );
+    }
+
+    /// An invoice, once bound, is still required and still checked.
+    #[test]
+    fn an_authorization_that_binds_an_invoice_still_requires_it() {
+        let p = Policy::from_yaml(EVM).unwrap();
+        let mut s = Session::new("s");
+        s.register_payment_authorization(chain_authorization("auth-inv", None, Some("INV-9"), 1))
+            .unwrap();
+        let without = evaluate(&p, &s, send("auth-inv", WALLET, None, None), 10_000);
+        assert!(failing(&without).contains(&"authorization-invoice".to_owned()));
+        let other = evaluate(
+            &p,
+            &s,
+            send("auth-inv", WALLET, None, Some("INV-8")),
+            10_000,
+        );
+        assert!(failing(&other).contains(&"authorization-invoice".to_owned()));
+        let right = evaluate(
+            &p,
+            &s,
+            send("auth-inv", WALLET, None, Some("INV-9")),
+            10_000,
+        );
+        assert_eq!(
+            right.verdict.decision,
+            Decision::Allow,
+            "{:?}",
+            failing(&right)
+        );
+    }
+
+    /// A rail whose policy requires invoices refuses a payment without one,
+    /// and a payment under an authorization that covers none, whatever the
+    /// authorization itself allowed.
+    #[test]
+    fn a_policy_can_require_every_payment_to_name_an_invoice() {
+        let strict = Policy::from_yaml(&format!("{EVM}\nrequire_invoice: true\n")).unwrap();
+        assert!(strict.require_invoice);
+        let mut s = Session::new("s");
+        s.register_payment_authorization(chain_authorization("auth-open", None, None, 3))
+            .unwrap();
+        s.register_payment_authorization(chain_authorization("auth-bill", None, Some("INV-9"), 1))
+            .unwrap();
+        let failing_ids = |call| failing(&evaluate(&strict, &s, call, 10_000));
+
+        assert!(failing_ids(send("auth-bill", WALLET, None, None))
+            .contains(&"invoice-required".to_owned()));
+        assert!(failing_ids(send("auth-open", WALLET, None, Some("INV-1")))
+            .contains(&"invoice-required".to_owned()));
+        let right = evaluate(
+            &strict,
+            &s,
+            send("auth-bill", WALLET, None, Some("INV-9")),
+            10_000,
+        );
+        assert_eq!(
+            right.verdict.decision,
+            Decision::Allow,
+            "{:?}",
+            failing(&right)
+        );
+        let invoice = right
+            .verdict
+            .reasons
+            .iter()
+            .find(|r| r.id == "invoice-required")
+            .unwrap();
+        assert!(invoice.passed);
+
+        // The same payments under the policy as shipped for chains.
+        let open = Policy::from_yaml(EVM).unwrap();
+        let e = evaluate(&open, &s, send("auth-open", WALLET, None, None), 10_000);
+        assert_eq!(e.verdict.decision, Decision::Allow, "{:?}", failing(&e));
+        assert!(!e.verdict.reasons.iter().any(|r| r.id == "invoice-required"));
+    }
+
+    #[test]
+    fn an_authorization_must_identify_who_is_paid() {
+        let mut s = Session::new("s");
+        let mut neither = chain_authorization("auth-nobody", None, None, 1);
+        neither.recipient_account_id = None;
+        assert!(s.register_payment_authorization(neither).is_err());
+    }
+
+    /// Without an authorization, a chain payment that gives no label is
+    /// judged by where the money goes, not held for a name it never needed.
+    #[test]
+    fn an_optional_label_rule_ignores_a_missing_label_and_checks_a_given_one() {
+        let p = Policy::from_yaml(EVM).unwrap();
+        let mut s = Session::new("s");
+        s.register_intent(&format!("Send 0.01 ETH to {WALLET}"));
+        let call = |label: Option<&str>| {
+            let mut c = send("", WALLET, label, None);
+            c.args.remove("authorization_id");
+            c
+        };
+        let e = evaluate(&p, &s, call(None), 10_000);
+        let payee = e
+            .verdict
+            .reasons
+            .iter()
+            .find(|r| r.id == "payee-provenance")
+            .unwrap();
+        assert!(payee.passed, "{}", payee.message);
+        assert_eq!(e.verdict.decision, Decision::Allow, "{:?}", failing(&e));
+        // A label nobody approved is still the agent's story, and is checked.
+        let e = evaluate(&p, &s, call(Some("Evil Corp")), 10_000);
+        assert!(failing(&e).contains(&"payee-provenance".to_owned()));
+    }
+
+    /// "Pay Orbit Labs 480 USD for invoice INV-100", and a page steers the
+    /// agent to settle INV-999 instead: the right supplier, the right amount,
+    /// the wrong bill.
+    #[test]
+    fn an_invoice_the_user_did_not_name_is_held() {
+        let mut s = Session::new("s");
+        s.register_intent_fields(
+            "Pay Orbit Labs Srl 480 USD for invoice INV-100",
+            crate::session::IntentFields {
+                references: vec!["INV-100".into()],
+                ..fields(&["Orbit Labs Srl"], &[], &["480"], &["USD"])
+            },
+        );
+        let pay = |invoice: Option<&str>| {
+            let mut args = json!({"payee": "Orbit Labs Srl", "amount": 480, "currency": "USD"});
+            if let Some(invoice) = invoice {
+                args["invoice_id"] = json!(invoice);
+            }
+            evaluate(&policy(), &s, call(args), 10_000)
+        };
+        let swapped = pay(Some("INV-999"));
+        assert_eq!(swapped.verdict.decision, Decision::StepUp);
+        let held = swapped
+            .verdict
+            .failures()
+            .find(|r| r.id == "intent-invoice")
+            .unwrap();
+        assert!(held.message.contains("INV-100") && held.message.contains("INV-999"));
+        // The signed record says which bill the user meant and which one the
+        // payment tried to settle.
+        let record = crate::evidence::Record::from_evaluation(&s, &swapped, None).to_line();
+        assert!(record.contains("intent-invoice"), "{record}");
+        assert!(
+            record.contains("the user named INV-100; this payment settles INV-999"),
+            "{record}"
+        );
+        // And the references themselves are bound into the intent's hash.
+        let registered = s
+            .events()
+            .iter()
+            .find_map(|e| match &e.event {
+                crate::session::Event::IntentRegistered { fields_sha256, .. } => {
+                    fields_sha256.clone()
+                }
+                _ => None,
+            })
+            .unwrap();
+        let fields_json = serde_json::to_value(s.intents()[0].fields.as_ref().unwrap()).unwrap();
+        assert_eq!(fields_json["references"], json!(["INV-100"]));
+        assert_eq!(
+            registered,
+            crate::hash::sha256_hex(crate::hash::canonical_json(&fields_json).as_bytes())
+        );
+        for same in ["INV-100", "inv 100", "INV100"] {
+            assert_eq!(pay(Some(same)).verdict.decision, Decision::Allow, "{same}");
+        }
+        // No invoice on the payment: nothing to compare, and `require_invoice`
+        // is the policy's way to insist on one.
+        let none = pay(None);
+        assert_eq!(none.verdict.decision, Decision::Allow);
+        assert!(!none
+            .verdict
+            .reasons
+            .iter()
+            .any(|r| r.id == "intent-invoice"));
+    }
+
+    #[test]
+    fn references_match_by_what_they_name() {
+        assert!(same_reference("INV-100", "inv 100"));
+        assert!(same_reference("100", "INV-100"));
+        assert!(same_reference("INV-100", "100"));
+        assert!(!same_reference("INV-100", "PO-100"));
+        assert!(!same_reference("100", "1000"));
+        assert!(!same_reference("INV-100", "INV-1000"));
+        assert!(!same_reference("", "INV-100"));
+    }
+
+    #[test]
+    fn fields_that_no_request_could_produce_are_refused() {
+        assert!(fields(&["Orbit Labs Srl"], &[], &["480.50"], &["usd"])
+            .validate()
+            .is_ok());
+        assert!(fields(&[" "], &[], &[], &[]).validate().is_err());
+        assert!(fields(&[], &[], &["four hundred"], &[]).validate().is_err());
+        assert!(fields(&[], &[], &["-5"], &[]).validate().is_err());
+        assert!(fields(&[], &[], &["0"], &[]).validate().is_err());
+        assert!(fields(&[], &[], &[], &["DOLLARS"]).validate().is_err());
+        let many: Vec<&str> = std::iter::repeat_n("X Ltd", 17).collect();
+        assert!(fields(&many, &[], &[], &[]).validate().is_err());
     }
 
     /// The bug this match mode exists to fix. `normalize_number` drops
@@ -2275,14 +2957,14 @@ rules:
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-iban".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("DE89 3704 0044 0532 0130 00".into()),
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-IBAN".into(),
+                invoice_id: Some("INV-IBAN".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2388,14 +3070,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-chain".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("0x864cc95dcD3a5d88401CB951b670874a17092302".into()),
                 amount_minor: Minor(250_000_000),
                 tolerance_minor: Minor(0),
                 currency: "USDC".into(),
                 network: Some("eip155:84532".into()),
                 asset_contract: None,
-                invoice_id: "INV-CHAIN".into(),
+                invoice_id: Some("INV-CHAIN".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2482,14 +3164,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-token".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("0x864cc95dcD3a5d88401CB951b670874a17092302".into()),
                 amount_minor: Minor(250_000_000),
                 tolerance_minor: Minor(0),
                 currency: "USDC".into(),
                 network: Some("eip155:84532".into()),
                 asset_contract: Some(REAL_USDC.into()),
-                invoice_id: "INV-TOKEN".into(),
+                invoice_id: Some("INV-TOKEN".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2552,14 +3234,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-token".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("0x864cc95dcD3a5d88401CB951b670874a17092302".into()),
                 amount_minor: Minor(250_000_000),
                 tolerance_minor: Minor(0),
                 currency: "USDC".into(),
                 network: Some("eip155:84532".into()),
                 asset_contract: Some(REAL_USDC.into()),
-                invoice_id: "INV-TOKEN".into(),
+                invoice_id: Some("INV-TOKEN".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2653,14 +3335,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-card".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("DE89 3704 0044 0532 0130 00".into()),
                 amount_minor: Minor(25_000),
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-CARD".into(),
+                invoice_id: Some("INV-CARD".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2704,14 +3386,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-card".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("DE89370400440532013000".into()),
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-CARD".into(),
+                invoice_id: Some("INV-CARD".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2757,14 +3439,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-bank".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("DE89370400440532013000".into()),
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(0),
                 currency: "EUR".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-BANK".into(),
+                invoice_id: Some("INV-BANK".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2841,14 +3523,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-usdc".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: None,
                 amount_minor: Minor(100_000_000),
                 tolerance_minor: Minor(500_000),
                 currency: "USDC".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-USDC".into(),
+                invoice_id: Some("INV-USDC".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2894,14 +3576,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-precision".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: None,
                 amount_minor: Minor(100_000_000),
                 tolerance_minor: Minor(0),
                 currency: "USDC".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-PRECISION".into(),
+                invoice_id: Some("INV-PRECISION".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -2945,14 +3627,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-eth".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: None,
                 amount_minor: one_eth,
                 tolerance_minor: Minor(0),
                 currency: "ETH".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-ETH".into(),
+                invoice_id: Some("INV-ETH".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: false,
                 aggregate_limit_minor: None,
@@ -3068,14 +3750,14 @@ rules: []
         session
             .register_payment_authorization(PaymentAuthorization {
                 id: "auth-bound".into(),
-                payee: "Monitoring Pro Inc".into(),
+                payee: Some("Monitoring Pro Inc".into()),
                 recipient_account_id: Some("acct_supplier_001".into()),
                 amount_minor: Minor(10_000),
                 tolerance_minor: Minor(0),
                 currency: "USD".into(),
                 network: None,
                 asset_contract: None,
-                invoice_id: "INV-BASE".into(),
+                invoice_id: Some("INV-BASE".into()),
                 invoice_fingerprint: None,
                 require_invoice_fingerprint: true,
                 aggregate_limit_minor: Some(Minor(10_000)),

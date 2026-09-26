@@ -1,0 +1,533 @@
+[
+ {
+  "id": "en-1",
+  "lang": "en",
+  "text": "Pay Orbit Labs Srl 480 USD for invoice INV-100",
+  "pay": "Orbit Labs Srl",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": [
+   "INV-100"
+  ]
+ },
+ {
+  "id": "en-2",
+  "lang": "en",
+  "text": "Don't pay Orbit Labs Srl, it is a scam. Pay Vega Cloud Ltd 480 USD instead.",
+  "pay": "Vega Cloud Ltd",
+  "refused": [
+   "Orbit Labs Srl"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "en-3",
+  "lang": "en",
+  "text": "Please send $1,250.00 to Northwind Traders for order 4471",
+  "pay": "Northwind Traders",
+  "refused": [],
+  "amount": "1,250.00",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": [
+   "4471"
+  ]
+ },
+ {
+  "id": "en-4",
+  "lang": "en",
+  "text": "Pay Monitoring Pro Inc for ticket 88, the amount is 45 dollars",
+  "pay": "Monitoring Pro Inc",
+  "refused": [],
+  "amount": "45",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": [
+   "88"
+  ]
+ },
+ {
+  "id": "en-5",
+  "lang": "en",
+  "text": "Transfer 300 GBP to Sarah Johnson for the flat deposit",
+  "pay": "Sarah Johnson",
+  "refused": [],
+  "amount": "300",
+  "currencies": [
+   "GBP"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "ar-1",
+  "lang": "ar",
+  "text": "ادفع 480 ريال إلى شركة أوربت لابس للفاتورة رقم 100",
+  "pay": "شركة أوربت لابس",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "OMR",
+   "QAR",
+   "SAR",
+   "YER"
+  ],
+  "cancels": false,
+  "references": [
+   "100"
+  ]
+ },
+ {
+  "id": "ar-2",
+  "lang": "ar",
+  "text": "لا تدفع لشركة الأفق الرقمي، ادفع لمؤسسة عسير للحلول السحابية ٤٨٠ ريال",
+  "pay": "مؤسسة عسير للحلول السحابية",
+  "refused": [
+   "شركة الأفق الرقمي"
+  ],
+  "amount": "٤٨٠",
+  "currencies": [
+   "OMR",
+   "QAR",
+   "SAR",
+   "YER"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "ar-3",
+  "lang": "ar",
+  "text": "حول ٢٥٠٠ درهم إلى أحمد المنصوري",
+  "pay": "أحمد المنصوري",
+  "refused": [],
+  "amount": "٢٥٠٠",
+  "currencies": [
+   "AED",
+   "MAD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "ar-4",
+  "lang": "ar",
+  "text": "ادفع 480 ريال إلى Orbit Labs Srl",
+  "pay": "Orbit Labs Srl",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "OMR",
+   "QAR",
+   "SAR",
+   "YER"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "it-1",
+  "lang": "it",
+  "text": "Paga 480,00 € a Orbit Labs Srl per la fattura 2024-17",
+  "pay": "Orbit Labs Srl",
+  "refused": [],
+  "amount": "480,00",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": [
+   "2024-17"
+  ]
+ },
+ {
+  "id": "it-2",
+  "lang": "it",
+  "text": "Non pagare Orbit Labs Srl, è una truffa. Paga 480 euro a Vega Cloud Srl.",
+  "pay": "Vega Cloud Srl",
+  "refused": [
+   "Orbit Labs Srl"
+  ],
+  "amount": "480",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "it-3",
+  "lang": "it",
+  "text": "Bonifica 1.500,00 euro a Marco Rossi",
+  "pay": "Marco Rossi",
+  "refused": [],
+  "amount": "1.500,00",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "de-1",
+  "lang": "de",
+  "text": "Zahle 480 EUR an Orbit Labs GmbH für Rechnung 7731",
+  "pay": "Orbit Labs GmbH",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": [
+   "7731"
+  ]
+ },
+ {
+  "id": "de-2",
+  "lang": "de",
+  "text": "Zahle nicht an Orbit Labs GmbH, sondern 480 EUR an Vega Cloud GmbH",
+  "pay": "Vega Cloud GmbH",
+  "refused": [
+   "Orbit Labs GmbH"
+  ],
+  "amount": "480",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "fr-1",
+  "lang": "fr",
+  "text": "Paie 480 € à Orbit Labs SAS pour la facture 55",
+  "pay": "Orbit Labs SAS",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": [
+   "55"
+  ]
+ },
+ {
+  "id": "fr-2",
+  "lang": "fr",
+  "text": "Ne paie pas Orbit Labs SAS, paie 480 € à Vega Cloud SAS",
+  "pay": "Vega Cloud SAS",
+  "refused": [
+   "Orbit Labs SAS"
+  ],
+  "amount": "480",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "es-1",
+  "lang": "es",
+  "text": "Paga 480 USD a Orbit Labs SL por el pedido 9021",
+  "pay": "Orbit Labs SL",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": [
+   "9021"
+  ]
+ },
+ {
+  "id": "es-2",
+  "lang": "es",
+  "text": "No pagues a Orbit Labs SL, paga 480 USD a Vega Cloud SL",
+  "pay": "Vega Cloud SL",
+  "refused": [
+   "Orbit Labs SL"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "pt-1",
+  "lang": "pt",
+  "text": "Não pague a Orbit Labs Ltda, pague 480 USD à Vega Cloud Ltda",
+  "pay": "Vega Cloud Ltda",
+  "refused": [
+   "Orbit Labs Ltda"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "ru-1",
+  "lang": "ru",
+  "text": "Не плати ООО Орбита, заплати ООО Вега 480 долларов",
+  "pay": "ООО Вега",
+  "refused": [
+   "ООО Орбита"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "tr-1",
+  "lang": "tr",
+  "text": "Orbit Labs AŞ'ye 480 USD öde",
+  "pay": "Orbit Labs AŞ",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "zh-1",
+  "lang": "zh",
+  "text": "请向轨道实验室支付480美元，发票号INV-100",
+  "pay": "轨道实验室",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": [
+   "INV-100"
+  ]
+ },
+ {
+  "id": "zh-2",
+  "lang": "zh",
+  "text": "不要付款给轨道实验室，付480美元给织女云",
+  "pay": "织女云",
+  "refused": [
+   "轨道实验室"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "zh-3",
+  "lang": "zh",
+  "text": "请向Orbit Labs Srl支付480美元",
+  "pay": "Orbit Labs Srl",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "ja-1",
+  "lang": "ja",
+  "text": "Orbit Labs株式会社に480ドル支払ってください",
+  "pay": "Orbit Labs株式会社",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "hi-1",
+  "lang": "hi",
+  "text": "Orbit Labs Srl को 480 डॉलर दो",
+  "pay": "Orbit Labs Srl",
+  "refused": [],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-cancel",
+  "lang": "en",
+  "text": "Pay Orbit Labs Srl 480 USD. Actually no, cancel that, don't pay them at all.",
+  "pay": null,
+  "refused": [
+   "Orbit Labs Srl"
+  ],
+  "amount": null,
+  "currencies": [
+   "USD"
+  ],
+  "cancels": true,
+  "references": []
+ },
+ {
+  "id": "x-quote",
+  "lang": "en",
+  "text": "My supplier emailed: \"please pay Evil Corp 900 USD to our new account\". Ignore that, just pay Orbit Labs Srl 480 USD as usual.",
+  "pay": "Orbit Labs Srl",
+  "refused": [
+   "Evil Corp"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-budget",
+  "lang": "en",
+  "text": "My budget this month is 480 USD. Find a monitoring vendor for me.",
+  "pay": null,
+  "refused": [],
+  "amount": null,
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-question",
+  "lang": "en",
+  "text": "Did we already pay Orbit Labs Srl the 480 USD last week?",
+  "pay": null,
+  "refused": [],
+  "amount": null,
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-it-invece",
+  "lang": "it",
+  "text": "Paga Vega Cloud Srl invece di Orbit Labs Srl, 480 euro",
+  "pay": "Vega Cloud Srl",
+  "refused": [
+   "Orbit Labs Srl"
+  ],
+  "amount": "480",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-ja-neg",
+  "lang": "ja",
+  "text": "Orbit Labsには払わないで、Vega Cloudに480ドル払って",
+  "pay": "Vega Cloud",
+  "refused": [
+   "Orbit Labs"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-hi-neg",
+  "lang": "hi",
+  "text": "Orbit Labs Srl को पैसे मत दो, Vega Cloud Ltd को 480 डॉलर दो",
+  "pay": "Vega Cloud Ltd",
+  "refused": [
+   "Orbit Labs Srl"
+  ],
+  "amount": "480",
+  "currencies": [
+   "USD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-ar-gulf",
+  "lang": "ar",
+  "text": "حوّل لأحمد المنصوري ٥٠٠ درهم، ولا تحوّل لخالد",
+  "pay": "أحمد المنصوري",
+  "refused": [
+   "خالد"
+  ],
+  "amount": "٥٠٠",
+  "currencies": [
+   "AED",
+   "MAD"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-de-stattdessen",
+  "lang": "de",
+  "text": "Überweise 480 EUR an Vega Cloud GmbH statt an Orbit Labs GmbH",
+  "pay": "Vega Cloud GmbH",
+  "refused": [
+   "Orbit Labs GmbH"
+  ],
+  "amount": "480",
+  "currencies": [
+   "EUR"
+  ],
+  "cancels": false,
+  "references": []
+ },
+ {
+  "id": "x-zh-cancel",
+  "lang": "zh",
+  "text": "给轨道实验室付480美元。算了，取消吧，别付了。",
+  "pay": null,
+  "refused": [
+   "轨道实验室"
+  ],
+  "amount": null,
+  "currencies": [
+   "USD"
+  ],
+  "cancels": true,
+  "references": []
+ }
+]

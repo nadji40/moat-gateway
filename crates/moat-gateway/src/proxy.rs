@@ -794,9 +794,7 @@ impl Gateway {
         let Some(authorization_id) = &authorized.authorization_id else {
             return;
         };
-        let Some(invoice_id) = &authorized.invoice_id else {
-            return;
-        };
+        let invoice_id = authorized.invoice_id.clone().unwrap_or_default();
         let is_error = result
             .get("isError")
             .and_then(Value::as_bool)
@@ -889,9 +887,7 @@ impl Gateway {
         let Some(authorization_id) = &authorized.authorization_id else {
             return;
         };
-        let Some(invoice_id) = &authorized.invoice_id else {
-            return;
-        };
+        let invoice_id = authorized.invoice_id.clone().unwrap_or_default();
         let disposition = OutcomeStatus::Unknown.disposition(authorized.rail);
         let session = self.shared.store.get_or_create(&self.session_id);
         let outcome = moat_core::session::PaymentOutcome {
@@ -1148,10 +1144,13 @@ impl Gateway {
                             .args
                             .get("authorization_id")
                             .and_then(Value::as_str);
-                        let invoice_id = eval.call.args.get("invoice_id").and_then(Value::as_str);
-                        if let (Some(authorization_id), Some(invoice_id)) =
-                            (authorization_id, invoice_id)
-                        {
+                        let invoice_id = eval
+                            .call
+                            .args
+                            .get("invoice_id")
+                            .and_then(Value::as_str)
+                            .unwrap_or("");
+                        if let Some(authorization_id) = authorization_id {
                             let fingerprint = payment_fingerprint(&eval.call);
                             let reservation = amount.map(|amount_minor| PaymentReservation {
                                 fingerprint: fingerprint.clone(),

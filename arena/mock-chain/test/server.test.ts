@@ -258,6 +258,18 @@ describe.each(FAMILIES)("mock-chain on $id", (family) => {
     expect(result.structuredContent?.["reason"]).toBe("unknown_asset");
   });
 
+  it("sends without a label, because the address is the payee", async () => {
+    const result = await send({
+      to_address: family.authorized,
+      token: family.native,
+      amount: "1",
+      network: family.network,
+    });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent?.["counterparty"]).toBeUndefined();
+    expect(result.structuredContent?.["destination"]).toBe(family.authorizedCanonical);
+  });
+
   it("moves a token only in the contract it holds it in", async () => {
     const base = {
       counterparty: "Monitoring Pro Inc",

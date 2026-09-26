@@ -45,7 +45,8 @@ server.registerTool(
     inputSchema: {
       counterparty: z
         .string()
-        .describe("Who the address is believed to belong to. A label: the chain does not check it"),
+        .optional()
+        .describe("Who the address is believed to belong to. Optional, and a label: the chain does not check it"),
       to_address: z.string().describe("Destination address, base58"),
       token: z.string().default("SOL").describe("Asset symbol; this wallet moves SOL"),
       amount: z.union([z.string().min(1), z.number().positive()]).describe("Amount in whole SOL"),

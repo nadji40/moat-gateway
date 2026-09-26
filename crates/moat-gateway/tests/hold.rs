@@ -445,3 +445,97 @@ async fn a_token_authorization_must_name_its_contract() {
 
     harness.gw.close_and_wait().await;
 }
+
+/// The direct path: a client that already knows what the user asked for
+/// sends it as fields. Fields that no request could produce are refused.
+#[tokio::test]
+async fn an_intent_can_be_given_as_fields() {
+    let harness = Harness::start("intent-fields", "bank").await;
+
+    let (status, body) = harness
+        .post(
+            "intent",
+            json!({
+                "text": "Non pagare Orbit Labs Srl, paga 480 euro a Monitoring Pro Inc",
+                "fields": {
+                    "pay": ["Monitoring Pro Inc"],
+                    "refused": ["Orbit Labs Srl"],
+                    "amounts": ["480"],
+                    "currencies": ["EUR"],
+                    "reader": "client"
+                }
+            }),
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+    assert_eq!(body["structured"], true);
+
+    // Fields alone, with no words, are enough.
+    let (status, body) = harness
+        .post(
+            "intent",
+            json!({ "fields": { "pay": ["Monitoring Pro Inc"] } }),
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+
+    for bad in [
+        json!({ "fields": { "amounts": ["four hundred"] } }),
+        json!({ "fields": { "currencies": ["dollars"] } }),
+        json!({ "fields": { "pay": [" "] } }),
+        json!({ "fields": { "payee": ["Monitoring Pro Inc"] } }),
+        json!({ "text": "   " }),
+        json!({ "text": "x".repeat(4001) }),
+    ] {
+        let (status, body) = harness.post("intent", bad.clone()).await;
+        // 422 is how a body of the wrong shape is refused; 400 is a body of
+        // the right shape carrying values no request could produce.
+        assert!(status == 400 || status == 422, "{bad} -> {status} {body}");
+    }
+    harness.gw.close_and_wait().await;
+}
+
+/// An authorization names the payee, pins the account, or both, and covers
+/// an invoice only when there is one. On a network the account is required,
+/// because a name beside an address is checked by nothing.
+#[tokio::test]
+async fn an_authorization_needs_a_payee_or_an_account_and_no_invoice() {
+    let harness = Harness::start("optional-fields", "bank").await;
+    let base = |id: &str| {
+        json!({
+            "authorization_id": id,
+            "amount": 100,
+            "currency": "EUR",
+            "expires_at": "2099-01-01T00:00:00Z"
+        })
+    };
+
+    let mut account_only = base("auth-account-only");
+    account_only["recipient_account_id"] = json!(IBAN);
+    let (status, body) = harness.post("authorizations", account_only).await;
+    assert_eq!(status, 200, "{body}");
+    assert!(body["authorization"].get("payee").is_none(), "{body}");
+    assert!(body["authorization"].get("invoice_id").is_none(), "{body}");
+
+    let mut name_only = base("auth-name-only");
+    name_only["payee"] = json!("Monitoring Pro Inc");
+    let (status, body) = harness.post("authorizations", name_only).await;
+    assert_eq!(status, 200, "{body}");
+
+    let (status, body) = harness.post("authorizations", base("auth-nobody")).await;
+    assert_eq!(status, 400, "{body}");
+
+    let mut chain_by_name = base("auth-chain-name");
+    chain_by_name["payee"] = json!("Monitoring Pro Inc");
+    chain_by_name["network"] = json!("eip155:84532");
+    chain_by_name["currency"] = json!("ETH");
+    chain_by_name["amount"] = json!("0.01");
+    let (status, body) = harness.post("authorizations", chain_by_name).await;
+    assert_eq!(status, 400, "{body}");
+    assert!(body["error"]
+        .as_str()
+        .unwrap_or("")
+        .contains("the address is the payee"));
+
+    harness.gw.close_and_wait().await;
+}

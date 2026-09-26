@@ -10,7 +10,7 @@ use serde_json::Value;
 use crate::extract::extract_leaves;
 use crate::hash::sha256_hex;
 use crate::money::Minor;
-use crate::normalize::{normalize_text, Normalized};
+use crate::normalize::{normalize_number, normalize_text, spelling_key, Normalized};
 use crate::outcome::{may_reconcile, OutcomeStatus};
 use crate::rail::Rail;
 use crate::source::Source;
@@ -24,8 +24,143 @@ pub struct Intent {
     pub text: String,
     /// Normalized text, for substring matching.
     pub normalized: String,
-    /// Every number-looking token in the text, canonicalized.
+    /// Every number-looking token in the text, canonicalized. For an intent
+    /// that arrived as fields, the amounts it names.
     pub numbers: Vec<String>,
+    /// The intent as fields, when it arrived that way. The text is then kept
+    /// for the record only and is never read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fields: Option<IntentFields>,
+}
+
+/// What the user asked for, as fields rather than as a sentence.
+///
+/// Either the client supplies these itself, from a form or a checkout the
+/// user confirmed, or a reader such as `moat-intent` produces them from what
+/// the user typed. Either way the core matches payment values against them
+/// exactly, and never reads the text of an intent that carries them.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IntentFields {
+    /// Payees the user asks to pay, as named.
+    #[serde(default)]
+    pub pay: Vec<String>,
+    /// Payees the user refuses, cancels or calls a scam. A refusal withdraws
+    /// the same payee asked for in this turn or any earlier one.
+    #[serde(default)]
+    pub refused: Vec<String>,
+    /// Amounts the user asks to pay, as plain decimal numbers.
+    #[serde(default)]
+    pub amounts: Vec<String>,
+    /// ISO 4217 codes, or token tickers, of the currencies the user named.
+    #[serde(default)]
+    pub currencies: Vec<String>,
+    /// Accounts, IBANs or addresses the user asks to pay to.
+    #[serde(default)]
+    pub destinations: Vec<String>,
+    /// Invoice, order or other reference numbers the user named, as written.
+    /// A payment that names an invoice must name one of these.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub references: Vec<String>,
+    /// The user withdrew everything asked for in earlier turns.
+    #[serde(default)]
+    pub cancels_previous: bool,
+    /// Who produced the fields, for the record: the client, or a reader and
+    /// the model it used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reader: Option<String>,
+}
+
+/// Most entries any one list in [`IntentFields`] may carry.
+const MAX_FIELD_ENTRIES: usize = 16;
+/// Longest any one entry in [`IntentFields`] may be, in characters.
+const MAX_FIELD_CHARS: usize = 256;
+
+impl IntentFields {
+    /// Refuse fields that could not have come from one person's request.
+    ///
+    /// Every entry non-blank and bounded, every amount a positive decimal
+    /// number, every currency a code this build knows.
+    pub fn validate(&self) -> Result<(), String> {
+        let lists = [
+            ("pay", &self.pay),
+            ("refused", &self.refused),
+            ("amounts", &self.amounts),
+            ("currencies", &self.currencies),
+            ("destinations", &self.destinations),
+            ("references", &self.references),
+        ];
+        for (name, list) in lists {
+            if list.len() > MAX_FIELD_ENTRIES {
+                return Err(format!("{name} has more than {MAX_FIELD_ENTRIES} entries"));
+            }
+            for entry in list {
+                if entry.trim().is_empty() {
+                    return Err(format!("{name} has a blank entry"));
+                }
+                if entry.chars().count() > MAX_FIELD_CHARS {
+                    return Err(format!(
+                        "{name} has an entry over {MAX_FIELD_CHARS} characters"
+                    ));
+                }
+            }
+        }
+        for amount in &self.amounts {
+            match normalize_number(amount) {
+                Some(n) if !n.starts_with('-') && n != "0" => {}
+                _ => {
+                    return Err(format!(
+                        "amount {amount:?} is not a positive decimal number"
+                    ))
+                }
+            }
+        }
+        for code in &self.currencies {
+            if !crate::money::is_currency_code(&code.trim().to_ascii_uppercase()) {
+                return Err(format!(
+                    "currency {code:?} is not a code this gateway knows"
+                ));
+            }
+        }
+        if self
+            .reader
+            .as_deref()
+            .is_some_and(|r| r.chars().count() > MAX_FIELD_CHARS)
+        {
+            return Err(format!("reader is over {MAX_FIELD_CHARS} characters"));
+        }
+        Ok(())
+    }
+
+    fn canonical(mut self) -> IntentFields {
+        let trim = |list: &mut Vec<String>| {
+            for entry in list.iter_mut() {
+                *entry = entry.trim().to_owned();
+            }
+        };
+        trim(&mut self.pay);
+        trim(&mut self.refused);
+        trim(&mut self.amounts);
+        trim(&mut self.destinations);
+        trim(&mut self.references);
+        for code in &mut self.currencies {
+            *code = code.trim().to_ascii_uppercase();
+        }
+        self
+    }
+}
+
+/// Whether a refusal of `refused` covers the payee `name`: the same name, or
+/// one written as whole words inside the other. Broad on purpose, because a
+/// refusal can only withhold a payment, never send one.
+fn refusal_covers(refused: &str, name: &str) -> bool {
+    let r = spelling_key(refused);
+    let n = spelling_key(name);
+    if r.is_empty() || n.is_empty() {
+        return false;
+    }
+    let (r, n) = (format!(" {r} "), format!(" {n} "));
+    r == n || r.contains(&n) || n.contains(&r)
 }
 
 /// One value seen in a tool result, with where it came from.
@@ -47,8 +182,12 @@ pub struct Observed {
 pub struct PaymentAuthorization {
     /// Stable host-generated identifier carried by every payment proposal.
     pub id: String,
-    /// Supplier name exactly as approved by the user.
-    pub payee: String,
+    /// The payee's name exactly as approved, when the authorization names
+    /// one. Absent when it binds only the account: on a chain the address is
+    /// the payee, and a name beside it is a label nothing checks. An
+    /// authorization names the payee, pins the account, or both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payee: Option<String>,
     /// Stable payment-rail account or merchant identity, when the host knows it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recipient_account_id: Option<String>,
@@ -74,8 +213,12 @@ pub struct PaymentAuthorization {
     /// field existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_contract: Option<String>,
-    /// Invoice that this authorization covers when repeats are disabled.
-    pub invoice_id: String,
+    /// The invoice this authorization covers, when it covers one. Absent
+    /// for a payment with no bill behind it, which on a chain is most of
+    /// them; the payment count and the aggregate limit are then what stop
+    /// it being spent twice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invoice_id: Option<String>,
     /// SHA-256 of canonical invoice content, independent of the supplier's id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub invoice_fingerprint: Option<String>,
@@ -110,7 +253,7 @@ pub struct PaymentAuthorization {
 pub struct PaymentOutcome {
     /// Authorization that permitted the attempt.
     pub authorization_id: String,
-    /// Supplier invoice carried to the provider.
+    /// Supplier invoice carried to the provider; empty when it carried none.
     pub invoice_id: String,
     /// Canonical invoice fingerprint carried by the successful proposal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -219,7 +362,8 @@ pub struct PaymentReservation {
     pub fingerprint: String,
     /// Authorization that permitted the proposal.
     pub authorization_id: String,
-    /// Supplier invoice carried by the proposal.
+    /// Supplier invoice carried by the proposal; empty when it carried none.
+    #[serde(default)]
     pub invoice_id: String,
     /// Canonical invoice content identity, when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -260,6 +404,9 @@ pub enum Event {
         turn: u32,
         /// SHA-256 of the text; the text itself stays in the session.
         text_sha256: String,
+        /// SHA-256 of the fields, when the intent arrived as fields.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fields_sha256: Option<String>,
     },
     /// A tool result was ingested.
     ToolResultObserved {
@@ -305,8 +452,9 @@ pub enum Event {
     PaymentAuthorizationRegistered {
         /// Stable authorization identifier.
         authorization_id: String,
-        /// Invoice initially covered by the authorization.
-        invoice_id: String,
+        /// Invoice initially covered by the authorization, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        invoice_id: Option<String>,
     },
     /// A structured payment authorization was cancelled.
     PaymentAuthorizationCancelled {
@@ -459,15 +607,88 @@ impl Session {
             text: text.to_owned(),
             normalized: normalize_text(text),
             numbers: crate::said::amounts(text),
+            fields: None,
         });
         self.log_at(
             Event::IntentRegistered {
                 turn,
                 text_sha256: sha256_hex(text.as_bytes()),
+                fields_sha256: None,
             },
             unix_ms,
         );
         turn
+    }
+
+    /// Register what the human asked for as fields. `text` is what they
+    /// typed, if anything, kept for the record and never read. The fields
+    /// must already have passed [`IntentFields::validate`]. Returns the turn
+    /// number.
+    pub fn register_intent_fields(&mut self, text: &str, fields: IntentFields) -> u32 {
+        self.register_intent_fields_at(text, fields, now_unix_ms())
+    }
+
+    /// [`Session::register_intent_fields`] with an explicit event timestamp.
+    pub fn register_intent_fields_at(
+        &mut self,
+        text: &str,
+        fields: IntentFields,
+        unix_ms: u64,
+    ) -> u32 {
+        let fields = fields.canonical();
+        let turn = u32::try_from(self.intents.len() + 1).unwrap_or(u32::MAX);
+        let fields_sha256 = serde_json::to_value(&fields)
+            .map(|value| sha256_hex(crate::hash::canonical_json(&value).as_bytes()))
+            .unwrap_or_default();
+        self.intents.push(Intent {
+            turn,
+            text: text.to_owned(),
+            normalized: normalize_text(text),
+            numbers: fields
+                .amounts
+                .iter()
+                .filter_map(|amount| normalize_number(amount))
+                .collect(),
+            fields: Some(fields),
+        });
+        self.log_at(
+            Event::IntentRegistered {
+                turn,
+                text_sha256: sha256_hex(text.as_bytes()),
+                fields_sha256: Some(fields_sha256),
+            },
+            unix_ms,
+        );
+        turn
+    }
+
+    /// The intents that still stand: every one from the last that cancelled
+    /// what came before it, or all of them.
+    pub fn live_intents(&self) -> &[Intent] {
+        let start = self
+            .intents
+            .iter()
+            .rposition(|intent| {
+                intent
+                    .fields
+                    .as_ref()
+                    .is_some_and(|fields| fields.cancels_previous)
+            })
+            .unwrap_or(0);
+        &self.intents[start..]
+    }
+
+    /// Whether the payee `name` was refused in turn `turn` or any later one.
+    ///
+    /// A refusal withdraws what was asked for before it and in the same
+    /// breath; a later request for the same payee stands, because the user
+    /// changed their mind again.
+    pub fn refused_since(&self, turn: u32, name: &str) -> bool {
+        self.intents
+            .iter()
+            .filter(|intent| intent.turn >= turn)
+            .filter_map(|intent| intent.fields.as_ref())
+            .any(|fields| fields.refused.iter().any(|r| refusal_covers(r, name)))
     }
 
     /// Ingest a tool result: every string and number leaf becomes an observed
@@ -545,6 +766,17 @@ impl Session {
             .any(|existing| existing.id == authorization.id)
         {
             return Err("authorization id already exists");
+        }
+        let named = authorization
+            .payee
+            .as_deref()
+            .is_some_and(|p| !p.trim().is_empty());
+        let pinned = authorization
+            .recipient_account_id
+            .as_deref()
+            .is_some_and(|a| !a.trim().is_empty());
+        if !named && !pinned {
+            return Err("an authorization must name the payee or pin the account");
         }
         self.log(Event::PaymentAuthorizationRegistered {
             authorization_id: authorization.id.clone(),

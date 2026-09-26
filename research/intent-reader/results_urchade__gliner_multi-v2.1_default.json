@@ -1,0 +1,1165 @@
+{
+ "model": "urchade/gliner_multi-v2.1",
+ "threshold": 0.4,
+ "load_s": 6.0,
+ "sets": {
+  "generic": {
+   "summary": {
+    "cases": 26,
+    "grounded": 26,
+    "payee_exact": 20,
+    "payee_partial": 22,
+    "amount_exact": 21,
+    "ref_as_amount": 0,
+    "refused_cases": 9,
+    "refused_leak": 0,
+    "refused_found": 0,
+    "ms_median": 111,
+    "ms_max": 1372
+   },
+   "rows": [
+    {
+     "id": "en-1",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs Srl",
+       0.91
+      ],
+      [
+       "money",
+       "480 USD",
+       0.93
+      ]
+     ]
+    },
+    {
+     "id": "en-2",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs Srl",
+       0.96
+      ],
+      [
+       "organization",
+       "Vega Cloud Ltd",
+       0.96
+      ],
+      [
+       "money",
+       "480 USD",
+       0.94
+      ]
+     ]
+    },
+    {
+     "id": "en-3",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "$1,250.00",
+       0.9
+      ],
+      [
+       "organization",
+       "Northwind Traders",
+       0.98
+      ],
+      [
+       "reference number",
+       "4471",
+       0.71
+      ]
+     ]
+    },
+    {
+     "id": "en-4",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Pay Monitoring Pro Inc",
+       0.94
+      ],
+      [
+       "reference number",
+       "ticket 88",
+       0.93
+      ],
+      [
+       "money",
+       "45 dollars",
+       0.94
+      ]
+     ]
+    },
+    {
+     "id": "en-5",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "300 GBP",
+       0.94
+      ],
+      [
+       "person",
+       "Sarah Johnson",
+       0.99
+      ],
+      [
+       "money",
+       "flat deposit",
+       0.54
+      ]
+     ]
+    },
+    {
+     "id": "ar-1",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "480 ريال",
+       0.84
+      ],
+      [
+       "organization",
+       "شركة أوربت لابس",
+       0.82
+      ],
+      [
+       "reference number",
+       "رقم 100",
+       0.59
+      ]
+     ]
+    },
+    {
+     "id": "ar-2",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "الأفق الرقمي",
+       0.56
+      ],
+      [
+       "money",
+       "٤٨٠ ريال",
+       0.78
+      ]
+     ]
+    },
+    {
+     "id": "ar-3",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "٢٥٠٠ درهم",
+       0.96
+      ],
+      [
+       "person",
+       "أحمد المنصوري",
+       0.97
+      ]
+     ]
+    },
+    {
+     "id": "ar-4",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "480 ريال",
+       0.85
+      ],
+      [
+       "organization",
+       "Orbit Labs Srl",
+       0.97
+      ]
+     ]
+    },
+    {
+     "id": "it-1",
+     "lang": "it",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "480,00 €",
+       0.91
+      ],
+      [
+       "organization",
+       "Orbit Labs Srl",
+       0.97
+      ]
+     ]
+    },
+    {
+     "id": "it-2",
+     "lang": "it",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs Srl",
+       0.98
+      ],
+      [
+       "money",
+       "480 euro",
+       0.95
+      ],
+      [
+       "organization",
+       "Vega Cloud Srl",
+       0.98
+      ]
+     ]
+    },
+    {
+     "id": "it-3",
+     "lang": "it",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "1.500,00 euro",
+       0.87
+      ],
+      [
+       "person",
+       "Marco Rossi",
+       0.97
+      ]
+     ]
+    },
+    {
+     "id": "de-1",
+     "lang": "de",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "480 EUR",
+       0.95
+      ],
+      [
+       "organization",
+       "Orbit Labs GmbH",
+       0.98
+      ],
+      [
+       "reference number",
+       "Rechnung",
+       0.55
+      ],
+      [
+       "reference number",
+       "7731",
+       0.63
+      ]
+     ]
+    },
+    {
+     "id": "de-2",
+     "lang": "de",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs GmbH",
+       0.97
+      ],
+      [
+       "money",
+       "480 EUR",
+       0.96
+      ],
+      [
+       "organization",
+       "Vega Cloud GmbH",
+       0.97
+      ]
+     ]
+    },
+    {
+     "id": "fr-1",
+     "lang": "fr",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "480 €",
+       0.95
+      ],
+      [
+       "organization",
+       "Orbit Labs SAS",
+       0.97
+      ],
+      [
+       "reference number",
+       "55",
+       0.41
+      ]
+     ]
+    },
+    {
+     "id": "fr-2",
+     "lang": "fr",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs SAS",
+       0.97
+      ],
+      [
+       "money",
+       "480 €",
+       0.96
+      ],
+      [
+       "organization",
+       "Vega Cloud SAS",
+       0.96
+      ]
+     ]
+    },
+    {
+     "id": "es-1",
+     "lang": "es",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "money",
+       "480 USD",
+       0.94
+      ],
+      [
+       "organization",
+       "Orbit Labs SL",
+       0.98
+      ],
+      [
+       "reference number",
+       "9021",
+       0.53
+      ]
+     ]
+    },
+    {
+     "id": "es-2",
+     "lang": "es",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs SL",
+       0.97
+      ],
+      [
+       "money",
+       "480 USD",
+       0.95
+      ],
+      [
+       "organization",
+       "Vega Cloud SL",
+       0.97
+      ]
+     ]
+    },
+    {
+     "id": "pt-1",
+     "lang": "pt",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs Ltda",
+       0.98
+      ],
+      [
+       "money",
+       "480 USD",
+       0.95
+      ],
+      [
+       "organization",
+       "Vega Cloud Ltda",
+       0.97
+      ]
+     ]
+    },
+    {
+     "id": "ru-1",
+     "lang": "ru",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "ООО Орбита",
+       0.95
+      ],
+      [
+       "organization",
+       "ООО Вега",
+       0.96
+      ],
+      [
+       "money",
+       "480 долларов",
+       0.87
+      ]
+     ]
+    },
+    {
+     "id": "tr-1",
+     "lang": "tr",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs AŞ",
+       0.96
+      ],
+      [
+       "money",
+       "480 USD",
+       0.95
+      ]
+     ]
+    },
+    {
+     "id": "zh-1",
+     "lang": "zh",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": []
+    },
+    {
+     "id": "zh-2",
+     "lang": "zh",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": []
+    },
+    {
+     "id": "zh-3",
+     "lang": "zh",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": []
+    },
+    {
+     "id": "ja-1",
+     "lang": "ja",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs株式会社に480ドル支払ってください",
+       0.88
+      ]
+     ]
+    },
+    {
+     "id": "hi-1",
+     "lang": "hi",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "organization",
+       "Orbit Labs Srl",
+       0.95
+      ]
+     ]
+    }
+   ]
+  },
+  "task": {
+   "summary": {
+    "cases": 26,
+    "grounded": 26,
+    "payee_exact": 2,
+    "payee_partial": 2,
+    "amount_exact": 21,
+    "ref_as_amount": 0,
+    "refused_cases": 9,
+    "refused_leak": 0,
+    "refused_found": 0,
+    "ms_median": 120,
+    "ms_max": 136
+   },
+   "rows": [
+    {
+     "id": "en-1",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 USD",
+       0.85
+      ],
+      [
+       "invoice or order number",
+       "invoice",
+       0.51
+      ],
+      [
+       "invoice or order number",
+       "INV-100",
+       0.71
+      ]
+     ]
+    },
+    {
+     "id": "en-2",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 USD",
+       0.82
+      ]
+     ]
+    },
+    {
+     "id": "en-3",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "$1,250.00",
+       0.82
+      ],
+      [
+       "invoice or order number",
+       "order 4471",
+       0.62
+      ]
+     ]
+    },
+    {
+     "id": "en-4",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "invoice or order number",
+       "ticket 88",
+       0.88
+      ],
+      [
+       "amount of money",
+       "45 dollars",
+       0.75
+      ]
+     ]
+    },
+    {
+     "id": "en-5",
+     "lang": "en",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "300 GBP",
+       0.79
+      ],
+      [
+       "recipient to pay",
+       "Sarah Johnson",
+       0.64
+      ]
+     ]
+    },
+    {
+     "id": "ar-1",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 ريال",
+       0.62
+      ],
+      [
+       "invoice or order number",
+       "للفاتورة رقم 100",
+       0.43
+      ]
+     ]
+    },
+    {
+     "id": "ar-2",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "٤٨٠ ريال",
+       0.72
+      ]
+     ]
+    },
+    {
+     "id": "ar-3",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": true,
+     "payee_partial": true,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "٢٥٠٠ درهم",
+       0.8
+      ],
+      [
+       "recipient to pay",
+       "أحمد المنصوري",
+       0.46
+      ]
+     ]
+    },
+    {
+     "id": "ar-4",
+     "lang": "ar",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 ريال",
+       0.72
+      ]
+     ]
+    },
+    {
+     "id": "it-1",
+     "lang": "it",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480,00 €",
+       0.82
+      ],
+      [
+       "invoice or order number",
+       "fattura 2024-17",
+       0.64
+      ]
+     ]
+    },
+    {
+     "id": "it-2",
+     "lang": "it",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 euro",
+       0.83
+      ]
+     ]
+    },
+    {
+     "id": "it-3",
+     "lang": "it",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "1.500,00 euro",
+       0.7
+      ]
+     ]
+    },
+    {
+     "id": "de-1",
+     "lang": "de",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 EUR",
+       0.83
+      ],
+      [
+       "invoice or order number",
+       "Rechnung 7731",
+       0.8
+      ]
+     ]
+    },
+    {
+     "id": "de-2",
+     "lang": "de",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 EUR",
+       0.86
+      ]
+     ]
+    },
+    {
+     "id": "fr-1",
+     "lang": "fr",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 €",
+       0.81
+      ]
+     ]
+    },
+    {
+     "id": "fr-2",
+     "lang": "fr",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 €",
+       0.88
+      ]
+     ]
+    },
+    {
+     "id": "es-1",
+     "lang": "es",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 USD",
+       0.81
+      ],
+      [
+       "invoice or order number",
+       "pedido 9021",
+       0.45
+      ]
+     ]
+    },
+    {
+     "id": "es-2",
+     "lang": "es",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 USD",
+       0.89
+      ]
+     ]
+    },
+    {
+     "id": "pt-1",
+     "lang": "pt",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 USD",
+       0.83
+      ]
+     ]
+    },
+    {
+     "id": "ru-1",
+     "lang": "ru",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 долларов",
+       0.69
+      ]
+     ]
+    },
+    {
+     "id": "tr-1",
+     "lang": "tr",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": true,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "amount of money",
+       "480 USD",
+       0.75
+      ]
+     ]
+    },
+    {
+     "id": "zh-1",
+     "lang": "zh",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": [
+      [
+       "invoice or order number",
+       "发票号INV-100",
+       0.44
+      ]
+     ]
+    },
+    {
+     "id": "zh-2",
+     "lang": "zh",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": []
+    },
+    {
+     "id": "zh-3",
+     "lang": "zh",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": []
+    },
+    {
+     "id": "ja-1",
+     "lang": "ja",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": []
+    },
+    {
+     "id": "hi-1",
+     "lang": "hi",
+     "grounded": true,
+     "payee_exact": false,
+     "payee_partial": false,
+     "refused_leak": false,
+     "refused_found": false,
+     "amount_exact": false,
+     "ref_as_amount": false,
+     "entities": []
+    }
+   ]
+  }
+ }
+}

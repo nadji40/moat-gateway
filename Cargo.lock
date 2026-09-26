@@ -1338,6 +1338,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "moat-intent"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "clap",
+ "moat-core",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "moat-mcp"
 version = "0.1.0"
 dependencies = [

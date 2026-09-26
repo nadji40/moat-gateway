@@ -4,6 +4,7 @@ members = [
     "crates/moat-core",
     "crates/moat-mcp",
     "crates/moat-gateway",
+    "crates/moat-intent",
 ]
 
 [workspace.package]

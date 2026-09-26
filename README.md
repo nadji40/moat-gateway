@@ -578,6 +578,7 @@ runs.
 | `crates/moat-core`     | Provenance, session store, policy, verdicts, evidence. No MCP knowledge. |
 | `crates/moat-mcp`      | MCP JSON-RPC types and transport framing. No policy logic.               |
 | `crates/moat-gateway`  | The binary. Wires transports to the core.                               |
+| `crates/moat-intent`   | Reads what a user typed, in any language, into intent fields.           |
 | `arena/`               | TypeScript mock servers, attack corpus, task runner and testnet adapters.|
 | `demo/`                | The public sandbox: a gateway per visitor, and the page that drives it.  |
 | `migrations/`          | PostgreSQL schema, including the payment ledger.                         |
@@ -718,12 +719,16 @@ is presented, the payee, the amount or the destination must trace to what the
 user said, or the payment steps up as `user-request` (the policy's
 `unrequested_payment`, `step_up` by default). If the user wrote a currency
 code, a payment without an approval must be in it, or it steps up as
-`intent-currency`. That is the correct default, not a
+`intent-currency`. If the user named an invoice or other reference, a payment
+without an approval that names an invoice must name one of those, or it steps
+up as `intent-invoice`: the right supplier and the right amount can still
+settle the wrong bill. That is the correct default, not a
 misconfiguration: a Moat that has never been told what the human wanted has no
 basis for believing they asked for a payment.
 
-- `intent` registers the human's text for the session; call it once per user
-  turn. Returns the turn number.
+- `intent` registers what the human asked for in this turn; call it once per
+  user turn. Returns the turn number. It takes the words, the fields, or both;
+  see [What the user asked for](#what-the-user-asked-for).
 - `resume` answers a step-up. With `approved: true`, the exact proposal the
   human was shown is allowed **once**: the next identical call proceeds, and
   the one after it is held again. The approved values are not registered as
@@ -737,6 +742,86 @@ basis for believing they asked for a payment.
 The session id is whatever `session_id` says in the config, or a generated
 `s_…` printed to stderr at startup. Why the intent is a side channel rather
 than something parsed from the MCP stream is [ADR 0004](docs/adr/0004-intent-api-side-channel.md).
+
+### What the user asked for
+
+The core never has to understand a sentence. It matches payment values
+against what the user asked for, and there are three ways to tell it, from
+strongest to weakest.
+
+**1. Fields, from the client.** A client that already knows, from a form, a
+checkout or a mandate the user confirmed, sends it as fields:
+
+```json
+POST /v1/session/{id}/intent
+{
+  "text": "Non pagare Orbit Labs Srl, paga 480 euro a Vega Cloud Srl, fattura 2024-17",
+  "fields": {
+    "pay": ["Vega Cloud Srl"],
+    "refused": ["Orbit Labs Srl"],
+    "amounts": ["480"],
+    "currencies": ["EUR"],
+    "destinations": [],
+    "references": ["2024-17"],
+    "cancels_previous": false,
+    "reader": "checkout v3"
+  }
+}
+```
+
+A payee is the user's only if a field names it exactly. The text, when sent,
+is kept for the record and never read. A name in `refused` withdraws the same
+payee asked for in that turn or any earlier one, and a later request for it
+stands again. `cancels_previous` withdraws everything asked for before, for
+"cancel that" or "never mind". `references` are the invoice, order or ticket
+numbers the user named; "INV-100", "inv 100" and a bare "100" count as the
+same one, "PO-100" and "1000" do not. The fields are hashed into the signed
+evidence with the turn they arrived in, and a held payment's record says
+which invoice the user named and which one it tried to settle. Fields no
+request could produce are refused:
+blank names, amounts that are not positive numbers, currencies the gateway
+does not know, more than 16 entries.
+
+**2. Words, read by `moat-intent`.** A client that has only what the user
+typed sends it to the `moat-intent` service instead of the gateway. A small
+model running beside it reads the message in any language, and every value it
+returns is checked against the message before the fields go to the gateway:
+a payee must be written there character for character, an amount must be a
+number the message contains, read with its own decimal conventions, a payee
+the user also refused is dropped. Account numbers, addresses and emails are
+replaced by placeholders before the model sees them; card numbers are removed
+from what the model sees and from what is kept. What fails a check is dropped
+and reported, so a misreading costs a confirmation, never a payment. If the
+model cannot be reached, the message is registered with empty fields.
+
+```bash
+llama-server -hf unsloth/gemma-4-E4B-it-GGUF:Q4_K_M --jinja -c 4096 --port 8092
+moat-intent --llm-url http://127.0.0.1:8092 --gateway http://127.0.0.1:7082
+```
+
+```
+POST /v1/session/{id}/intent   { "text": "..." }   read, check, and register with the gateway
+POST /v1/read                  { "text": "..." }   read and check only, for the host to confirm
+```
+
+`moat-intent` holds no key. It passes the caller's approver key to the
+gateway, which checks it as if the host had called directly. The strongest way
+to use it is `/v1/read`: show the user what was understood, in their language,
+and send the fields they confirm to the gateway yourself.
+
+Measured on 36 messages in 12 languages with Gemma 4 E4B quantised to four
+bits, on a six-core desktop CPU: no message produced a payee the user refused
+or never named, every payee was right, and a message takes about ten seconds,
+at the moment the user types rather than when the payment is checked. The run
+is `cargo test -p moat-intent --test model_corpus` with
+`MOAT_INTENT_LLM_URL` set; the model comparison behind the choice is in
+`research/intent-reader/`.
+
+**3. Words, read by the core.** Text sent to the gateway with no fields is
+read by the core's own rules, as before. They read English and Arabic well
+and other languages poorly: in Italian, German, French, Portuguese and
+Russian they miss a refusal, and they read no unspaced Chinese or Japanese at
+all. Kept so existing clients keep working. Use one of the first two.
 
 With `auth.required: true`, the intent API uses the same tenant bearer key as the
 MCP listener. Session snapshots, signed evidence and single-use approval tokens
@@ -1164,10 +1249,35 @@ MOAT_STRIPE_SMOKE_CONFIRM=YES pnpm --filter @moat/stripe-sandbox smoke
 ### Supplier-invoice workflow
 
 `POST /v1/session/{session}/authorizations` registers a structured user
-authorization with an id, supplier, optional payment-rail account, invoice,
-optional canonical invoice fingerprint, expected amount, per-payment tolerance,
-aggregate limit, currency, RFC 3339 expiry, repeat-payment flag and maximum
-payment count. A payment proposal carries the bound identifiers. Moat then:
+authorization with an id, the payee's name, the payment-rail account, an
+optional invoice and canonical invoice fingerprint, expected amount,
+per-payment tolerance, aggregate limit, currency, RFC 3339 expiry,
+repeat-payment flag and maximum payment count. A payment proposal carries the
+bound identifiers.
+
+An authorization names the payee, pins the account, or both; one with
+neither is refused. On a network the account is required, because the name
+beside a chain address is checked by nothing: pin the address and leave the
+name out if there is none. With the account pinned and matching, a payment
+may leave the name out too, but may not name somebody other than the payee
+the authorization named. The invoice is optional: a payment with no bill
+behind it, which on a chain is most of them, is limited by the maximum
+payment count and the aggregate limit instead, and an identical payment in
+flight is still refused. An authorization that does bind an invoice still
+requires the payment to carry it. The shipped chain policies apply the
+payee-label rule only when a label is given.
+
+A rail where every payment settles a bill can say so once, in its policy:
+
+```yaml
+require_invoice: true
+```
+
+Every payment that policy governs must then name an invoice, and the
+authorization it cites must cover one, or it is denied as `invoice-required`,
+whatever the integration sent. It is off in every shipped policy. Turning it
+on for `supplier-invoice.yaml` would also deny payments made without any
+authorization, which the pilot's test clients make on purpose. Moat then:
 
 - denies an unknown, expired or cancelled authorization and any recipient,
   rail-account, currency, invoice-id or invoice-content mismatch;
@@ -1181,7 +1291,8 @@ payment count. A payment proposal carries the bound identifiers. Moat then:
 - leaves a failed or unknown provider attempt retryable.
 
 The Stripe adapter derives its idempotency key from Stripe account,
-authorization id and invoice id. The same retry therefore resolves to the same
+authorization id and invoice id, so it still requires an invoice id even
+though Moat does not. The same retry therefore resolves to the same
 PaymentIntent instead of creating a second charge. Stripe metadata carries the
 authorization id, invoice id and invoice fingerprint; the adapter also verifies
 the bound Stripe account before creating the PaymentIntent. `GET

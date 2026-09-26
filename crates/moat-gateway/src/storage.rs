@@ -1313,14 +1313,14 @@ mod ledger_tests {
     fn authorization(id: &str, amount: u128, aggregate: Option<u128>) -> PaymentAuthorization {
         PaymentAuthorization {
             id: id.to_owned(),
-            payee: "Monitoring Pro Inc".into(),
+            payee: Some("Monitoring Pro Inc".into()),
             recipient_account_id: Some("acct_supplier_001".into()),
             amount_minor: Minor(amount),
             tolerance_minor: Minor(0),
             currency: "USD".into(),
             network: None,
             asset_contract: None,
-            invoice_id: format!("INV-{id}"),
+            invoice_id: Some(format!("INV-{id}")),
             invoice_fingerprint: None,
             require_invoice_fingerprint: false,
             aggregate_limit_minor: aggregate.map(Minor),
@@ -1381,7 +1381,7 @@ mod ledger_tests {
             .await
             .expect("reading back")
             .expect("the mandate should be in the ledger");
-        assert_eq!(found.payee, "Monitoring Pro Inc");
+        assert_eq!(found.payee.as_deref(), Some("Monitoring Pro Inc"));
         assert_eq!(found.amount_minor, Minor(50_000));
         assert_eq!(
             found.recipient_account_id.as_deref(),

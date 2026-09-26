@@ -191,7 +191,8 @@ server.registerTool(
     inputSchema: {
       counterparty: z
         .string()
-        .describe("Who the address is believed to belong to. A label only: the chain does not check it"),
+        .optional()
+        .describe("Who the address is believed to belong to. Optional, and a label only: the chain does not check it"),
       to_address: z.string().describe("Destination address"),
       token: z.string().describe(`Asset symbol: ${chain.assets.map((a) => a.symbol).join(" or ")}`),
       token_address: z
@@ -244,7 +245,7 @@ server.registerTool(
         ledger.append({
           receipt: txId,
           rail: chain.family as LedgerRail,
-          payee: args.counterparty,
+          payee: args.counterparty ?? "",
           amount,
           currency: args.token.toUpperCase(),
           status: "succeeded",
@@ -274,7 +275,7 @@ server.registerTool(
     const entry = ledger.append({
       receipt: txId,
       rail: chain.family as LedgerRail,
-      payee: args.counterparty,
+      payee: args.counterparty ?? "",
       amount,
       currency: args.token.toUpperCase(),
       status: "succeeded",
@@ -296,8 +297,11 @@ server.registerTool(
           type: "text",
           text:
             `Submitted: ${amount} ${entry.currency} to ${checked.display} on ` +
-            `${checked.network}. The label "${args.counterparty}" was not verified against ` +
-            `the address; nothing on chain can verify it. ` +
+            `${checked.network}. ` +
+            (args.counterparty
+              ? `The label "${args.counterparty}" was not verified against the address; ` +
+                `nothing on chain can verify it. `
+              : "") +
             `${automine ? "Confirmed" : "Awaiting confirmation"}. Receipt ${txId}.`,
         },
       ],
@@ -315,7 +319,7 @@ server.registerTool(
         network: checked.network,
         destination: checked.canonical,
         destination_display: checked.display,
-        counterparty: args.counterparty,
+        ...(args.counterparty ? { counterparty: args.counterparty } : {}),
         counterparty_verified: false,
         amount,
         currency: entry.currency,
@@ -336,7 +340,7 @@ if (chain.hasApprovals) {
         "Grant a spender the right to move a token out of this wallet, up to an " +
         "allowance, at any time in the future. This is a sandbox: no value moves now.",
       inputSchema: {
-        counterparty: z.string().describe("Who the spender is believed to be. A label only"),
+        counterparty: z.string().optional().describe("Who the spender is believed to be. Optional, and a label only"),
         spender: z.string().describe("Address being granted the allowance"),
         token: z.string().describe("Token symbol"),
         token_address: z
@@ -371,7 +375,7 @@ if (chain.hasApprovals) {
       const entry = ledger.append({
         receipt: txId,
         rail: chain.family as LedgerRail,
-        payee: args.counterparty,
+        payee: args.counterparty ?? "",
         amount,
         currency: args.token.toUpperCase(),
         status: "succeeded",

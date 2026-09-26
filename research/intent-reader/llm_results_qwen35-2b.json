@@ -1,0 +1,792 @@
+{
+ "summary": {
+  "model": "qwen35-2b",
+  "cases": 36,
+  "fail_open": 4,
+  "pay_ok": 29,
+  "refused_ok": 33,
+  "amount_ok": 31,
+  "currency_ok": 30,
+  "ref_as_amount": 0,
+  "ungrounded_cases": 5,
+  "s_median": 2.8,
+  "s_max": 5.32
+ },
+ "rows": [
+  {
+   "id": "en-1",
+   "lang": "en",
+   "pay_ok": false,
+   "fail_open": [
+    "480 usd"
+   ],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs Srl",
+     "480 USD"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": [
+     "INV-100"
+    ]
+   }
+  },
+  {
+   "id": "en-2",
+   "lang": "en",
+   "pay_ok": false,
+   "fail_open": [
+    "480 usd"
+   ],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Vega Cloud Ltd",
+     "480 USD"
+    ],
+    "refused": [
+     "Orbit Labs Srl"
+    ],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "en-3",
+   "lang": "en",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": false,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [
+    "1250.00"
+   ],
+   "got": {
+    "pay": [
+     "Northwind Traders"
+    ],
+    "refused": [],
+    "amount": "1250.00",
+    "currency": "USD",
+    "references": [
+     "order 4471"
+    ]
+   }
+  },
+  {
+   "id": "en-4",
+   "lang": "en",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Monitoring Pro Inc"
+    ],
+    "refused": [],
+    "amount": "45",
+    "currency": "USD",
+    "references": [
+     "ticket 88"
+    ]
+   }
+  },
+  {
+   "id": "en-5",
+   "lang": "en",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Sarah Johnson"
+    ],
+    "refused": [],
+    "amount": "300",
+    "currency": "GBP",
+    "references": []
+   }
+  },
+  {
+   "id": "ar-1",
+   "lang": "ar",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": false,
+   "ref_as_amount": false,
+   "ungrounded": [
+    "الفاتورة رقم 100"
+   ],
+   "got": {
+    "pay": [
+     "شركة أوربت لابس"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "ريال",
+    "references": [
+     "الفاتورة رقم 100"
+    ]
+   }
+  },
+  {
+   "id": "ar-2",
+   "lang": "ar",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": false,
+   "currency_ok": false,
+   "ref_as_amount": false,
+   "ungrounded": [
+    "480"
+   ],
+   "got": {
+    "pay": [
+     "مؤسسة عسير للحلول السحابية"
+    ],
+    "refused": [
+     "شركة الأفق الرقمي"
+    ],
+    "amount": "480",
+    "currency": "Rial",
+    "references": []
+   }
+  },
+  {
+   "id": "ar-3",
+   "lang": "ar",
+   "pay_ok": false,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": false,
+   "currency_ok": false,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [],
+    "refused": [],
+    "amount": null,
+    "currency": null,
+    "references": []
+   }
+  },
+  {
+   "id": "ar-4",
+   "lang": "ar",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": false,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs Srl"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "AED",
+    "references": []
+   }
+  },
+  {
+   "id": "it-1",
+   "lang": "it",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs Srl"
+    ],
+    "refused": [],
+    "amount": "480,00",
+    "currency": "EUR",
+    "references": [
+     "2024-17"
+    ]
+   }
+  },
+  {
+   "id": "it-2",
+   "lang": "it",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": false,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Vega Cloud Srl"
+    ],
+    "refused": [
+     "Orbit Labs Srl"
+    ],
+    "amount": "480",
+    "currency": "euro",
+    "references": []
+   }
+  },
+  {
+   "id": "it-3",
+   "lang": "it",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": false,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [
+    "1500.00"
+   ],
+   "got": {
+    "pay": [
+     "Marco Rossi"
+    ],
+    "refused": [],
+    "amount": "1500.00",
+    "currency": "EUR",
+    "references": []
+   }
+  },
+  {
+   "id": "de-1",
+   "lang": "de",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs GmbH"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "EUR",
+    "references": [
+     "7731"
+    ]
+   }
+  },
+  {
+   "id": "de-2",
+   "lang": "de",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Vega Cloud GmbH"
+    ],
+    "refused": [
+     "Orbit Labs GmbH"
+    ],
+    "amount": "480",
+    "currency": "EUR",
+    "references": []
+   }
+  },
+  {
+   "id": "fr-1",
+   "lang": "fr",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs SAS"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "EUR",
+    "references": [
+     "55"
+    ]
+   }
+  },
+  {
+   "id": "fr-2",
+   "lang": "fr",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Vega Cloud SAS"
+    ],
+    "refused": [
+     "Orbit Labs SAS"
+    ],
+    "amount": "480",
+    "currency": "EUR",
+    "references": []
+   }
+  },
+  {
+   "id": "es-1",
+   "lang": "es",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs SL"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": [
+     "9021"
+    ]
+   }
+  },
+  {
+   "id": "es-2",
+   "lang": "es",
+   "pay_ok": false,
+   "fail_open": [
+    "orbit labs sl"
+   ],
+   "refused_ok": false,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs SL",
+     "Vega Cloud SL"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "pt-1",
+   "lang": "pt",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Vega Cloud Ltda"
+    ],
+    "refused": [
+     "Orbit Labs Ltda"
+    ],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "ru-1",
+   "lang": "ru",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "ООО Вега"
+    ],
+    "refused": [
+     "ООО Орбита"
+    ],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "tr-1",
+   "lang": "tr",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs AŞ"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "zh-1",
+   "lang": "zh",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "轨道实验室"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": [
+     "INV-100"
+    ]
+   }
+  },
+  {
+   "id": "zh-2",
+   "lang": "zh",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "织女云"
+    ],
+    "refused": [
+     "轨道实验室"
+    ],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "zh-3",
+   "lang": "zh",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs Srl"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "ja-1",
+   "lang": "ja",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs株式会社"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "hi-1",
+   "lang": "hi",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs Srl"
+    ],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "x-cancel",
+   "lang": "en",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [],
+    "refused": [
+     "Orbit Labs Srl"
+    ],
+    "amount": null,
+    "currency": null,
+    "references": []
+   }
+  },
+  {
+   "id": "x-quote",
+   "lang": "en",
+   "pay_ok": false,
+   "fail_open": [
+    "480 usd"
+   ],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Orbit Labs Srl",
+     "480 USD"
+    ],
+    "refused": [
+     "Evil Corp",
+     "900 USD"
+    ],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "x-budget",
+   "lang": "en",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [],
+    "refused": [],
+    "amount": null,
+    "currency": null,
+    "references": []
+   }
+  },
+  {
+   "id": "x-question",
+   "lang": "en",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [],
+    "refused": [],
+    "amount": null,
+    "currency": null,
+    "references": []
+   }
+  },
+  {
+   "id": "x-it-invece",
+   "lang": "it",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Vega Cloud Srl"
+    ],
+    "refused": [
+     "Orbit Labs Srl"
+    ],
+    "amount": "480",
+    "currency": "EUR",
+    "references": []
+   }
+  },
+  {
+   "id": "x-ja-neg",
+   "lang": "ja",
+   "pay_ok": false,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [],
+    "refused": [
+     "Orbit Labs"
+    ],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "x-hi-neg",
+   "lang": "hi",
+   "pay_ok": false,
+   "fail_open": [],
+   "refused_ok": false,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [],
+    "refused": [],
+    "amount": "480",
+    "currency": "USD",
+    "references": []
+   }
+  },
+  {
+   "id": "x-ar-gulf",
+   "lang": "ar",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": false,
+   "currency_ok": false,
+   "ref_as_amount": false,
+   "ungrounded": [
+    "500"
+   ],
+   "got": {
+    "pay": [
+     "أحمد المنصوري"
+    ],
+    "refused": [
+     "خالد"
+    ],
+    "amount": "500",
+    "currency": "درام",
+    "references": []
+   }
+  },
+  {
+   "id": "x-de-stattdessen",
+   "lang": "de",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": true,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [
+     "Vega Cloud GmbH"
+    ],
+    "refused": [
+     "Orbit Labs GmbH"
+    ],
+    "amount": "480",
+    "currency": "EUR",
+    "references": []
+   }
+  },
+  {
+   "id": "x-zh-cancel",
+   "lang": "zh",
+   "pay_ok": true,
+   "fail_open": [],
+   "refused_ok": false,
+   "amount_ok": true,
+   "currency_ok": true,
+   "ref_as_amount": false,
+   "ungrounded": [],
+   "got": {
+    "pay": [],
+    "refused": [],
+    "amount": null,
+    "currency": null,
+    "references": []
+   }
+  }
+ ]
+}

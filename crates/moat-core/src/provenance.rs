@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::destination::{destinations_in_text, Destination};
-use crate::normalize::{Normalized, MIN_SUBSTRING_LEN};
+use crate::normalize::{normalize_text, Normalized, MIN_SUBSTRING_LEN};
 use crate::session::Session;
 use crate::source::Source;
 
@@ -145,11 +145,17 @@ fn resolve_destination(session: &Session, allowlist: &[String], value: &Value) -
     let key = target.key();
     let mut matches = Vec::new();
 
-    for intent in session.intents() {
-        if destinations_in_text(&intent.text)
-            .iter()
-            .any(|found| found.key() == key)
-        {
+    for intent in session.live_intents() {
+        let named = match &intent.fields {
+            Some(fields) => fields
+                .destinations
+                .iter()
+                .any(|d| Destination::parse(d).key() == key),
+            None => destinations_in_text(&intent.text)
+                .iter()
+                .any(|found| found.key() == key),
+        };
+        if named {
             matches.push(Match {
                 source: Source::User { turn: intent.turn },
                 kind: MatchKind::Exact,
@@ -212,12 +218,17 @@ fn resolve_text(session: &Session, allowlist: &[String], value: &Value) -> Resol
     let long_enough = text.chars().count() >= MIN_SUBSTRING_LEN;
 
     // 1. Intents -> User
-    for intent in session.intents() {
+    for intent in session.live_intents() {
         let kind = if let Some(n) = numeric {
             intent
                 .numbers
                 .iter()
                 .any(|m| m == n)
+                .then_some(MatchKind::Exact)
+        } else if let Some(fields) = &intent.fields {
+            // Fields are matched exactly and the text beside them is never
+            // read: the reader, or the client, already decided what it says.
+            (!text.is_empty() && fields.pay.iter().any(|p| normalize_text(p) == text))
                 .then_some(MatchKind::Exact)
         } else if !text.is_empty() && intent.normalized == text {
             Some(MatchKind::Exact)
@@ -227,6 +238,9 @@ fn resolve_text(session: &Session, allowlist: &[String], value: &Value) -> Resol
             // to pay (see `said`).
             (long_enough && crate::said::names(&intent.text, text)).then_some(MatchKind::Substring)
         };
+        // A name the user refused, in this turn or a later one, is not one
+        // they are asking for, however it was asked for before.
+        let kind = kind.filter(|_| numeric.is_some() || !session.refused_since(intent.turn, text));
         if let Some(kind) = kind {
             matches.push(Match {
                 source: Source::User { turn: intent.turn },

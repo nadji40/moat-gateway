@@ -17,7 +17,7 @@ use moat_core::destination::Destination;
 use moat_core::money::parse_major;
 use moat_core::outcome::OutcomeStatus;
 use moat_core::policy::{payment_amount, PaymentCall};
-use moat_core::session::{lock, PaymentAuthorization};
+use moat_core::session::{lock, IntentFields, PaymentAuthorization};
 use moat_core::verdict::Decision;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -25,10 +25,25 @@ use serde_json::{json, Value};
 use crate::proxy::now_unix_ms;
 use crate::state::{PolicyState, Shared};
 
+/// What the host says the user asked for: the words, the fields, or both.
+///
+/// Fields are the direct path, for a client that already knows what the
+/// user asked for (a form, a checkout, a confirmed mandate), and the path
+/// `moat-intent` takes after reading the words. When fields are given the
+/// core matches against them and never reads the text, which is then kept
+/// for the record only. Text alone is read by the core's own rules.
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct IntentBody {
+    #[serde(default)]
     text: String,
+    #[serde(default)]
+    fields: Option<IntentFields>,
 }
+
+/// The longest message kept as an intent. A request to pay somebody is a
+/// sentence or two; anything this long is a document pasted into the chat.
+const MAX_INTENT_CHARS: usize = 4000;
 
 #[derive(Deserialize)]
 struct ResumeBody {
@@ -44,8 +59,13 @@ struct HeadlessBody {
 #[derive(Deserialize)]
 struct AuthorizationBody {
     authorization_id: String,
-    invoice_id: String,
-    payee: String,
+    /// The bill this pays, when there is one.
+    #[serde(default)]
+    invoice_id: Option<String>,
+    /// The payee's name. Optional when the account is pinned: on a chain the
+    /// address is the payee.
+    #[serde(default)]
+    payee: Option<String>,
     #[serde(default)]
     recipient_account_id: Option<String>,
     /// Major units, as a decimal string or a JSON number. Strings are the
@@ -199,17 +219,33 @@ async fn post_intent(
     Json(body): Json<IntentBody>,
 ) -> ApiResult {
     let tenant_id = authenticated_tenant(&shared, &headers, "intent:write").await?;
-    let text = body.text.trim();
-    if text.is_empty() {
-        return Err(err(StatusCode::BAD_REQUEST, "text is empty"));
+    let text = body.text.trim().to_owned();
+    if text.chars().count() > MAX_INTENT_CHARS {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            format!("text is over {MAX_INTENT_CHARS} characters"),
+        ));
+    }
+    if let Some(fields) = &body.fields {
+        fields
+            .validate()
+            .map_err(|why| err(StatusCode::BAD_REQUEST, format!("fields: {why}")))?;
+    } else if text.is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "text or fields is required"));
     }
     let _session = session_for_request(&shared, &tenant_id, &id).await?;
-    let turn = mutate(&shared, &tenant_id, &id, |session| {
-        Ok(session.register_intent(text))
+    let structured = body.fields.is_some();
+    let turn = mutate(&shared, &tenant_id, &id, move |session| {
+        Ok(match body.fields {
+            Some(fields) => session.register_intent_fields(&text, fields),
+            None => session.register_intent(&text),
+        })
     })
     .await?;
-    tracing::info!(session = %id, turn, chars = text.chars().count(), "intent registered");
-    Ok(Json(json!({ "session": id, "turn": turn })))
+    tracing::info!(session = %id, turn, structured, "intent registered");
+    Ok(Json(
+        json!({ "session": id, "turn": turn, "structured": structured }),
+    ))
 }
 
 async fn post_resume(
@@ -280,8 +316,18 @@ async fn post_authorization(
 ) -> ApiResult {
     let tenant_id = authenticated_tenant(&shared, &headers, "authorizations:write").await?;
     let authorization_id = body.authorization_id.trim();
-    let invoice_id = body.invoice_id.trim();
-    let payee = body.payee.trim();
+    let invoice_id = body
+        .invoice_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
+    let payee = body
+        .payee
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned);
     let recipient_account_id = body
         .recipient_account_id
         .as_deref()
@@ -307,10 +353,22 @@ async fn post_authorization(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_owned);
-    if authorization_id.is_empty() || invoice_id.is_empty() || payee.is_empty() {
+    if authorization_id.is_empty() {
+        return Err(err(StatusCode::BAD_REQUEST, "authorization_id is required"));
+    }
+    if payee.is_none() && recipient_account_id.is_none() {
         return Err(err(
             StatusCode::BAD_REQUEST,
-            "authorization_id, invoice_id and payee are required",
+            "name the payee, pin the account with recipient_account_id, or both",
+        ));
+    }
+    // On a chain the name beside an address is checked by nothing, so an
+    // authorization that named only a payee would authorize whatever
+    // address the agent put beside that name.
+    if network.is_some() && recipient_account_id.is_none() {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            "recipient_account_id is required on a network: the address is the payee",
         ));
     }
     let Some(asset) = shared
@@ -399,16 +457,22 @@ async fn post_authorization(
         .as_deref()
         .map(|contract| format!(" in the contract at {contract}"))
         .unwrap_or_default();
+    // The amount as the approver wrote it, for the intent fields.
+    let amount_text = match &body.amount {
+        Value::String(text) => moat_core::normalize::normalize_number(text),
+        Value::Number(n) => moat_core::normalize::normalize_number(&n.to_string()),
+        _ => None,
+    };
     let authorization = PaymentAuthorization {
         id: authorization_id.to_owned(),
-        payee: payee.to_owned(),
-        recipient_account_id,
+        payee: payee.clone(),
+        recipient_account_id: recipient_account_id.clone(),
         amount_minor,
         tolerance_minor,
         currency: currency.clone(),
         network: network.clone(),
         asset_contract: asset_contract.clone(),
-        invoice_id: invoice_id.to_owned(),
+        invoice_id: invoice_id.clone(),
         invoice_fingerprint,
         require_invoice_fingerprint: body.require_invoice_fingerprint,
         aggregate_limit_minor,
@@ -423,22 +487,42 @@ async fn post_authorization(
         session
             .register_payment_authorization(to_register)
             .map_err(|message| message.to_owned())?;
-        // Feed the same user-approved values into the existing provenance engine.
-        session.register_intent(&format!(
-            "Authorize invoice {} to {}{}{}{} for {} {} until {}",
-            invoice_id,
-            payee,
-            account_note,
-            network_note,
-            contract_note,
-            body.amount,
-            currency,
-            body.expires_at
-        ));
+        // What the approver approved is what the user asked for, as fields:
+        // the core matches the payment against these values exactly. The
+        // sentence beside them is the record a person reads.
+        session.register_intent_fields(
+            &format!(
+                "Authorize {}{}{}{}{} for {} {} until {}",
+                invoice_id
+                    .as_deref()
+                    .map(|invoice| format!("invoice {invoice} to "))
+                    .unwrap_or_else(|| "payment to ".to_owned()),
+                payee.as_deref().unwrap_or("the account"),
+                account_note,
+                network_note,
+                contract_note,
+                body.amount,
+                currency,
+                body.expires_at
+            ),
+            IntentFields {
+                pay: payee.iter().cloned().collect(),
+                amounts: amount_text.iter().cloned().collect(),
+                currencies: vec![currency.clone()],
+                destinations: recipient_account_id.iter().cloned().collect(),
+                references: invoice_id.iter().cloned().collect(),
+                reader: Some("authorization".to_owned()),
+                ..IntentFields::default()
+            },
+        );
         Ok(())
     })
     .await?;
-    tracing::info!(session = %id, authorization_id, invoice_id, "payment authorization registered");
+    tracing::info!(
+        session = %id, authorization_id, invoice_id = invoice_id.as_deref().unwrap_or("none"),
+        named = payee.is_some(), pinned = recipient_account_id.is_some(),
+        "payment authorization registered"
+    );
     Ok(Json(
         json!({ "session": id, "authorization": authorization }),
     ))
