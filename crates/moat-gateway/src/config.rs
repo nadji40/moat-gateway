@@ -34,17 +34,14 @@ pub struct Config {
     /// directory from `keys`, because the two have different blast radii.
     #[serde(default)]
     pub cosign_keys: Option<PathBuf>,
-    /// The intent API listener. Read from step 7 on.
+    /// The intent API listener.
     #[serde(default)]
-    #[allow(dead_code)]
     pub intent_api: Option<IntentApi>,
     /// Separator between upstream name and tool name in aggregated names.
     #[serde(default = "default_separator")]
     pub separator: String,
-    /// Fixed session id. If unset, one is generated per connection. Read
-    /// from step 4 on.
+    /// Fixed session id. If unset, one is generated per connection.
     #[serde(default)]
-    #[allow(dead_code)]
     pub session_id: Option<String>,
     /// Optional durable PostgreSQL state. Required for authenticated HTTP.
     #[serde(default)]
@@ -61,7 +58,7 @@ pub enum Listen {
     /// Speak MCP on this process's own stdin/stdout.
     #[default]
     Stdio,
-    /// Streamable HTTP on the given address (step 11).
+    /// Streamable HTTP on the given address.
     Http {
         /// `host:port` to bind.
         addr: String,
@@ -121,8 +118,7 @@ pub enum UpstreamTransport {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct IntentApi {
-    /// `host:port` to bind. Should be loopback.
-    #[allow(dead_code)]
+    /// `host:port` to bind. Loopback, unless `auth.required` is on.
     pub addr: String,
 }
 
@@ -153,6 +149,28 @@ pub struct Auth {
     /// named customer stays that way.
     #[serde(default)]
     pub self_signup: bool,
+}
+
+/// Refuse a bind address off the loopback interface.
+fn ensure_loopback(addr: &str, what: &str) -> Result<()> {
+    let host = addr
+        .rsplit_once(':')
+        .map_or(addr, |(host, _)| host)
+        .trim_matches(|c| c == '[' || c == ']');
+    let loopback = host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback());
+    anyhow::ensure!(
+        loopback,
+        concat!(
+            "{} is {:?}, which is not loopback, and auth.required is off, so anyone ",
+            "who can reach it would be trusted; bind it to 127.0.0.1 or turn auth.required on",
+        ),
+        what,
+        addr
+    );
+    Ok(())
 }
 
 fn default_evidence() -> PathBuf {
@@ -215,6 +233,17 @@ impl Config {
                 self.storage.is_some(),
                 "auth.required needs durable storage for tenant API keys"
             );
+        } else {
+            // With authentication off, whoever can reach a listener is the
+            // trusted caller: the intent API registers what the user said
+            // and releases holds, and the MCP listener pays. Neither may be
+            // reachable from off the machine on that footing.
+            if let Listen::Http { addr, .. } = &self.listen {
+                ensure_loopback(addr, "listen.addr")?;
+            }
+            if let Some(api) = &self.intent_api {
+                ensure_loopback(&api.addr, "intent_api.addr")?;
+            }
         }
         if let Listen::Http {
             idle_timeout_secs, ..
@@ -355,6 +384,46 @@ upstreams:
         let cfg: Config = serde_norway::from_str(text).unwrap();
         assert!(cfg.upstreams.iter().all(|u| u.rail == Rail::Card));
         assert!(cfg.upstreams.iter().all(|u| u.policy.is_none()));
+        assert!(cfg.validate().is_ok());
+    }
+
+    /// Without authentication, a listener anyone can reach is a listener
+    /// that trusts anyone. It is refused at load rather than warned about.
+    #[test]
+    fn an_open_listener_needs_authentication() {
+        let open_mcp = r#"
+listen: { transport: http, addr: "0.0.0.0:7071" }
+upstreams:
+  - { name: stripe, transport: stdio, command: ["x"] }
+"#;
+        let cfg: Config = serde_norway::from_str(open_mcp).unwrap();
+        assert!(cfg.validate().is_err());
+
+        let open_api = r#"
+upstreams:
+  - { name: stripe, transport: stdio, command: ["x"] }
+intent_api: { addr: "10.0.0.5:7072" }
+"#;
+        let cfg: Config = serde_norway::from_str(open_api).unwrap();
+        assert!(cfg.validate().is_err());
+
+        for addr in ["127.0.0.1:7072", "localhost:7072", "[::1]:7072"] {
+            let text = format!(
+                "upstreams:\n  - {{ name: s, transport: stdio, command: [\"x\"] }}\nintent_api: {{ addr: \"{addr}\" }}\n"
+            );
+            let cfg: Config = serde_norway::from_str(&text).unwrap();
+            assert!(cfg.validate().is_ok(), "{addr}");
+        }
+
+        let authenticated = r#"
+listen: { transport: http, addr: "0.0.0.0:7071" }
+upstreams:
+  - { name: stripe, transport: stdio, command: ["x"] }
+intent_api: { addr: "0.0.0.0:7072" }
+storage: { database_url_env: MOAT_DATABASE_URL, max_connections: 4 }
+auth: { required: true }
+"#;
+        let cfg: Config = serde_norway::from_str(authenticated).unwrap();
         assert!(cfg.validate().is_ok());
     }
 

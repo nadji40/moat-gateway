@@ -20,7 +20,9 @@
 
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::pin::Pin;
 use std::sync::{Arc, PoisonError};
+use std::task::Poll;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
@@ -30,7 +32,7 @@ use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::Router;
-use futures::stream::StreamExt;
+use futures::Stream;
 use moat_mcp::jsonrpc::code;
 use moat_mcp::stdio::Frame;
 use moat_mcp::types::method;
@@ -49,11 +51,50 @@ pub const MCP_PATH: &str = "/mcp";
 struct Session {
     gw: Arc<Gateway>,
     tenant_id: String,
-    /// Server-initiated lines, taken by the GET stream when a client opens
-    /// one. `None` once taken.
-    notifications: Mutex<Option<mpsc::Receiver<String>>>,
+    /// Server-initiated lines, taken by the GET stream while a client holds
+    /// one open and handed back when it goes away. `None` while taken.
+    notifications: std::sync::Mutex<Option<mpsc::Receiver<String>>>,
     /// When a request last named this session.
     last_used: std::sync::Mutex<Instant>,
+}
+
+/// The notification stream for one session.
+///
+/// A client that drops its stream can open it again: the receiver goes back
+/// to the session when this is dropped, and whatever arrived in between is
+/// waiting in the channel for the next GET.
+struct NotificationStream {
+    rx: Option<mpsc::Receiver<String>>,
+    session: Arc<Session>,
+}
+
+impl Stream for NotificationStream {
+    type Item = Result<Bytes, Infallible>;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        let Some(rx) = this.rx.as_mut() else {
+            return Poll::Ready(None);
+        };
+        rx.poll_recv(cx).map(|line| {
+            line.map(|line| Ok(Bytes::from(format!("event: message\ndata: {line}\n\n"))))
+        })
+    }
+}
+
+impl Drop for NotificationStream {
+    fn drop(&mut self) {
+        if let Some(rx) = self.rx.take() {
+            *self
+                .session
+                .notifications
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) = Some(rx);
+        }
+    }
 }
 
 impl Session {
@@ -76,11 +117,10 @@ struct Listener {
     cfg: Config,
     shared: Arc<Shared>,
     sessions: Mutex<HashMap<String, Arc<Session>>>,
-    /// Sessions explicitly terminated during this process lifetime, and
-    /// when. Durable state remains available for audit and recovery after a
-    /// process restart, but DELETE must not immediately resurrect the
-    /// session in the same process. Forgotten after the idle timeout, like
-    /// everything else here.
+    /// Sessions ended by DELETE in this process, and when. The durable row
+    /// records the end too, and stays for audit; this is the answer for a
+    /// gateway with no storage, and the fast one for a gateway with it.
+    /// Forgotten after the idle timeout, like everything else here.
     ended_sessions: Mutex<HashMap<String, Instant>>,
     default_session: Mutex<Option<Arc<Session>>>,
 }
@@ -98,7 +138,7 @@ impl Listener {
         let s = Arc::new(Session {
             gw,
             tenant_id,
-            notifications: Mutex::new(Some(rx)),
+            notifications: std::sync::Mutex::new(Some(rx)),
             last_used: std::sync::Mutex::new(Instant::now()),
         });
         self.sessions.lock().await.insert(id, Arc::clone(&s));
@@ -112,6 +152,14 @@ impl Listener {
         if let Some(session) = self.sessions.lock().await.get(id).cloned() {
             session.touch();
             return Ok((session.tenant_id == tenant_id).then_some(session));
+        }
+        // Ended in another process, or in this one before the memory of it
+        // was dropped: the row is still there for audit and must not come
+        // back as a live session.
+        if let Some(storage) = self.shared.storage() {
+            if storage.session_ended(tenant_id, id).await? {
+                return Ok(None);
+            }
         }
         if self
             .shared
@@ -157,6 +205,14 @@ impl Listener {
                     .lock()
                     .await
                     .insert(id.to_owned(), Instant::now());
+                if let Some(storage) = self.shared.storage() {
+                    if let Err(error) = storage.end_session(&s.tenant_id, id).await {
+                        tracing::error!(
+                            %error, session = %id,
+                            "session end was not recorded; a restart could bring it back"
+                        );
+                    }
+                }
                 tracing::info!(session = %id, "http session ended");
                 true
             }
@@ -463,12 +519,18 @@ async fn get_mcp(State(l): State<Arc<Listener>>, headers: HeaderMap) -> Response
             return StatusCode::SERVICE_UNAVAILABLE.into_response();
         }
     };
-    let Some(rx) = session.notifications.lock().await.take() else {
+    let taken = session
+        .notifications
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .take();
+    let Some(rx) = taken else {
         return (StatusCode::CONFLICT, "stream already open").into_response();
     };
-    let stream = tokio_stream::wrappers::ReceiverStream::new(rx).map(|line| {
-        Ok::<Bytes, Infallible>(Bytes::from(format!("event: message\ndata: {line}\n\n")))
-    });
+    let stream = NotificationStream {
+        rx: Some(rx),
+        session: Arc::clone(&session),
+    };
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "text/event-stream")
@@ -932,9 +994,6 @@ pub async fn serve(addr: &str, idle: Duration, cfg: Config, shared: Arc<Shared>)
         .await
         .with_context(|| format!("binding MCP listener on {addr}"))?;
     let local = socket.local_addr().context("MCP listener local address")?;
-    if !local.ip().is_loopback() && !shared.auth_required() {
-        tracing::warn!(%local, "MCP listener is not loopback and authentication is disabled");
-    }
     tracing::info!(
         %local, path = MCP_PATH, idle_timeout_secs = idle.as_secs(),
         "streamable http listener ready"
@@ -968,7 +1027,7 @@ mod scope_tests {
 listen: { transport: http, addr: "127.0.0.1:0" }
 upstreams:
   - { name: stripe, transport: http, url: "http://127.0.0.1:1/mcp", rail: card }
-  - { name: chain,  transport: http, url: "http://127.0.0.1:2/mcp", rail: crypto }
+  - { name: chain, transport: http, url: "http://127.0.0.1:2/mcp", rail: crypto }
 policy: policies/default.yaml
 evidence: ./evidence.jsonl
 keys: ./keys

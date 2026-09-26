@@ -18,6 +18,60 @@ use tokio::sync::{mpsc, oneshot, Mutex};
 
 use crate::config::{Upstream as UpstreamConfig, UpstreamTransport};
 
+/// How long an HTTP upstream has to accept a connection at start.
+const REACH_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Refuse an HTTP upstream nobody is listening for.
+///
+/// A stdio upstream that cannot be spawned fails the start. An HTTP one
+/// that nothing answered used to be found out one failed request at a
+/// time, after the client had been told the gateway was up. This is the
+/// same rule for both: the upstream is there when the gateway starts, or
+/// the gateway does not.
+async fn reachable(url: &str, name: &str) -> Result<()> {
+    let (host, port) = host_port(url)
+        .ok_or_else(|| anyhow!("upstream {name:?}: cannot read a host and port from {url:?}"))?;
+    match tokio::time::timeout(
+        REACH_TIMEOUT,
+        tokio::net::TcpStream::connect((host.as_str(), port)),
+    )
+    .await
+    {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(e)) => Err(anyhow!(
+            "upstream {name:?}: nothing is listening at {url} ({e})"
+        )),
+        Err(_) => Err(anyhow!(
+            "upstream {name:?}: {url} did not accept a connection within {}s",
+            REACH_TIMEOUT.as_secs()
+        )),
+    }
+}
+
+/// The host and port an `http` or `https` URL names.
+fn host_port(url: &str) -> Option<(String, u16)> {
+    let (scheme, rest) = url.split_once("://")?;
+    let default = match scheme {
+        "http" => 80,
+        "https" => 443,
+        _ => return None,
+    };
+    let authority = rest.split(['/', '?', '#']).next()?;
+    let authority = authority.rsplit('@').next()?;
+    if let Some(rest) = authority.strip_prefix('[') {
+        let (host, after) = rest.split_once(']')?;
+        let port = match after.strip_prefix(':') {
+            Some(port) => port.parse().ok()?,
+            None => default,
+        };
+        return Some((host.to_owned(), port));
+    }
+    match authority.rsplit_once(':') {
+        Some((host, port)) => Some((host.to_owned(), port.parse().ok()?)),
+        None => Some((authority.to_owned(), default)),
+    }
+}
+
 /// Something an upstream sent that was not a reply to us.
 #[derive(Debug)]
 pub enum UpstreamEvent {
@@ -122,6 +176,7 @@ impl Upstream {
                 Ok(up)
             }
             UpstreamTransport::Http { url } => {
+                reachable(url, &cfg.name).await?;
                 let client = HttpClient::new(url)
                     .with_context(|| format!("upstream {:?}: http client", cfg.name))?;
                 tracing::info!(upstream = %cfg.name, %url, "http upstream configured");
@@ -209,8 +264,11 @@ impl Upstream {
         }
     }
 
-    /// Whether the upstream can still be talked to. HTTP upstreams are
-    /// assumed alive; a failed POST surfaces per request.
+    /// Whether the upstream can still be talked to. A stdio upstream is
+    /// alive until its stdout closes. An HTTP one was reachable when the
+    /// gateway started and is taken to be alive after that: HTTP has no
+    /// stream whose closing could be observed, so a failed POST surfaces
+    /// per request instead.
     pub fn is_alive(&self) -> bool {
         match &self.link {
             Link::Stdio(s) => s.alive.load(Ordering::SeqCst),
@@ -309,5 +367,33 @@ impl Upstream {
             }
             Link::Http(client) => client.close().await,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_url_names_its_host_and_port() {
+        assert_eq!(
+            host_port("http://127.0.0.1:7100/mcp"),
+            Some(("127.0.0.1".to_owned(), 7100))
+        );
+        assert_eq!(
+            host_port("https://mcp.example.com/v1?x=1"),
+            Some(("mcp.example.com".to_owned(), 443))
+        );
+        assert_eq!(
+            host_port("http://user:pw@host.internal/mcp"),
+            Some(("host.internal".to_owned(), 80))
+        );
+        assert_eq!(
+            host_port("http://[::1]:8080/mcp"),
+            Some(("::1".to_owned(), 8080))
+        );
+        assert_eq!(host_port("http://[::1]/mcp"), Some(("::1".to_owned(), 80)));
+        assert_eq!(host_port("ftp://x/"), None);
+        assert_eq!(host_port("http://host:notaport/"), None);
     }
 }

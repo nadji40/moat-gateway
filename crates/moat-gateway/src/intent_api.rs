@@ -989,9 +989,6 @@ pub async fn serve(addr: &str, shared: Arc<Shared>) -> Result<()> {
         .await
         .with_context(|| format!("binding intent API on {addr}"))?;
     let local = listener.local_addr().context("intent API local address")?;
-    if !local.ip().is_loopback() && !shared.auth_required() {
-        tracing::warn!(%local, "intent API is not loopback and authentication is disabled");
-    }
     tracing::info!(%local, "intent API listening");
     axum::serve(listener, router(shared))
         .await

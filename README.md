@@ -611,13 +611,13 @@ auth: { required: true }
 
 | Key | Meaning | Default |
 | --- | --- | --- |
-| `listen` | `{ transport: stdio }` or `{ transport: http, addr, idle_timeout_secs }` | stdio |
+| `listen` | `{ transport: stdio }` or `{ transport: http, addr, idle_timeout_secs }`; `addr` must be loopback unless `auth.required` | stdio |
 | `upstreams[].name` | Tool namespace prefix; must be unique | required |
 | `upstreams[].transport` | `stdio` with `command` (and optional `env`), or `http` with `url` | required |
 | `policy` | Path to the policy YAML | none → payments denied |
 | `evidence` | Append-only JSONL file | `./evidence.jsonl` |
 | `keys` | Directory for the ed25519 signing key (step 8) | `./keys` |
-| `intent_api.addr` | Where the intent API listens; keep it loopback | none → no intents can be registered |
+| `intent_api.addr` | Where the intent API listens; must be loopback unless `auth.required` | none → no intents can be registered |
 | `storage` | Dedicated PostgreSQL state; URL is read from the named environment variable | none → memory only |
 | `auth.required` | Require a tenant bearer key on HTTP and intent routes | false |
 | `separator` | Between upstream name and tool name | `__` |
@@ -637,7 +637,8 @@ shape the MCP TypeScript SDK's `StreamableHTTPClientTransport` speaks:
   session — and returns the id in `Mcp-Session-Id`. Later requests echo it.
   **That id is the one to use with the intent API.**
 - `GET /mcp` with the session header opens the SSE stream for server-initiated
-  notifications; one per session.
+  notifications; one at a time per session. A client that drops it can open
+  it again, and whatever arrived in between is delivered then.
 - A session no request has named for `idle_timeout_secs` (default 1800) has
   its upstreams shut down and is dropped from memory. With `storage`
   configured, the next request that names it restores it from its durable

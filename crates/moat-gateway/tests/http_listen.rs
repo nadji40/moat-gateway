@@ -205,6 +205,20 @@ intent_api: {{ addr: "127.0.0.1:{api_port}" }}
     assert_eq!(second.status(), 409);
     drop(stream);
 
+    // Once the client has gone, the stream can be opened again. The server
+    // learns of the disconnect when the connection closes, not the instant
+    // the client drops it.
+    let mut reopened = 0;
+    for _ in 0..40 {
+        let again = get(&c).await.unwrap();
+        reopened = again.status().as_u16();
+        if reopened == 200 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert_eq!(reopened, 200, "a dropped stream must be reopenable");
+
     // Unknown session -> 404. Bad Origin -> 403.
     let resp = c
         .http

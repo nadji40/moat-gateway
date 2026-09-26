@@ -200,6 +200,60 @@ async fn an_unparseable_reply_from_the_upstream_is_an_error_not_a_wait() {
     gw.close_and_wait().await;
 }
 
+/// An upstream that pages its tool list is walked to the end, so a tool on
+/// the second page is as reachable as one on the first.
+#[tokio::test]
+async fn every_page_of_an_upstreams_tools_is_listed() {
+    let fake = fake_server_path();
+    let policy = policy_for_fake("pages-policy", "default.yaml");
+    let cfg = write_config(
+        "pages",
+        &format!(
+            r#"
+upstreams:
+  - name: fake
+    transport: stdio
+    command: [{}]
+    env: {{ FAKE_MCP_TOOL_PAGES: "1" }}
+policy: {}
+"#,
+            yaml_path(&fake),
+            yaml_path(&policy)
+        ),
+    );
+    let mut gw = Peer::spawn(&gateway_path(), &["--config", cfg.to_str().unwrap()], &[]);
+    let (_, reply) = gw.call(Request::new(1, method::TOOLS_LIST, None)).await;
+    let Message::Response(r) = reply else {
+        panic!("expected a response: {reply:?}");
+    };
+    let list: ListToolsResult = serde_json::from_value(r.result).unwrap();
+    let names: Vec<&str> = list.tools.iter().map(|t| t.name.as_str()).collect();
+    assert!(names.contains(&"fake__echo"), "first page: {names:?}");
+    assert!(names.contains(&"fake__pay"), "second page: {names:?}");
+    assert!(list.next_cursor.is_none(), "the merged list is whole");
+    gw.close_and_wait().await;
+}
+
+/// An HTTP upstream nobody is listening for stops the gateway at start,
+/// the way a stdio upstream that cannot be spawned does.
+#[tokio::test]
+async fn an_http_upstream_nobody_listens_for_stops_the_gateway() {
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let cfg = write_config(
+        "unreachable",
+        &format!(
+            "upstreams:\n  - {{ name: web, transport: http, url: \"http://127.0.0.1:{port}/mcp\" }}\n"
+        ),
+    );
+    let gw = Peer::spawn(&gateway_path(), &["--config", cfg.to_str().unwrap()], &[]);
+    let status = gw.close_and_wait().await;
+    assert!(!status.success(), "the gateway ran without its upstream");
+}
+
 #[tokio::test]
 async fn garbage_from_client_gets_parse_error() {
     let fake = fake_server_path();

@@ -216,6 +216,43 @@ impl DurableStore {
         Ok(version)
     }
 
+    /// Record that a session was ended by its client. The row stays for
+    /// audit; what changes is that no listener brings it back as a live
+    /// session. Returns whether a live session was there to end.
+    pub async fn end_session(&self, tenant_id: &str, id: &str) -> Result<bool> {
+        let client = self
+            .pool
+            .get()
+            .await
+            .context("session database connection")?;
+        let ended = client
+            .execute(
+                "UPDATE moat.sessions SET ended_at = now(), updated_at = now()
+                 WHERE tenant_id = $1 AND id = $2 AND ended_at IS NULL",
+                &[&tenant_id, &id],
+            )
+            .await
+            .context("ending session")?;
+        Ok(ended > 0)
+    }
+
+    /// Whether a session was ended by its client, in this process or another.
+    pub async fn session_ended(&self, tenant_id: &str, id: &str) -> Result<bool> {
+        let client = self
+            .pool
+            .get()
+            .await
+            .context("session database connection")?;
+        let row = client
+            .query_opt(
+                "SELECT ended_at IS NOT NULL FROM moat.sessions WHERE tenant_id = $1 AND id = $2",
+                &[&tenant_id, &id],
+            )
+            .await
+            .context("checking whether the session ended")?;
+        Ok(row.is_some_and(|row| row.get::<_, bool>(0)))
+    }
+
     /// Persist one signed evidence record alongside its JSONL copy.
     pub async fn save_evidence(
         &self,
@@ -1462,6 +1499,52 @@ mod ledger_tests {
             .await
             .expect("aggregate");
         assert_eq!(aggregate.committed, Minor(30_000));
+
+        cleanup(&store, &id).await;
+    }
+
+    /// A DELETE ends a session for every process, not only the one that saw
+    /// it. The row stays, so the evidence and the mandates it holds can still
+    /// be read.
+    #[tokio::test]
+    async fn an_ended_session_stays_ended_for_every_process() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let session = Session::new(unique("s"));
+        store
+            .save_session(&id, &session, None)
+            .await
+            .expect("saving");
+        assert!(!store
+            .session_ended(&id, &session.id)
+            .await
+            .expect("checking"));
+        assert!(store.end_session(&id, &session.id).await.expect("ending"));
+        assert!(store
+            .session_ended(&id, &session.id)
+            .await
+            .expect("checking"));
+        assert!(
+            !store
+                .end_session(&id, &session.id)
+                .await
+                .expect("ending again"),
+            "ending twice is not a second end"
+        );
+        assert!(
+            store
+                .load_session(&id, &session.id)
+                .await
+                .expect("loading")
+                .is_some(),
+            "the row is still there to read"
+        );
+        assert!(!store
+            .session_ended(&id, "never-existed")
+            .await
+            .expect("checking"));
 
         cleanup(&store, &id).await;
     }

@@ -50,6 +50,10 @@ struct AuthorizedPayment {
 /// backstop, not a budget.
 pub const REPLY_TIMEOUT: Duration = Duration::from_secs(300);
 
+/// The most pages of one upstream's tool list that are walked. A server
+/// that keeps handing out cursors past this is looping, not listing.
+const MAX_TOOL_PAGES: usize = 64;
+
 /// A running proxy session.
 pub struct Gateway {
     upstreams: Vec<Arc<Upstream>>,
@@ -505,9 +509,31 @@ impl Gateway {
         }
     }
 
+    /// One further page of an upstream's tool list.
+    async fn tools_page(&self, u: &Arc<Upstream>, cursor: &str) -> Result<ListToolsResult> {
+        let frame = u
+            .request(Request::new(
+                u.own_id(),
+                method::TOOLS_LIST,
+                Some(json!({"cursor": cursor})),
+            ))
+            .await?;
+        match frame.message {
+            Message::Response(resp) => serde_json::from_value(resp.result)
+                .map_err(|e| anyhow::anyhow!("tools/list page has an unexpected shape: {e}")),
+            Message::Error(e) => anyhow::bail!(
+                "tools/list page rejected: {} ({})",
+                e.error.message,
+                e.error.code
+            ),
+            _ => anyhow::bail!("tools/list page was answered with something other than a response"),
+        }
+    }
+
     async fn fan_out_tools_list(&self, req: Request) {
-        // Cursors are per-upstream and cannot be aggregated; the merged list
-        // is always the first page of every upstream.
+        // A client's cursor is ignored: cursors are per upstream and cannot
+        // be aggregated. Every upstream's pages are walked here instead, so
+        // the merged list is the whole list and never carries a cursor.
         let mut params = req.params_object();
         if params.remove("cursor").is_some() {
             tracing::warn!(
@@ -530,12 +556,29 @@ impl Gateway {
                     message: Message::Response(resp),
                     ..
                 }) => match serde_json::from_value::<ListToolsResult>(resp.result) {
-                    Ok(list) => {
+                    Ok(first) => {
                         any_ok = true;
-                        if list.next_cursor.is_some() {
-                            tracing::warn!(upstream = %u.name, "upstream has more tool pages; only the first is exposed");
+                        let mut all = first.tools;
+                        let mut cursor = first.next_cursor;
+                        let mut pages = 1;
+                        while let Some(next) = cursor.take() {
+                            pages += 1;
+                            if pages > MAX_TOOL_PAGES {
+                                tracing::error!(upstream = %u.name, pages, "tools/list keeps paging; stopping here");
+                                break;
+                            }
+                            match self.tools_page(&u, &next).await {
+                                Ok(page) => {
+                                    all.extend(page.tools);
+                                    cursor = page.next_cursor;
+                                }
+                                Err(e) => {
+                                    tracing::error!(upstream = %u.name, error = %e, "a later page of tools/list failed; listing what was read");
+                                    break;
+                                }
+                            }
                         }
-                        for mut t in list.tools {
+                        for mut t in all {
                             if self.shared.policies.classify(&u.name, &t.name)
                                 == ToolClass::Unclassified
                             {

@@ -9,7 +9,8 @@
 //! the passthrough tests use to prove the gateway forwards bytes unchanged.
 //! `echo` called with `simulate_malformed: true` answers with a line that is
 //! JSON carrying the request's id but is not a JSON-RPC message, which is how
-//! a broken upstream reply is exercised.
+//! a broken upstream reply is exercised. `FAKE_MCP_TOOL_PAGES=1` makes
+//! `tools/list` hand out its tools one page at a time.
 
 use std::io::{self, BufRead, Write};
 
@@ -19,6 +20,7 @@ fn main() {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let pretty = std::env::var_os("FAKE_MCP_PRETTY").is_some();
+    let paged = std::env::var_os("FAKE_MCP_TOOL_PAGES").is_some();
     let mut out = stdout.lock();
     let mut calls = 0u32;
 
@@ -66,11 +68,8 @@ fn main() {
                 })
             }
             "ping" => json!({"jsonrpc": "2.0", "id": id, "result": {}}),
-            "tools/list" => json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "result": {
-                    "tools": [
+            "tools/list" => {
+                let all: Vec<Value> = json!([
                         {
                             "name": "echo",
                             "description": "Echo the arguments back as text.",
@@ -109,9 +108,25 @@ fn main() {
                                 "required": ["payee", "amount"]
                             }
                         }
-                    ]
+                    ])
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+                // Paged on request: the first tool alone with a cursor, then
+                // the rest. A gateway that stops at the first page never
+                // sees `pay`.
+                let cursor = msg.pointer("/params/cursor").and_then(Value::as_str);
+                let (page, next) = match (paged, cursor) {
+                    (false, _) => (all, None),
+                    (true, None) => (all[..1].to_vec(), Some("page-2")),
+                    (true, Some(_)) => (all[1..].to_vec(), None),
+                };
+                let mut result = json!({"tools": page});
+                if let Some(next) = next {
+                    result["nextCursor"] = json!(next);
                 }
-            }),
+                json!({"jsonrpc": "2.0", "id": id, "result": result})
+            }
             "tools/call" => {
                 calls += 1;
                 let name = msg
