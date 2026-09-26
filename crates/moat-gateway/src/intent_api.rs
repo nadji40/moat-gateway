@@ -58,9 +58,9 @@ struct AuthorizationBody {
     /// than one. Omitted on card and bank, which have exactly one each.
     #[serde(default)]
     network: Option<String>,
-    /// The token contract or mint the payment must be in, where the asset
-    /// is a token. Omitted for fiat, and for a token the approver is
-    /// content to identify by ticker alone.
+    /// The token contract or mint the payment must be in. Required for a
+    /// token that is not the network's own coin; omitted for fiat and for
+    /// the coin itself.
     #[serde(default)]
     asset_contract: Option<String>,
     #[serde(default)]
@@ -323,6 +323,18 @@ async fn post_authorization(
             "unknown asset; declare it under `assets` in the policy",
         ));
     };
+    if asset.needs_contract() && asset_contract.is_none() {
+        return Err(err(
+            StatusCode::BAD_REQUEST,
+            format!(
+                concat!(
+                    "asset_contract is required for {}: a ticker is a label any ",
+                    "contract can wear, so name the contract or mint the payment must be in",
+                ),
+                currency
+            ),
+        ));
+    }
     if body.max_payments == 0 || (!body.repeat_payments && body.max_payments != 1) {
         return Err(err(
             StatusCode::BAD_REQUEST,
@@ -602,7 +614,7 @@ fn default_cosign_ttl() -> u64 {
 /// is the thing the arena's standing-approval attack is about. Five minutes
 /// is enough to get a transaction mined on an L2 and short enough that a
 /// leaked signature is nearly always already dead.
-const MAX_COSIGN_TTL_SECONDS: u64 = 900;
+const MAX_COSIGN_TTL_SECONDS: u64 = 300;
 
 async fn cosign_verdict(
     State(shared): State<Arc<Shared>>,

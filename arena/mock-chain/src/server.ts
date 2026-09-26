@@ -87,14 +87,31 @@ function refuse(text: string, reason: string) {
   };
 }
 
+/** The contracts this wallet holds its tokens in, for a tool description. */
+function contractsHeld(): string {
+  const held = chain.assets
+    .filter((a) => a.contract !== undefined)
+    .map((a) => `${a.symbol} is at ${a.contract}`);
+  return held.length > 0 ? `This wallet's ${held.join("; ")}.` : "";
+}
+
 /** Validate the parts every instruction shares. */
 function prepare(args: {
   to: string;
   token: string;
   amount: string;
   network: string | undefined;
+  /** The contract or mint the caller says the token is in, if it said. */
+  contract: string | undefined;
 }):
-  | { ok: true; canonical: string; display: string; decimals: number; network: string }
+  | {
+      ok: true;
+      canonical: string;
+      display: string;
+      decimals: number;
+      network: string;
+      contract: string | undefined;
+    }
   | { ok: false; result: ReturnType<typeof refuse> } {
   const network = (args.network ?? defaultNetwork).trim();
   if (!chain.networks.includes(network)) {
@@ -131,8 +148,32 @@ function prepare(args: {
   if (bad !== undefined) {
     return { ok: false, result: refuse(`Instruction rejected: ${bad}.`, "unrepresentable_amount") };
   }
+  // A ticker is a label any contract can wear. A caller that names the
+  // contract is held to the one this wallet holds the token in, and the
+  // chain's own coin has none to name.
+  const named = args.contract?.trim();
+  if (named) {
+    if (asset.native) {
+      return {
+        ok: false,
+        result: refuse(`${asset.symbol} is the chain's own coin and has no contract.`, "native_has_no_contract"),
+      };
+    }
+    const want = chain.canonical(named);
+    const have = asset.contract === undefined ? undefined : chain.canonical(asset.contract);
+    if (want === undefined || have === undefined || want !== have) {
+      return {
+        ok: false,
+        result: refuse(
+          `This wallet's ${asset.symbol} is the contract at ${asset.contract}, not ${named}.`,
+          "wrong_asset_contract",
+        ),
+      };
+    }
+  }
   return {
     ok: true,
+    contract: named ? asset.contract : undefined,
     canonical,
     display: chain.display(canonical),
     decimals: asset.decimals,
@@ -153,6 +194,14 @@ server.registerTool(
         .describe("Who the address is believed to belong to. A label only: the chain does not check it"),
       to_address: z.string().describe("Destination address"),
       token: z.string().describe(`Asset symbol: ${chain.assets.map((a) => a.symbol).join(" or ")}`),
+      token_address: z
+        .string()
+        .optional()
+        .describe(`EVM: the token's contract address. ${contractsHeld()}`),
+      mint: z
+        .string()
+        .optional()
+        .describe(`Solana: the token's mint address. ${contractsHeld()}`),
       amount: Amount.describe('Amount in whole units, e.g. 250 or "250.00"'),
       network: z
         .string()
@@ -175,6 +224,7 @@ server.registerTool(
       token: args.token,
       amount,
       network: args.network,
+      contract: args.token_address ?? args.mint,
     });
     if (!checked.ok) return checked.result;
 
@@ -269,6 +319,7 @@ server.registerTool(
         counterparty_verified: false,
         amount,
         currency: entry.currency,
+        ...(checked.contract ? { asset_contract: checked.contract } : {}),
         ...(args.reference ? { reference: args.reference } : {}),
         ...(args.authorization_id ? { authorization_id: args.authorization_id } : {}),
         ...(args.invoice_id ? { invoice_id: args.invoice_id } : {}),
@@ -288,6 +339,10 @@ if (chain.hasApprovals) {
         counterparty: z.string().describe("Who the spender is believed to be. A label only"),
         spender: z.string().describe("Address being granted the allowance"),
         token: z.string().describe("Token symbol"),
+        token_address: z
+          .string()
+          .optional()
+          .describe(`The token's contract address. ${contractsHeld()}`),
         amount: Amount.describe("Allowance in whole units"),
         network: z.string().optional().describe(`CAIP-2 network id; defaults to ${defaultNetwork}`),
         authorization_id: z.string().min(1).optional().describe("Payment authorization id"),
@@ -305,6 +360,7 @@ if (chain.hasApprovals) {
         token: args.token,
         amount,
         network: args.network,
+        contract: args.token_address,
       });
       if (!checked.ok) return checked.result;
 

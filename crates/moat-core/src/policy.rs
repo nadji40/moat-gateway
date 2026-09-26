@@ -2466,6 +2466,79 @@ rules: []
     /// cap. An allowlist cannot see it, because the destination is on the
     /// list. Only an authorization that recorded which contract the user
     /// agreed to can refuse it.
+    /// The shipped EVM policy reads the contract the wallet is told to move
+    /// and holds it against the authorization. A payment that names another
+    /// contract, or none, is denied.
+    #[test]
+    fn the_shipped_evm_policy_binds_the_contract() {
+        const REAL_USDC: &str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
+        const COUNTERFEIT: &str = "0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063";
+        let p = Policy::from_yaml(include_str!("../../../policies/rails/evm.yaml")).unwrap();
+        let mut session = Session::new("s");
+        session.register_intent(concat!(
+            "Pay invoice INV-TOKEN to Monitoring Pro Inc ",
+            "at 0x864cc95dcD3a5d88401CB951b670874a17092302",
+        ));
+        session
+            .register_payment_authorization(PaymentAuthorization {
+                id: "auth-token".into(),
+                payee: "Monitoring Pro Inc".into(),
+                recipient_account_id: Some("0x864cc95dcD3a5d88401CB951b670874a17092302".into()),
+                amount_minor: Minor(250_000_000),
+                tolerance_minor: Minor(0),
+                currency: "USDC".into(),
+                network: Some("eip155:84532".into()),
+                asset_contract: Some(REAL_USDC.into()),
+                invoice_id: "INV-TOKEN".into(),
+                invoice_fingerprint: None,
+                require_invoice_fingerprint: false,
+                aggregate_limit_minor: None,
+                expires_unix_ms: 20_000,
+                repeat_payments: false,
+                max_payments: 1,
+                cancelled: false,
+            })
+            .unwrap();
+        let proposal = |contract: Option<&str>| {
+            let mut args = json!({
+                "authorization_id": "auth-token", "invoice_id": "INV-TOKEN",
+                "counterparty": "Monitoring Pro Inc", "amount": 250, "token": "USDC",
+                "network": "eip155:84532",
+                "to_address": "0x864cc95dcD3a5d88401CB951b670874a17092302"
+            });
+            if let Some(contract) = contract {
+                args["token_address"] = json!(contract);
+            }
+            PaymentCall {
+                server: "wallet".into(),
+                tool: "send".into(),
+                call_id: "1".into(),
+                args: args.as_object().cloned().unwrap(),
+            }
+        };
+        for (contract, expected) in [
+            (Some(REAL_USDC), true),
+            (Some(COUNTERFEIT), false),
+            (None, false),
+        ] {
+            let e = evaluate(&p, &session, proposal(contract), 10_000);
+            let outcome = e
+                .verdict
+                .reasons
+                .iter()
+                .find(|r| r.id == "authorization-asset-contract")
+                .expect("the shipped policy maps the contract");
+            assert_eq!(
+                outcome.passed, expected,
+                "{contract:?}: {}",
+                outcome.message
+            );
+            if !expected {
+                assert_eq!(e.verdict.decision, Decision::Deny);
+            }
+        }
+    }
+
     #[test]
     fn the_right_ticker_in_the_wrong_contract_is_denied() {
         const REAL_USDC: &str = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";

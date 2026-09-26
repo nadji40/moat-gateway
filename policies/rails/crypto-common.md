@@ -48,3 +48,13 @@ only looks at transfers does not see it happen. What a per-transaction cap
 cannot see is the difference between the two: the same number, once, versus
 the same number whenever the holder likes, for as long as the allowance
 stands.
+
+**The asset is a contract, not a ticker.** `asset_contract` reads the
+`token_address` (EVM) or `mint` (Solana) the wallet is told to move, and
+`authorization-asset-contract` denies a payment in any other contract, or in
+none. It is enforced because the authorization names a contract, which the
+intent API requires for every token that is not the chain's own coin:
+`symbol()` returns whatever a contract was written to return, and a contract
+that returns "USDC" costs the gas to deploy. A wallet that can only be told a
+symbol cannot make a token payment under an authorization until it can be
+told a contract, and that is the point.

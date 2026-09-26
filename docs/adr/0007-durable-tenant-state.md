@@ -136,8 +136,8 @@ reservations when their payments settle. A process that dies between
 allowing a payment and hearing its outcome never does, and the row held
 value against the mandate for every other session under the tenant until
 somebody deleted it by hand. A reservation now carries the time it was
-taken; nothing older than `RESERVATION_MAX_AGE_MS` (fifteen minutes, the
-longest a co-signature lives) is written back to the ledger, a restored
+taken; nothing older than `RESERVATION_MAX_AGE_MS` (fifteen minutes, three
+times the longest a co-signature lives) is written back to the ledger, a restored
 session drops what it finds abandoned, and the gateway deletes ledger rows
 that old at startup and once a minute after.
 

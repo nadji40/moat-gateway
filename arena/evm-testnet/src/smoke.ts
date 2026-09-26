@@ -189,6 +189,7 @@ async function main(): Promise<void> {
       await authorize(usdc, `INV-USDC-${run}`, config.authorized.address, {
         amount: "0.005",
         currency: token.symbol,
+        asset_contract: token.address,
       });
       const paid = structured<{ receipt: string; status: string; explorer_url: string; amount: string }>(
         await send({
@@ -196,6 +197,7 @@ async function main(): Promise<void> {
           authorization_id: usdc,
           invoice_id: `INV-USDC-${run}`,
           token: token.symbol,
+          token_address: token.address,
           amount: "0.005",
         }),
       );

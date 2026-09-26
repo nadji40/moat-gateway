@@ -35,6 +35,10 @@ fields:
   currency:    { args: ["token"] }
   destination: { kind: destination, args: ["to_address"] }
   network:     { args: ["network"] }
+  # The contract or mint the wallet is told to move. An authorization for
+  # a token names one, and a payment that names another, or none, is
+  # denied: a ticker is a label any contract can wear.
+  asset_contract: { args: ["token_address", "mint"] }
 
 allowlist:
   payees: []

@@ -30,6 +30,10 @@ interface Family {
   authorizedCanonical: string;
   /** Shares its first and last characters and nothing else. */
   poisoned: string;
+  /** The contract or mint the wallet holds USDC in. */
+  usdc: string;
+  /** The argument that names it on this family. */
+  contractArg: "token_address" | "mint";
   /**
    * A string of the right general look that is not an address. Getting
    * this wrong is easy: a base58 address with its last character removed
@@ -50,6 +54,8 @@ const FAMILIES: Family[] = [
     authorizedCanonical: "0x864cc95dcd3a5d88401cb951b670874a17092302",
     poisoned: "0x864C0cDC27357ebceb496b4AbAFa6daF5e882302",
     malformed: "0x864cc95dcD3a5d88401CB951b670874a1709230",
+    usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    contractArg: "token_address",
     hasApprovals: true,
   },
   {
@@ -61,6 +67,8 @@ const FAMILIES: Family[] = [
     authorizedCanonical: "F1QXGt5jMA3ukFsFDHaHF59FB8ZVNTFgu6HiNzmfNy51",
     poisoned: "F1QX9aGApCfD7KBJzT2jfYkTxQLuDCNABDhV9aGANy51",
     malformed: "F1QXGt5jMA3ukFsFDHaHF59FB8ZVNTFg",
+    usdc: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    contractArg: "mint",
     hasApprovals: false,
   },
 ];
@@ -248,6 +256,29 @@ describe.each(FAMILIES)("mock-chain on $id", (family) => {
     });
     expect(result.isError).toBe(true);
     expect(result.structuredContent?.["reason"]).toBe("unknown_asset");
+  });
+
+  it("moves a token only in the contract it holds it in", async () => {
+    const base = {
+      counterparty: "Monitoring Pro Inc",
+      to_address: family.authorized,
+      token: "USDC",
+      amount: "1",
+      network: family.network,
+    };
+    const right = await send({ ...base, [family.contractArg]: family.usdc });
+    expect(right.isError).toBeFalsy();
+    expect(right.structuredContent?.["asset_contract"]).toBe(family.usdc);
+
+    // The same ticker at another address: the counterfeit-token attack.
+    const wrong = await send({ ...base, [family.contractArg]: family.poisoned });
+    expect(wrong.isError).toBe(true);
+    expect(wrong.structuredContent?.["reason"]).toBe("wrong_asset_contract");
+
+    // The chain's own coin has no contract to name.
+    const coin = await send({ ...base, token: family.native, [family.contractArg]: family.usdc });
+    expect(coin.isError).toBe(true);
+    expect(coin.structuredContent?.["reason"]).toBe("native_has_no_contract");
   });
 
   it("confirms a pending transaction and reads it back", async () => {

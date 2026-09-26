@@ -24,6 +24,8 @@ export interface ChainAsset {
   readonly decimals: number;
   /** Whether it is the chain's own coin rather than a contract token. */
   readonly native: boolean;
+  /** The contract or mint a token lives in. Absent for the chain's own coin. */
+  readonly contract?: string;
 }
 
 export interface ChainSpec {
@@ -51,7 +53,8 @@ const EVM: ChainSpec = {
   defaultNetwork: "eip155:84532",
   networks: ["eip155:84532", "eip155:1", "eip155:8453", "eip155:11155111"],
   assets: [
-    { symbol: "USDC", decimals: 6, native: false },
+    // Circle's USDC on Base Sepolia, the network this sandbox pretends to be.
+    { symbol: "USDC", decimals: 6, native: false, contract: "0x036CbD53842c5426634e7929541eC2318f3dCF7e" },
     { symbol: "ETH", decimals: 18, native: true },
   ],
   hasApprovals: true,
@@ -66,7 +69,8 @@ const SOLANA: ChainSpec = {
   defaultNetwork: "solana:devnet",
   networks: ["solana:devnet", "solana:mainnet", "solana:testnet"],
   assets: [
-    { symbol: "USDC", decimals: 6, native: false },
+    // Circle's USDC mint on Solana devnet.
+    { symbol: "USDC", decimals: 6, native: false, contract: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU" },
     { symbol: "SOL", decimals: 9, native: true },
   ],
   hasApprovals: false,

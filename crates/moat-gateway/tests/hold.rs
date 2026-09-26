@@ -389,3 +389,59 @@ async fn reconciliation_will_not_contradict_a_final_answer() {
         .await;
     assert_eq!(status, 404, "{body}");
 }
+
+/// A ticker is a label any contract can wear, so an authorization for a
+/// token has to name the contract or mint it is in. The chain's own coin
+/// has none, and fiat never did.
+#[tokio::test]
+async fn a_token_authorization_must_name_its_contract() {
+    let harness = Harness::start("token-contract", "bank").await;
+    let token = |id: &str, contract: Option<&str>| {
+        let mut body = json!({
+            "authorization_id": id,
+            "invoice_id": format!("INV-{id}"),
+            "payee": "Monitoring Pro Inc",
+            "recipient_account_id": "0x864cc95dcD3a5d88401CB951b670874a17092302",
+            "network": "eip155:84532",
+            "amount": 250,
+            "tolerance": 0,
+            "currency": "USDC",
+            "expires_at": "2099-01-01T00:00:00Z"
+        });
+        if let Some(contract) = contract {
+            body["asset_contract"] = json!(contract);
+        }
+        body
+    };
+
+    let (status, body) = harness
+        .post("authorizations", token("usdc-bare", None))
+        .await;
+    assert_eq!(status, 400, "{body}");
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("asset_contract is required for USDC"),
+        "{body}"
+    );
+
+    let (status, body) = harness
+        .post(
+            "authorizations",
+            token(
+                "usdc-bound",
+                Some("0x036CbD53842c5426634e7929541eC2318f3dCF7e"),
+            ),
+        )
+        .await;
+    assert_eq!(status, 200, "{body}");
+
+    let mut coin = token("eth", None);
+    coin["currency"] = json!("ETH");
+    coin["amount"] = json!("0.01");
+    let (status, body) = harness.post("authorizations", coin).await;
+    assert_eq!(status, 200, "{body}");
+
+    harness.gw.close_and_wait().await;
+}

@@ -56,7 +56,15 @@ pub struct Asset {
     /// networks. Absent for fiat.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network: Option<String>,
+    /// Whether it is the network's own coin rather than a contract on it.
+    /// A coin has no contract to name; a token does, and an authorization
+    /// for one has to name it.
+    #[serde(default)]
+    pub native: bool,
 }
+
+/// Tokens in the built-in table that are a network's own coin.
+const NATIVE_COINS: &[&str] = &["ETH", "SOL", "BTC"];
 
 impl Asset {
     /// A fiat currency with the given number of decimal places.
@@ -66,7 +74,15 @@ impl Asset {
             exponent,
             kind: AssetKind::Fiat,
             network: None,
+            native: false,
         }
+    }
+
+    /// Whether an authorization for this asset has to name the contract or
+    /// mint it is in: a token that is not the network's own coin. A ticker
+    /// is a label any contract can wear.
+    pub fn needs_contract(&self) -> bool {
+        self.kind == AssetKind::Token && !self.native
     }
 }
 
@@ -182,10 +198,11 @@ impl AssetRegistry {
         }
         if let Some((_, exponent)) = TOKENS.iter().find(|(c, _)| *c == upper) {
             return Some(Asset {
-                code: upper,
+                code: upper.clone(),
                 exponent: *exponent,
                 kind: AssetKind::Token,
                 network: network.map(str::to_owned),
+                native: NATIVE_COINS.contains(&upper.as_str()),
             });
         }
         if ZERO_DECIMAL.contains(&upper.as_str()) {
@@ -439,8 +456,38 @@ mod tests {
             exponent: 12,
             kind: AssetKind::Token,
             network: None,
+            native: false,
         }]);
         assert_eq!(declared.lookup("WOTSIT", None).unwrap().exponent, 12);
+    }
+
+    /// A contract can call itself anything, so a token is identified by its
+    /// contract. A chain's own coin has none, and fiat never did.
+    #[test]
+    fn a_token_needs_a_contract_and_a_coin_does_not() {
+        let r = AssetRegistry::new();
+        assert!(r
+            .lookup("USDC", Some("eip155:84532"))
+            .unwrap()
+            .needs_contract());
+        assert!(r.lookup("DAI", None).unwrap().needs_contract());
+        assert!(!r
+            .lookup("ETH", Some("eip155:84532"))
+            .unwrap()
+            .needs_contract());
+        assert!(!r.lookup("SOL", None).unwrap().needs_contract());
+        assert!(!r.lookup("EUR", None).unwrap().needs_contract());
+        let declared = r.with_declared(&[Asset {
+            code: "POL".into(),
+            exponent: 18,
+            kind: AssetKind::Token,
+            network: Some("eip155:137".into()),
+            native: true,
+        }]);
+        assert!(!declared
+            .lookup("POL", Some("eip155:137"))
+            .unwrap()
+            .needs_contract());
     }
 
     #[test]
@@ -450,6 +497,7 @@ mod tests {
             exponent: 18,
             kind: AssetKind::Token,
             network: Some("eip155:56".into()),
+            native: false,
         }]);
         // The same symbol really does have different exponents per network.
         assert_eq!(r.lookup("USDC", Some("eip155:56")).unwrap().exponent, 18);

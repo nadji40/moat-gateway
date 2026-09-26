@@ -238,7 +238,8 @@ pub struct PaymentReservation {
 /// for. A process that dies between the two never releases it, and the
 /// mandate then holds value against a payment nobody is making. A payment
 /// reaches its provider in seconds, and the longest co-signature Moat will
-/// issue lives fifteen minutes, so nothing older than this is in flight.
+/// issue lives five minutes, so nothing older than three times that is in
+/// flight.
 pub const RESERVATION_MAX_AGE_MS: u64 = 15 * 60 * 1000;
 
 impl PaymentReservation {

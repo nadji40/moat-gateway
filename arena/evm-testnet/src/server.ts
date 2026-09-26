@@ -12,6 +12,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { getAddress, isAddress } from "viem";
 import { z } from "zod";
 import { assetsOf, baseUnitsFor, CHAIN, configFromEnv, NETWORK, Wallet } from "./evm.js";
 
@@ -21,6 +22,46 @@ const chainId = await wallet.assertChain();
 const server = new McpServer({ name: "evm-testnet", version: "0.1.0" });
 
 const Amount = z.union([z.string().min(1), z.number().positive()]);
+
+const TokenAddress = z
+  .string()
+  .optional()
+  .describe(
+    "The token's contract address. Must be the contract this wallet holds the token in" +
+      (wallet.config.token ? `: ${wallet.config.token.symbol} is at ${wallet.config.token.address}` : ""),
+  );
+
+/**
+ * A ticker is a label any contract can wear. A caller that names the
+ * contract is held to the one this wallet holds the token in, and ether has
+ * none to name. Returns the refusal, or the checksummed contract to report,
+ * or nothing when no contract was named.
+ */
+function checkContract(
+  symbol: string,
+  tokenAddress: string | undefined,
+): { refusal: ReturnType<typeof refuse> } | { contract: string | undefined } {
+  const named = tokenAddress?.trim();
+  if (!named) return { contract: undefined };
+  let asset;
+  try {
+    asset = wallet.asset(symbol);
+  } catch (error) {
+    return { refusal: refuse(`Refused: ${(error as Error).message}`, "rejected") };
+  }
+  if (!asset.token) {
+    return { refusal: refuse(`${asset.symbol} is the chain's own coin and has no contract.`, "native_has_no_contract") };
+  }
+  if (!isAddress(named) || getAddress(named) !== asset.token.address) {
+    return {
+      refusal: refuse(
+        `This wallet's ${asset.symbol} is the contract at ${asset.token.address}, not ${named}.`,
+        "wrong_asset_contract",
+      ),
+    };
+  }
+  return { contract: asset.token.address };
+}
 
 function refuse(text: string, reason: string) {
   return {
@@ -46,6 +87,7 @@ server.registerTool(
         .string()
         .default("ETH")
         .describe(`Asset symbol: ${assetsOf(wallet.config).map((a) => a.symbol).join(" or ")}`),
+      token_address: TokenAddress,
       amount: Amount.describe('Amount in whole units, e.g. "0.0001"'),
       network: z.string().default(NETWORK).describe(`CAIP-2 network id; this wallet is on ${NETWORK}`),
       reference: z.string().min(1).optional().describe("Memo, recorded locally"),
@@ -73,6 +115,8 @@ server.registerTool(
         "unknown_network",
       );
     }
+    const contract = checkContract(args.token, args.token_address);
+    if ("refusal" in contract) return contract.refusal;
     let sent;
     try {
       sent = await wallet.send({
@@ -114,6 +158,7 @@ server.registerTool(
         counterparty_verified: false,
         amount: record.amount,
         currency: record.asset,
+        ...(contract.contract ? { asset_contract: contract.contract } : {}),
         confirmations: view.confirmations,
         block: view.block,
         explorer_url: view.explorer_url,
@@ -206,6 +251,7 @@ server.registerTool(
       counterparty: z.string().describe("Who the address is believed to belong to"),
       to_address: z.string().describe("Destination address"),
       token: z.string().describe("Asset symbol, e.g. ETH"),
+      token_address: TokenAddress,
       amount: Amount.describe("Amount in whole units"),
       network: z.string().describe("CAIP-2 network, e.g. eip155:84532"),
       authorization_id: z.string().optional(),
@@ -213,6 +259,8 @@ server.registerTool(
     },
   },
   async (args) => {
+    const contract = checkContract(args.token, args.token_address);
+    if ("refusal" in contract) return contract.refusal;
     let baseUnits: string;
     try {
       baseUnits = baseUnitsFor(wallet.config, String(args.amount), args.token).toString();
@@ -233,6 +281,7 @@ server.registerTool(
       receipt: `proposal_${args.invoice_id ?? args.authorization_id ?? "unknown"}`,
       to_address: args.to_address,
       token: args.token,
+      ...(contract.contract ? { asset_contract: contract.contract } : {}),
       amount: String(args.amount),
       base_units: baseUnits,
       network: args.network,

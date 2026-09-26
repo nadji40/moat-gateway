@@ -202,3 +202,15 @@ from the call, so there the agent cannot choose one; making that
 demonstrable end to end means letting the wallet be asked for a contract
 and letting Moat be the thing that refuses, which is the adapter's stated
 philosophy and is not yet done.
+
+## Addendum, 26 September 2026: the contract is required, and the policies read it
+
+The field existed and nothing used it: no shipped policy mapped
+`asset_contract`, no wallet took a contract as an argument, and every token
+authorization was registered by ticker alone. The five crypto policies now
+read it from `token_address` or `mint`; the arena's mock chain and the Base
+Sepolia wallet accept those arguments and refuse a contract they do not hold
+the token in; and the intent API refuses to register a token authorization
+without one, the chain's own coin excepted. A wallet that can only be told a
+symbol cannot make a token payment under an authorization until it can be
+told a contract, and that is the point.
