@@ -30,8 +30,12 @@ keep that order.
 
 The ledger's behaviour -- the cross-session aggregate and its row lock --
 is covered by tests that need a database and are skipped without one.
-Never point them at the pilot database: they create a tenant, write rows
-and delete them. A throwaway container is enough, and touches nothing.
+`scripts/deploy.sh` runs them on the server before it installs anything,
+against the pilot database as `moat_owner`: each test works inside a tenant
+of its own with a unique id and deletes it at the end, and the script
+removes any such tenant a failed test left behind. Nothing else is touched.
+
+To run them elsewhere, a throwaway container is enough:
 
 ```bash
 docker run -d --rm --name moatpg -e POSTGRES_PASSWORD=test   -p 55432:5432 docker.io/library/postgres:16
@@ -48,15 +52,21 @@ That is correct on a scratch database and not a failure.
 ## Deploy or update
 
 ```bash
-scripts/migrate.sh
-CARGO_PROFILE_RELEASE_DEBUG=0 cargo build --release -p moat-gateway
-install -m 755 -o root -g root target/release/moat-gateway /usr/local/bin/moat-gateway
-systemctl restart moat-gateway.service
+scripts/deploy.sh
+```
+
+In order: migrate, build the release binary, run the ledger tests against
+the database, install, restart, wait for `/health/ready`. A failed step stops
+the deploy with the old binary still running. Then, if the pilot keys are
+provisioned:
+
+```bash
 scripts/smoke-pilot.sh /etc/moat/tenants/pilot-agent.env /etc/moat/tenants/pilot-approver.env
 ```
 
-Run `cargo fmt --all -- --check`, Clippy with warnings denied, the full Rust
-workspace tests, and `pnpm test && pnpm typecheck` before installing a binary.
+The pre-push hook has already run `cargo fmt --all -- --check`, Clippy with
+warnings denied, the full Rust workspace tests and `pnpm test && pnpm
+typecheck` for anything that reached the server.
 
 ## Health and diagnosis
 

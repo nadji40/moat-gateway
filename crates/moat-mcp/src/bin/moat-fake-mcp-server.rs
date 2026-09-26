@@ -7,6 +7,9 @@
 //!
 //! Set `FAKE_MCP_PRETTY=1` to make it emit responses with extra spaces, which
 //! the passthrough tests use to prove the gateway forwards bytes unchanged.
+//! `echo` called with `simulate_malformed: true` answers with a line that is
+//! JSON carrying the request's id but is not a JSON-RPC message, which is how
+//! a broken upstream reply is exercised.
 
 use std::io::{self, BufRead, Write};
 
@@ -120,6 +123,14 @@ fn main() {
                     .cloned()
                     .unwrap_or_else(|| json!({}));
                 match name {
+                    "echo"
+                        if args
+                            .get("simulate_malformed")
+                            .and_then(Value::as_bool)
+                            .unwrap_or(false) =>
+                    {
+                        json!({"jsonrpc": "2.0", "id": id})
+                    }
                     "echo" => json!({
                         "jsonrpc": "2.0",
                         "id": id,

@@ -33,13 +33,34 @@ macro_rules! api_key_columns {
     };
 }
 
-/// The lowest schema version this build can run against.
+/// The schema version this build needs: the newest file in `migrations/`,
+/// read by the build script.
 ///
-/// Raised by the migration that made it necessary, never separately: a gateway
-/// that starts against a schema it predates fails at the first query instead
-/// of at startup, and the error is about a missing column rather than about a
+/// Read rather than written, because a number kept by hand is a number that
+/// goes stale. The deploy migrates before it installs, so a binary that wants
+/// the newest migration is a binary that gets it; and a gateway that started
+/// against a schema it predates would fail at the first query instead of at
+/// startup, with an error about a missing column rather than about a
 /// migration nobody ran.
-const REQUIRED_MIGRATION: i64 = 7;
+const REQUIRED_MIGRATION: i64 = parse_decimal(env!("MOAT_LATEST_MIGRATION"));
+
+/// A non-negative decimal integer, at compile time.
+const fn parse_decimal(text: &str) -> i64 {
+    let bytes = text.as_bytes();
+    assert!(!bytes.is_empty(), "MOAT_LATEST_MIGRATION is empty");
+    let mut i = 0;
+    let mut n: i64 = 0;
+    while i < bytes.len() {
+        let digit = bytes[i];
+        assert!(
+            digit.is_ascii_digit(),
+            "MOAT_LATEST_MIGRATION is not a number"
+        );
+        n = n * 10 + (digit - b'0') as i64;
+        i += 1;
+    }
+    n
+}
 
 impl DurableStore {
     /// Connect and verify that the first production schema migration exists.
@@ -67,9 +88,6 @@ impl DurableStore {
             .await
             .context("checking storage migration")?
             .get(0);
-        // A version named by hand is a version that goes stale. This one at
-        // least says which build wants what, in a single place beside the
-        // migration that introduced the need.
         anyhow::ensure!(
             applied.unwrap_or(0) >= REQUIRED_MIGRATION,
             "this build needs Moat database migration {REQUIRED_MIGRATION}; the database is at {}. Run scripts/migrate.sh.",
@@ -1142,7 +1160,7 @@ mod ledger_tests {
     /// CI needs no service. Point it at a scratch database, never a production
     /// one: these tests create a tenant, write rows and delete them again.
     ///
-    ///   MOAT_TEST_DATABASE_URL=postgres://... cargo test -p moat-gateway --test storage_ledger
+    ///   MOAT_TEST_DATABASE_URL=postgres://... cargo test -p moat-gateway ledger_tests
     ///
     /// The role in that URL needs to reach the `moat` schema and insert into
     /// `moat.tenants`; `moat_migrator` does not, which is what broke the deploy
@@ -1753,6 +1771,34 @@ mod ledger_tests {
         );
 
         cleanup(&store, &id).await;
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+
+    /// The build script and this test read the same directory. If they ever
+    /// disagree, the build script is what is wrong.
+    #[test]
+    fn the_required_migration_is_the_newest_file() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../migrations");
+        let newest = std::fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("{}: {e}", dir.display()))
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                let (number, _) = name.split_once('_')?;
+                name.ends_with(".sql")
+                    .then(|| number.parse::<i64>().ok())
+                    .flatten()
+            })
+            .max()
+            .expect("at least one migration");
+        assert_eq!(REQUIRED_MIGRATION, newest);
+        assert_eq!(parse_decimal("0007"), 7);
+        assert_eq!(parse_decimal("12"), 12);
     }
 }
 

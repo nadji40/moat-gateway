@@ -155,6 +155,51 @@ evidence: ./evidence.jsonl
     assert!(status.success(), "gateway exit: {status:?}");
 }
 
+/// A reply the upstream mangles is answered with an error at once. Before,
+/// the line was dropped and the caller waited the whole reply timeout for
+/// an answer that had already arrived.
+#[tokio::test]
+async fn an_unparseable_reply_from_the_upstream_is_an_error_not_a_wait() {
+    let fake = fake_server_path();
+    let policy = policy_for_fake("unparseable-policy", "default.yaml");
+    let cfg = write_config(
+        "unparseable",
+        &format!(
+            "upstreams:\n  - {{ name: fake, transport: stdio, command: [{}] }}\npolicy: {}\n",
+            yaml_path(&fake),
+            yaml_path(&policy)
+        ),
+    );
+    let mut gw = Peer::spawn(&gateway_path(), &["--config", cfg.to_str().unwrap()], &[]);
+    let (_, reply) = gw
+        .call(Request::new(
+            1,
+            method::TOOLS_CALL,
+            Some(json!({"name": "fake__echo", "arguments": {"simulate_malformed": true}})),
+        ))
+        .await;
+    let Message::Error(e) = reply else {
+        panic!("expected an error: {reply:?}");
+    };
+    assert_eq!(e.error.code, moat_mcp::jsonrpc::code::INTERNAL_ERROR);
+    assert!(
+        e.error.message.contains("unparseable reply"),
+        "{}",
+        e.error.message
+    );
+
+    // The upstream is still there, and the next call is unaffected.
+    let (_, reply) = gw
+        .call(Request::new(
+            2,
+            method::TOOLS_CALL,
+            Some(json!({"name": "fake__echo", "arguments": {"hello": "again"}})),
+        ))
+        .await;
+    assert!(matches!(reply, Message::Response(_)), "{reply:?}");
+    gw.close_and_wait().await;
+}
+
 #[tokio::test]
 async fn garbage_from_client_gets_parse_error() {
     let fake = fake_server_path();

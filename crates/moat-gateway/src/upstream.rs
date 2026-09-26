@@ -9,9 +9,10 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use moat_core::rail::Rail;
 use moat_mcp::http::HttpClient;
+use moat_mcp::jsonrpc::code;
 use moat_mcp::process::ChildTransport;
 use moat_mcp::stdio::{Frame, FrameWriter};
-use moat_mcp::{Message, Request, RequestId};
+use moat_mcp::{ErrorObject, ErrorResponse, Message, Request, RequestId};
 use tokio::process::ChildStdin;
 use tokio::sync::{mpsc, oneshot, Mutex};
 
@@ -92,20 +93,19 @@ impl Upstream {
                 let reader_up = Arc::clone(&up);
                 tokio::spawn(async move {
                     loop {
-                        match reader.next_frame().await {
-                            Ok(Some(frame)) => reader_up.dispatch(frame, &events).await,
+                        let raw = match reader.next_line().await {
+                            Ok(Some(raw)) => raw,
                             Ok(None) => break,
-                            Err(moat_mcp::Error::Json { .. })
-                            | Err(moat_mcp::Error::Malformed(_)) => {
-                                // A bad line from an upstream is dropped, not
-                                // fatal: the spec forbids it, but a proxy has
-                                // no one to report it to except the log.
-                                tracing::warn!(upstream = %reader_up.name, "dropped unparseable line from upstream");
-                            }
                             Err(e) => {
                                 tracing::error!(upstream = %reader_up.name, error = %e, "upstream read failed");
                                 break;
                             }
+                        };
+                        match Message::parse(&raw) {
+                            Ok(message) => {
+                                reader_up.dispatch(Frame { raw, message }, &events).await
+                            }
+                            Err(e) => reader_up.refuse_unparseable(&raw, &e).await,
                         }
                     }
                     if let Link::Stdio(s) = &reader_up.link {
@@ -163,6 +163,49 @@ impl Upstream {
                     .send((self.name.clone(), UpstreamEvent::Request(frame)))
                     .await;
             }
+        }
+    }
+
+    /// A line from the upstream that is not a message. The spec forbids it,
+    /// and a proxy has no one to report it to except the log.
+    ///
+    /// If the line carries the id of a request that is waiting, that request
+    /// is answered with an error now. Left alone, its caller would wait the
+    /// whole reply timeout for a reply that has already come and gone. A
+    /// line with no usable id is dropped: a server that logs to stdout by
+    /// mistake is a nuisance, and failing whatever happened to be in flight
+    /// would make it a breakage.
+    async fn refuse_unparseable(&self, raw: &str, error: &moat_mcp::Error) {
+        let id = serde_json::from_str::<serde_json::Value>(raw)
+            .ok()
+            .and_then(|value| value.get("id").cloned())
+            .filter(|id| !id.is_null())
+            .and_then(|id| serde_json::from_value::<RequestId>(id).ok());
+        let waiter = match (&self.link, &id) {
+            (Link::Stdio(s), Some(id)) => s.pending.lock().await.remove(id),
+            _ => None,
+        };
+        let (Some(id), Some(tx)) = (id, waiter) else {
+            tracing::warn!(upstream = %self.name, %error, "dropped unparseable line from upstream");
+            return;
+        };
+        tracing::warn!(
+            upstream = %self.name, %id, %error,
+            "unparseable reply from upstream; its caller is told"
+        );
+        let message = Message::from(ErrorResponse::new(
+            Some(id),
+            ErrorObject::new(
+                code::INTERNAL_ERROR,
+                format!(
+                    "upstream {:?} sent an unparseable reply: {error}",
+                    self.name
+                ),
+                None,
+            ),
+        ));
+        if let Ok(raw) = message.to_line() {
+            let _ = tx.send(Frame { raw, message });
         }
     }
 
