@@ -1,0 +1,15 @@
+baseline-q4km | {"config": "baseline-q4km", "median_s": 9.52, "tokens_per_s": 9.3, "draft_acceptance": null} | 5,27 GB resident, 2,59 GB private
+qat | {"config": "qat", "median_s": 8.25, "tokens_per_s": 10.9, "draft_acceptance": null} | 5,21 GB resident, 2,90 GB private
+qat-lazy | {"config": "qat-lazy", "median_s": 8.22, "tokens_per_s": 11.0, "draft_acceptance": null} | 5,21 GB resident, 2,90 GB private
+qat-lazy-ngram | {"config": "qat-lazy-ngram", "median_s": 8.17, "tokens_per_s": 11.0, "draft_acceptance": null} | 5,21 GB resident, 2,90 GB private
+qat-lazy-mtp | {"config": "qat-lazy-mtp", "median_s": 3.72, "tokens_per_s": 27.6, "draft_acceptance": 0.89} | 5,44 GB resident, 3,15 GB private
+qat-lazy-both | {"config": "qat-lazy-both", "median_s": 4.0, "tokens_per_s": 24.6, "draft_acceptance": 0.73} | 5,44 GB resident, 3,15 GB private
+DONE
+n=2 | {"config": "mtp-n2", "median_s": 5.11, "tokens_per_s": 18.5, "draft_acceptance": 0.96}
+n=6 | {"config": "mtp-n6", "median_s": 4.15, "tokens_per_s": 24.0, "draft_acceptance": 0.82}
+n=8 | {"config": "mtp-n8", "median_s": 4.11, "tokens_per_s": 24.4, "draft_acceptance": 0.73}
+
+# Colab, Tesla T4 (15 GB), same corpus and prompt, colab_gpu_bench.ipynb, 2026-09-27 00:17-00:22
+gpu-gemma-alone     | fail_open 0 | payee/refused/amount/currency/references/cancel 36/36 each | median 1.51 s, p95 1.65 s | 56.7 tok/s | 2.74 GB VRAM
+gpu-gemma+drafter   | fail_open 0 | payee/refused/amount/currency/references/cancel 36/36 each | median 0.77 s, p95 0.90 s | 117.7 tok/s | drafter acceptance 0.89 | 2.81 GB VRAM
+gpu-drafter-4-at-once | 36 messages in 18.5 s = 116.9 messages/minute | median 1.96 s, max 2.44 s | 3.02 GB VRAM
