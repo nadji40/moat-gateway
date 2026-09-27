@@ -2,8 +2,8 @@
 //!
 //! The model is served by llama.cpp's `llama-server`, which speaks the OpenAI
 //! chat completions API and constrains the answer to a JSON schema, so a
-//! malformed answer is not something this code has to parse around. It runs
-//! on the caller's own machine: the message never leaves it.
+//! malformed answer is not something this code has to parse around. The
+//! message is sent to the configured model endpoint, which may be remote.
 //!
 //! The prompt and the schema are part of the record. Every intent this
 //! reader registers says which model read it and which prompt it was given,

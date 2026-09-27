@@ -1,0 +1,16 @@
+[Unit]
+Description=Moat intent reader backed by Colab Gemma
+After=network-online.target moat-colab-tunnel.service
+Wants=moat-colab-tunnel.service
+
+[Service]
+Type=simple
+User=moat
+Group=moat
+WorkingDirectory=/var/lib/moat
+ExecStart=/usr/local/bin/moat-intent --listen 127.0.0.1:7083 --llm-url http://127.0.0.1:8092 --model gemma-4-E4B-it-qat-UD-Q4_K_XL
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=Single consumer for Moat Colab intent queue
+After=network-online.target redis.service moat-intent-colab.service
+Wants=moat-intent-colab.service
+
+[Service]
+Type=simple
+User=moat
+Group=moat
+EnvironmentFile=/etc/moat/colab-queue.env
+ExecStart=/var/lib/moat/colab-cli/venv/bin/python /var/lib/moat/moat-colab-queue.py worker
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

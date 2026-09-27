@@ -1,0 +1,15 @@
+[Unit]
+Description=Loopback API for Moat Colab intent queue
+After=network-online.target redis.service
+
+[Service]
+Type=simple
+User=moat
+Group=moat
+EnvironmentFile=/etc/moat/colab-queue.env
+ExecStart=/var/lib/moat/colab-cli/venv/bin/python /var/lib/moat/moat-colab-queue.py api
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

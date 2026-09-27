@@ -1,0 +1,19 @@
+[Unit]
+Description=Colab Gemma model and SSH tunnel for Moat intent reads
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=moat
+Group=moat
+WorkingDirectory=/var/lib/moat
+ExecStartPre=/usr/bin/scp -q -F /var/lib/moat/.ssh/config /var/lib/moat/colab-gemma-server.py moat-colab:/content/colab-gemma-server.py
+ExecStart=/usr/bin/ssh -T -F /var/lib/moat/.ssh/config -o ExitOnForwardFailure=yes -L 127.0.0.1:8092:127.0.0.1:8092 moat-colab python /content/colab-gemma-server.py --watch
+Restart=always
+RestartSec=30
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target
