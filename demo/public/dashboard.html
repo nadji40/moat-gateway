@@ -519,15 +519,17 @@ async function refresh(){
 
 function openWorkspace(){
   show("#gate", false); show("#workspace", true); show("#foot", true);
+  const apiOrigin = location.hostname === "moatgateway.dpdns.org"
+    ? "https://api.moatgateway.dpdns.org" : location.origin;
   // This panel used to hand out a /v1/keys call, which an agent key cannot
   // make: that path needs an admin key, so the first thing a new tenant was
   // told to run answered 401 with the credential they had just been given.
   // The address an agent key is for is the MCP endpoint.
   $("#curl").textContent = [
-    `${location.origin}/mcp`,
+    `${apiOrigin}/mcp`,
     ``,
     `# any MCP client, with the agent key as a bearer token:`,
-    `curl -s ${location.origin}/mcp \\`,
+    `curl -s ${apiOrigin}/mcp \\`,
     `  -H 'authorization: Bearer YOUR_AGENT_KEY' \\`,
     `  -H 'content-type: application/json' \\`,
     `  -H 'accept: application/json, text/event-stream' \\`,
@@ -539,13 +541,13 @@ function openWorkspace(){
   // the user's words belong to.
   $("#curl-intent").textContent = [
     `# before the agent runs: what the user actually typed, from your own code`,
-    `curl -s ${location.origin}/v1/session/SESSION_ID/intent \\`,
+    `curl -s ${apiOrigin}/v1/session/SESSION_ID/intent \\`,
     `  -H 'authorization: Bearer YOUR_APPROVER_KEY' \\`,
     `  -H 'content-type: application/json' \\`,
     `  -d '{"text":"Pay the Aseer Cloud Co invoice INV-4471 for 480 USD."}'`,
     ``,
     `# what a person signed off, if you use structured authorizations`,
-    `curl -s ${location.origin}/v1/session/SESSION_ID/authorizations \\`,
+    `curl -s ${apiOrigin}/v1/session/SESSION_ID/authorizations \\`,
     `  -H 'authorization: Bearer YOUR_APPROVER_KEY' \\`,
     `  -H 'content-type: application/json' \\`,
     `  -d '{"authorization_id":"auth-1","invoice_id":"INV-4471","payee":"Aseer Cloud Co",` +

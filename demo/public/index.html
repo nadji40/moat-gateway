@@ -216,7 +216,8 @@ function agentPrompt(b){
 }
 
 (async()=>{
-  const b=location.origin;
+  const b=location.hostname === "moatgateway.dpdns.org"
+    ? "https://api.moatgateway.dpdns.org" : location.origin;
   const prompt=agentPrompt(b);
   $("#ask-gpt").href="https://chatgpt.com/?q="+encodeURIComponent(prompt);
   $("#ask-claude").href="https://claude.ai/new?q="+encodeURIComponent(prompt);
