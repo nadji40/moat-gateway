@@ -1,4 +1,4 @@
-/* Shared by index.html and tests.html. */
+/* Shared by all site pages. */
 :root{
   --bg:#000000; --bg-2:#0A0A0A; --ink:#F4F4F6; --ink-2:#9C9CA6; --ink-3:#5E5E68;
   --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16);
@@ -48,6 +48,10 @@ html,body{margin:0}
 button,input,select,textarea{font-family:var(--font)}
 code,kbd,samp{font-family:var(--mono)}
 body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden;text-align:center;-webkit-user-select:none;user-select:none}
+@media (hover:hover) and (pointer:fine){
+  body,body *{cursor:url("/cursor.svg") 4 4,auto!important}
+  input,textarea{cursor:text!important}
+}
 /* the page reads as an app, not a document. Two exceptions: a field you
    cannot select text in is a field you cannot edit, and the curl block
    exists to be copied. */
