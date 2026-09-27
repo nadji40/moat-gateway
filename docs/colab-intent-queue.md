@@ -51,19 +51,16 @@ MTP drafter, one parallel slot, and context 2048. Its median was 0.767 seconds
 on a 36-message internal corpus. That measurement excludes Redis queue wait,
 SSH startup, and Colab runtime startup. Colab uptime is not guaranteed.
 
-The reader preserves the notebook's JSON-schema property order on the wire:
-pay, refused, amount, currency, destinations, references, cancellation. The
-previous Rust `Value` serialized these alphabetically, changing the constrained
-model's generation order and its answers. The prompt/schema hash includes the
-ordered schema. A transport regression test checks the actual HTTP body.
+The reader preserves this JSON-schema property order on the wire: pay,
+refused, amount, currency, destinations, references, cancellation. The
+prompt/schema hash includes the ordered schema. A transport regression test
+checks the actual HTTP body.
 
 Destinations must resolve through the redactor's account-placeholder map.
 A literal name appearing in the message cannot supply an account destination.
 
-The initial live corpus report overstated amount errors (decimal commas were
-scored incorrectly) and overlooked missing amounts and extra references. The
-corrected test uses explicit canonical amount labels, requires present amounts
-and currencies for payment cases, and checks both missing and extra references.
-See [the schema-order comparison](../research/intent-reader/colab-schema-order/README.md)
-for the stricter before/after measurements and remaining errors. These are
-small internal samples; keep confirmation in the host flow.
+The research documentation explains the [complete serving architecture](../research/intent-reader/colab-serving.md),
+including redaction, structured output, grounding, queue deadlines, recovery,
+and the final deployed measurement. The evaluator uses explicit canonical
+amount labels, requires amounts and currencies for payment cases, and checks
+both missing and extra references. Keep confirmation in the host flow.

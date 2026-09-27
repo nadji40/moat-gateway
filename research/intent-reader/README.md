@@ -1,4 +1,16 @@
-# GLiNER as a span locator for Moat's intent reader
+# Moat intent reader research
+
+## Deployed Colab reader
+
+The [Colab serving architecture](colab-serving.md) describes the final setup:
+SkyLight's Moat reader and Redis queue, the persistent SSH connection to Gemma
+on a Colab T4, structured output, grounding, failure handling and operation.
+It includes the final deployed measurement and links to the implementation.
+The recorded responses and timings are in [colab-live-results.json](colab-live-results.json).
+
+The sections below retain the model-selection and runtime experiments.
+
+## GLiNER as a span locator
 
 `gliner_eval.py` runs a GLiNER model over 26 payment sentences in 12
 languages and scores what Moat needs: the payee and the amount as exact spans
@@ -32,8 +44,9 @@ span locator cannot handle: "cancel that", a quoted scam email, a budget with
 no payee, a question, and negations in Italian, German, Japanese, Hindi, Gulf
 Arabic and Chinese. `rescore.py` then applies Moat's own number rule.
 
-Fail-open means the model put someone in `pay` whom the user refused or never
-named. It is the only error that could let money out.
+The `Fail-open` column counts a model returning a payee outside the expected
+set. This is a payee-specific metric; authorization also depends on the other
+fields and the gateway's checks.
 
 | Model, Q4_K_M | Fail-open | Payee | Refused | Currency ISO | Median on a Ryzen 5 5600G |
 |---|---|---|---|---|---|

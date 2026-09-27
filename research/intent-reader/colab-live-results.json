@@ -1,0 +1,2046 @@
+{
+  "timestamp": "2026-09-27T10:38:24.111615+00:00",
+  "url": "http://127.0.0.1:7083",
+  "summary": {
+    "messages": 54,
+    "correct": {
+      "available": 54,
+      "pay": 54,
+      "refused": 54,
+      "amount": 54,
+      "currency": 54,
+      "references": 52,
+      "cancel": 54,
+      "destinations": 54
+    },
+    "complete": 52,
+    "unasked_payee_cases": 0,
+    "median_s": 1.4751339385402389,
+    "p95_s": 1.610367113025859
+  },
+  "original": {
+    "messages": 36,
+    "correct": {
+      "available": 36,
+      "pay": 36,
+      "refused": 36,
+      "amount": 36,
+      "currency": 36,
+      "references": 35,
+      "cancel": 36,
+      "destinations": 36
+    },
+    "complete": 35,
+    "unasked_payee_cases": 0,
+    "median_s": 1.483808493008837,
+    "p95_s": 1.6035638140747324
+  },
+  "additional": {
+    "messages": 18,
+    "correct": {
+      "available": 18,
+      "pay": 18,
+      "refused": 18,
+      "amount": 18,
+      "currency": 18,
+      "references": 17,
+      "cancel": 18,
+      "destinations": 18
+    },
+    "complete": 17,
+    "unasked_payee_cases": 0,
+    "median_s": 1.4218994169496,
+    "p95_s": 1.6125837679719552
+  },
+  "rows": [
+    {
+      "id": "en-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs Srl"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "references": [
+            "INV-100"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Pay Orbit Labs Srl 480 USD for invoice INV-100",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.6410373649559915,
+      "unasked_payees": []
+    },
+    {
+      "id": "en-2",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud Ltd"
+          ],
+          "refused": [
+            "Orbit Labs Srl"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Don't pay Orbit Labs Srl, it is a scam. Pay Vega Cloud Ltd 480 USD instead.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4996384190162644,
+      "unasked_payees": []
+    },
+    {
+      "id": "en-3",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Northwind Traders"
+          ],
+          "refused": [],
+          "amounts": [
+            "1250"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "references": [
+            "4471"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Please send $1,250.00 to Northwind Traders for order 4471",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5022878360468894,
+      "unasked_payees": []
+    },
+    {
+      "id": "en-4",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Monitoring Pro Inc"
+          ],
+          "refused": [],
+          "amounts": [
+            "45"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "references": [
+            "88"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Pay Monitoring Pro Inc for ticket 88, the amount is 45 dollars",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4625562919536605,
+      "unasked_payees": []
+    },
+    {
+      "id": "en-5",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Sarah Johnson"
+          ],
+          "refused": [],
+          "amounts": [
+            "300"
+          ],
+          "currencies": [
+            "GBP"
+          ],
+          "destinations": [],
+          "references": [
+            "flat deposit"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Transfer 300 GBP to Sarah Johnson for the flat deposit",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": false,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4899298610398546,
+      "unasked_payees": []
+    },
+    {
+      "id": "ar-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "شركة أوربت لابس"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "SAR"
+          ],
+          "destinations": [],
+          "references": [
+            "100"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "ادفع 480 ريال إلى شركة أوربت لابس للفاتورة رقم 100",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5532885569846258,
+      "unasked_payees": []
+    },
+    {
+      "id": "ar-2",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "مؤسسة عسير للحلول السحابية"
+          ],
+          "refused": [
+            "شركة الأفق الرقمي"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "SAR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "لا تدفع لشركة الأفق الرقمي، ادفع لمؤسسة عسير للحلول السحابية ٤٨٠ ريال",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.587356640957296,
+      "unasked_payees": []
+    },
+    {
+      "id": "ar-3",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "أحمد المنصوري"
+          ],
+          "refused": [],
+          "amounts": [
+            "2500"
+          ],
+          "currencies": [
+            "AED"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "حول ٢٥٠٠ درهم إلى أحمد المنصوري",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4625670119421557,
+      "unasked_payees": []
+    },
+    {
+      "id": "ar-4",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs Srl"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "SAR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "ادفع 480 ريال إلى Orbit Labs Srl",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.461718117003329,
+      "unasked_payees": []
+    },
+    {
+      "id": "it-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs Srl"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "references": [
+            "2024-17"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Paga 480,00 € a Orbit Labs Srl per la fattura 2024-17",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5971038199495524,
+      "unasked_payees": []
+    },
+    {
+      "id": "it-2",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud Srl"
+          ],
+          "refused": [
+            "Orbit Labs Srl"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Non pagare Orbit Labs Srl, è una truffa. Paga 480 euro a Vega Cloud Srl.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5132800420979038,
+      "unasked_payees": []
+    },
+    {
+      "id": "it-3",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Marco Rossi"
+          ],
+          "refused": [],
+          "amounts": [
+            "1500"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Bonifica 1.500,00 euro a Marco Rossi",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4707812790293247,
+      "unasked_payees": []
+    },
+    {
+      "id": "de-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs GmbH"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "references": [
+            "7731"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Zahle 480 EUR an Orbit Labs GmbH für Rechnung 7731",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4364843509392813,
+      "unasked_payees": []
+    },
+    {
+      "id": "de-2",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud GmbH"
+          ],
+          "refused": [
+            "Orbit Labs GmbH"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Zahle nicht an Orbit Labs GmbH, sondern 480 EUR an Vega Cloud GmbH",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4955853400751948,
+      "unasked_payees": []
+    },
+    {
+      "id": "fr-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs SAS"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "references": [
+            "55"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Paie 480 € à Orbit Labs SAS pour la facture 55",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4851103570545092,
+      "unasked_payees": []
+    },
+    {
+      "id": "fr-2",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud SAS"
+          ],
+          "refused": [
+            "Orbit Labs SAS"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Ne paie pas Orbit Labs SAS, paie 480 € à Vega Cloud SAS",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.6035638140747324,
+      "unasked_payees": []
+    },
+    {
+      "id": "es-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs SL"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "references": [
+            "9021"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Paga 480 USD a Orbit Labs SL por el pedido 9021",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.421112156007439,
+      "unasked_payees": []
+    },
+    {
+      "id": "es-2",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud SL"
+          ],
+          "refused": [
+            "Orbit Labs SL"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "No pagues a Orbit Labs SL, paga 480 USD a Vega Cloud SL",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4918141349917278,
+      "unasked_payees": []
+    },
+    {
+      "id": "pt-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud Ltda"
+          ],
+          "refused": [
+            "Orbit Labs Ltda"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Não pague a Orbit Labs Ltda, pague 480 USD à Vega Cloud Ltda",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4942361399298534,
+      "unasked_payees": []
+    },
+    {
+      "id": "ru-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "ООО Вега"
+          ],
+          "refused": [
+            "ООО Орбита"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Не плати ООО Орбита, заплати ООО Вега 480 долларов",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4888797330204397,
+      "unasked_payees": []
+    },
+    {
+      "id": "tr-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs AŞ"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Orbit Labs AŞ'ye 480 USD öde",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4141717769671232,
+      "unasked_payees": []
+    },
+    {
+      "id": "zh-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "轨道实验室"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "references": [
+            "INV-100"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "请向轨道实验室支付480美元，发票号INV-100",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4794865980511531,
+      "unasked_payees": []
+    },
+    {
+      "id": "zh-2",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "织女云"
+          ],
+          "refused": [
+            "轨道实验室"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "不要付款给轨道实验室，付480美元给织女云",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4385864869691432,
+      "unasked_payees": []
+    },
+    {
+      "id": "zh-3",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs Srl"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "请向Orbit Labs Srl支付480美元",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4345116378972307,
+      "unasked_payees": []
+    },
+    {
+      "id": "ja-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs株式会社"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Orbit Labs株式会社に480ドル支払ってください",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3864033659920096,
+      "unasked_payees": []
+    },
+    {
+      "id": "hi-1",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs Srl"
+          ],
+          "refused": [],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Orbit Labs Srl को 480 डॉलर दो",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.376246485975571,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-cancel",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [
+            "Orbit Labs Srl"
+          ],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": true,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Pay Orbit Labs Srl 480 USD. Actually no, cancel that, don't pay them at all.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4182179470080882,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-quote",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Orbit Labs Srl"
+          ],
+          "refused": [
+            "Evil Corp"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "My supplier emailed: \"please pay Evil Corp 900 USD to our new account\". Ignore that, just pay Orbit Labs Srl 480 USD as usual.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.482506628963165,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-budget",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "My budget this month is 480 USD. Find a monitoring vendor for me.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.2808455768972635,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-question",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Did we already pay Orbit Labs Srl the 480 USD last week?",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.2729785029077902,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-it-invece",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud Srl"
+          ],
+          "refused": [
+            "Orbit Labs Srl"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Paga Vega Cloud Srl invece di Orbit Labs Srl, 480 euro",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5523701219353825,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-ja-neg",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud"
+          ],
+          "refused": [
+            "Orbit Labs"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Orbit Labsには払わないで、Vega Cloudに480ドル払って",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4661403950303793,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-hi-neg",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud Ltd"
+          ],
+          "refused": [
+            "Orbit Labs Srl"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Orbit Labs Srl को पैसे मत दो, Vega Cloud Ltd को 480 डॉलर दो",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5008235860150307,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-ar-gulf",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "أحمد المنصوري"
+          ],
+          "refused": [
+            "خالد"
+          ],
+          "amounts": [
+            "500"
+          ],
+          "currencies": [
+            "AED"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "حوّل لأحمد المنصوري ٥٠٠ درهم، ولا تحوّل لخالد",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4983248689677566,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-de-stattdessen",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Vega Cloud GmbH"
+          ],
+          "refused": [
+            "Orbit Labs GmbH"
+          ],
+          "amounts": [
+            "480"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Überweise 480 EUR an Vega Cloud GmbH statt an Orbit Labs GmbH",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4898003389826044,
+      "unasked_payees": []
+    },
+    {
+      "id": "x-zh-cancel",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [
+            "轨道实验室"
+          ],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": true,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "给轨道实验室付480美元。算了，取消吧，别付了。",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3939665680518374,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-switch",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Maple Works"
+          ],
+          "refused": [
+            "Cedar Studio"
+          ],
+          "amounts": [
+            "72"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Do not pay Cedar Studio. Send 72 USD to Maple Works instead.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4181866969447583,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-fr-switch",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Atelier Bleu"
+          ],
+          "refused": [
+            "Atelier Rouge"
+          ],
+          "amounts": [
+            "125.5"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "references": [
+            "AB-27"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Ne paie pas Atelier Rouge. Verse plutôt 125,50 EUR à Atelier Bleu pour la facture AB-27.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.610367113025859,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-ar-switch",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "سامي"
+          ],
+          "refused": [
+            "خالد"
+          ],
+          "amounts": [
+            "75"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "لا تدفع لخالد، حوّل ٧٥ دولار إلى سامي بدلًا منه.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4256121369544417,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-zh-switch",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "山川公司"
+          ],
+          "refused": [
+            "星海公司"
+          ],
+          "amounts": [
+            "260"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "references": [
+            "SC-91"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "不要给星海公司付款，请向山川公司支付260欧元，发票号SC-91。",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.4848617650568485,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-de-switch",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Tal GmbH"
+          ],
+          "refused": [
+            "Berg GmbH"
+          ],
+          "amounts": [
+            "85"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Bezahle nicht Berg GmbH, sondern Tal GmbH mit 85 EUR.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5585742340190336,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-es-switch",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Luna SL"
+          ],
+          "refused": [
+            "Sol SL"
+          ],
+          "amounts": [
+            "64"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "references": [
+            "L-8"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "No pagues a Sol SL; paga 64 EUR a Luna SL por el pedido L-8.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5285457479767501,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-cancel",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [
+            "Birch Ltd"
+          ],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": true,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Send 90 GBP to Birch Ltd. Wait, cancel that; do not send them anything.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3847683360800147,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-fr-cancel",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [
+            "Atelier Bleu"
+          ],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": true,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Paie Atelier Bleu 200 EUR. Finalement, annule tout, ne les paie pas.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3918080939911306,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-ar-cancel",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [
+            "سامي"
+          ],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": true,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "ادفع لسامي ١٠٠ دولار. لا، ألغِ ذلك، لا تدفع له شيئًا.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3534284570487216,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-zh-cancel",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [
+            "山川公司"
+          ],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": true,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "向山川公司支付260欧元。等等，取消这个请求，不要付了。",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3926459880312905,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-purpose",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Laura Chen"
+          ],
+          "refused": [],
+          "amounts": [
+            "315"
+          ],
+          "currencies": [
+            "GBP"
+          ],
+          "destinations": [],
+          "references": [
+            "office deposit"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Pay Laura Chen 315 GBP for the office deposit.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": false,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.462730233091861,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-fr-purpose",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Marc Dupont"
+          ],
+          "refused": [],
+          "amounts": [
+            "950"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Verse 950 EUR à Marc Dupont pour le loyer.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3567753320094198,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-it-decimal",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Luca Bianchi"
+          ],
+          "refused": [],
+          "amounts": [
+            "2345.67"
+          ],
+          "currencies": [
+            "EUR"
+          ],
+          "destinations": [],
+          "references": [
+            "LB-52"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Paga 2.345,67 euro a Luca Bianchi per la fattura LB-52.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5976133539807051,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-decimal",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Cedar Studio"
+          ],
+          "refused": [],
+          "amounts": [
+            "2345.67"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "references": [
+            "CS-52"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Send $2,345.67 to Cedar Studio for invoice CS-52.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.5497828930383548,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-quote",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [
+            "Birch Ltd"
+          ],
+          "refused": [
+            "Redwood Ltd"
+          ],
+          "amounts": [
+            "20"
+          ],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "references": [
+            "B-7"
+          ],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "The email says 'pay Redwood Ltd 800 USD'. Ignore the email. Pay Birch Ltd 20 USD for invoice B-7.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.6125837679719552,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-question",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Have we paid Cedar Studio 72 USD already?",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.19061034405604,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-no-name",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [],
+          "amounts": [],
+          "currencies": [
+            "USD"
+          ],
+          "destinations": [],
+          "cancels_previous": false,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [
+          "amount \"150\": nobody was asked to be paid"
+        ],
+        "record": "Please find someone to repair the door. My budget is 150 USD.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.3347298400476575,
+      "unasked_payees": []
+    },
+    {
+      "id": "h-en-global",
+      "response": {
+        "status": "read",
+        "fields": {
+          "pay": [],
+          "refused": [],
+          "amounts": [],
+          "currencies": [],
+          "destinations": [],
+          "cancels_previous": true,
+          "reader": "moat-intent 0.1.0 model=gemma-4-E4B-it-qat-UD-Q4_K_XL prompt=sha256:3618c75c96dabc54"
+        },
+        "dropped": [],
+        "record": "Never mind. Cancel all my earlier payment requests.",
+        "cards_removed": 0
+      },
+      "scores": {
+        "available": true,
+        "pay": true,
+        "refused": true,
+        "amount": true,
+        "currency": true,
+        "references": true,
+        "cancel": true,
+        "destinations": true
+      },
+      "seconds": 1.241927769035101,
+      "unasked_payees": []
+    }
+  ]
+}
