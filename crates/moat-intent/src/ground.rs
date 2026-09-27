@@ -145,13 +145,12 @@ pub fn ground(out: ModelOutput, message: &Redacted) -> Grounded {
         match message.original(value) {
             Some(original) if !original.contains('@') => destinations.push(original.to_owned()),
             Some(_) => dropped.push(format!("destination {value:?}: an email is not an account")),
-            None if !Redacted::looks_like_placeholder(value)
-                && !value.is_empty()
-                && text.contains(value) =>
-            {
-                destinations.push(value.to_owned());
-            }
-            None => dropped.push(format!("destination {value:?}: not in the message")),
+            // A literal substring can be a payee name or an ignored account.
+            // The redactor already mapped supported accounts to placeholders;
+            // only that map can supply a destination, never arbitrary text.
+            None => dropped.push(format!(
+                "destination {value:?}: not a known destination placeholder"
+            )),
         }
     }
 
@@ -476,6 +475,21 @@ mod tests {
         assert_eq!(g.fields.references, vec!["INV-100"]);
         assert_eq!(g.dropped.len(), 1);
         assert!(g.fields.validate().is_ok());
+    }
+
+    #[test]
+    fn a_name_cannot_supply_an_account_or_keep_an_unasked_amount() {
+        let message = redact("Do not pay Cedar Studio 72 USD");
+        let out = ModelOutput {
+            amount: Some("72".into()),
+            currency: Some("USD".into()),
+            destinations: vec!["Cedar Studio".into()],
+            ..Default::default()
+        };
+        let grounded = ground(out, &message);
+        assert!(grounded.fields.destinations.is_empty());
+        assert!(grounded.fields.amounts.is_empty());
+        assert_eq!(grounded.dropped.len(), 2);
     }
 
     #[test]

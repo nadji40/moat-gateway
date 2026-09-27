@@ -51,9 +51,19 @@ MTP drafter, one parallel slot, and context 2048. Its median was 0.767 seconds
 on a 36-message internal corpus. That measurement excludes Redis queue wait,
 SSH startup, and Colab runtime startup. Colab uptime is not guaranteed.
 
-On 2026-09-27 the same corpus was run through SkyLight's queued model path.
-The grounded reader produced 0 unsafe payees and 36/36 expected payees, but
-34/36 expected refusals, 34/36 amounts, and 31/36 cancellation flags; median
-read time was 1.9 seconds. The notebook's 36/36 for those fields did not
-repeat in this live run. Keep confirmation in the host flow and do not use
-these small internal samples as a production accuracy guarantee.
+The reader preserves the notebook's JSON-schema property order on the wire:
+pay, refused, amount, currency, destinations, references, cancellation. The
+previous Rust `Value` serialized these alphabetically, changing the constrained
+model's generation order and its answers. The prompt/schema hash includes the
+ordered schema. A transport regression test checks the actual HTTP body.
+
+Destinations must resolve through the redactor's account-placeholder map.
+A literal name appearing in the message cannot supply an account destination.
+
+The initial live corpus report overstated amount errors (decimal commas were
+scored incorrectly) and overlooked missing amounts and extra references. The
+corrected test uses explicit canonical amount labels, requires present amounts
+and currencies for payment cases, and checks both missing and extra references.
+See [the schema-order comparison](../research/intent-reader/colab-schema-order/README.md)
+for the stricter before/after measurements and remaining errors. These are
+small internal samples; keep confirmation in the host flow.
