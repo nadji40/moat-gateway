@@ -20,8 +20,8 @@ PREFIX = "moat:colab:"
 PENDING = PREFIX + "pending"
 PROCESSING = PREFIX + "processing"
 MODEL_URL = "http://127.0.0.1:8092/v1/chat/completions"
-WAIT_SECONDS = 55
-MAX_ACTIVE_REQUESTS = 64
+WAIT_SECONDS = 120
+MAX_ACTIVE_REQUESTS = 3
 slots = threading.BoundedSemaphore(MAX_ACTIVE_REQUESTS)
 
 
@@ -41,7 +41,7 @@ def result_key(job_id):
 
 
 def enqueue(db, body):
-    if db.llen(PENDING) + db.llen(PROCESSING) >= 1000:
+    if db.llen(PENDING) + db.llen(PROCESSING) >= MAX_ACTIVE_REQUESTS:
         raise RuntimeError("model queue is full")
     job_id = uuid.uuid4().hex
     payload = json.dumps({"body": body, "deadline": time.time() + WAIT_SECONDS})
@@ -83,7 +83,7 @@ def work(db):
             request = urllib.request.Request(
                 MODEL_URL, data=json.dumps(payload["body"]).encode(),
                 headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(request, timeout=min(45, remaining - 1)) as response:
+            with urllib.request.urlopen(request, timeout=min(115, remaining - 1)) as response:
                 answer = json.load(response)
             finish(db, job_id, 200, answer)
             print(f"model job {job_id}: completed", flush=True)

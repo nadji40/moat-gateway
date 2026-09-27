@@ -4,9 +4,9 @@
 
 The [Colab serving architecture](colab-serving.md) describes the final setup:
 SkyLight's Moat reader and Redis queue, the persistent SSH connection to Gemma
-on a Colab T4, structured output, grounding, failure handling and operation.
+on a Colab CPU runtime, structured output, grounding, failure handling and operation.
 It includes the final deployed measurement and links to the implementation.
-The recorded responses and timings are in [colab-live-results.json](colab-live-results.json).
+The earlier T4 responses and timings are in [colab-live-results.json](colab-live-results.json).
 
 The sections below retain the model-selection and runtime experiments.
 

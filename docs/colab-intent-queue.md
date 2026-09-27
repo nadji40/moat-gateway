@@ -1,6 +1,6 @@
 # Colab intent queue
 
-SkyLight runs the Moat gateway and intent reader. Gemma runs on a Colab T4,
+SkyLight runs the Moat gateway and intent reader. Gemma runs on a Colab CPU runtime,
 reached through one `google-colab-cli` SSH tunnel. The reader sends its
 OpenAI-compatible completion requests to the loopback queue proxy at
 `127.0.0.1:8093`. One Redis worker sends them, in FIFO order, to the forwarded
@@ -16,7 +16,7 @@ Clients use the normal `moat-intent` routes on `127.0.0.1:7083`:
   at `127.0.0.1:7082`. The key stays in the reader process during that request;
   it is not stored in Redis or Colab. The gateway validates the key and tenant.
 
-When Colab is unavailable or a queued read exceeds 55 seconds, the reader
+When Colab is unavailable or a queued read exceeds 120 seconds, the reader
 returns `status=unavailable` with empty intent fields. The registration route
 then forwards those empty fields, so the message cannot provide model-derived
 payment authority. A caller should retry the read when Colab returns; it
@@ -26,7 +26,7 @@ The four systemd units in `deploy/` are:
 
 - `moat-colab-tunnel.service`: copies `scripts/colab-gemma-server.py` into
   Colab, keeps one SSH tunnel open, and watches the model process. On a lost
-  runtime it requests a T4, downloads the benchmarked model files again,
+  runtime it requests a CPU session, downloads the model file again,
   starts llama-server, and reconnects. Colab capacity and time limits can
   cause interruptions.
 - `moat-colab-queue-api.service`: accepts model completions on loopback and
@@ -46,10 +46,13 @@ calling the model, but Redis AOF can still retain other message content until
 compaction or backup expiry. Set a customer-data retention and access policy
 before using the queue with real customer messages.
 
-The notebook's one-at-a-time T4 configuration uses Gemma 4 E4B Q4 with the
-MTP drafter, one parallel slot, and context 2048. Its median was 0.767 seconds
-on a 36-message internal corpus. That measurement excludes Redis queue wait,
-SSH startup, and Colab runtime startup. Colab uptime is not guaranteed.
+The CPU configuration uses Gemma 4 E4B Q4, one parallel slot, context 2048,
+and no MTP drafter. The earlier T4 notebook configuration measured a median
+0.767 seconds on a 36-message internal corpus; that GPU result does not
+describe CPU latency. On the current two-core Colab CPU Standard runtime, a
+cold full-prompt completion took 81.16 seconds; two warm end-to-end reads
+took 37.80 and 29.75 seconds. These are smoke checks, not a CPU benchmark.
+The queue admits up to three waiting requests. Colab uptime is not guaranteed.
 
 The reader preserves this JSON-schema property order on the wire: pay,
 refused, amount, currency, destinations, references, cancellation. The

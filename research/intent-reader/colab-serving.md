@@ -1,7 +1,7 @@
 # Moat intent reader: Colab serving architecture
 
 This document describes the deployed setup as of 27 September 2026. SkyLight
-runs the Moat reader, gateway and Redis queue. A Colab Tesla T4 runs Gemma.
+runs the Moat reader, gateway and Redis queue. A Colab CPU runtime runs Gemma.
 GitHub holds the source, configuration and research artifacts; inference
 executes in the Colab runtime.
 
@@ -12,7 +12,7 @@ sequenceDiagram
     participant Host as Host application
     participant Reader as Moat reader on SkyLight
     participant Queue as Redis proxy and worker
-    participant Model as Gemma on Colab T4
+    participant Model as Gemma on Colab CPU
     participant Gateway as Moat gateway
     Host->>Reader: User message
     Reader->>Reader: Redact cards, accounts and emails
@@ -75,14 +75,13 @@ Messages must be nonempty and at most 4,000 characters after trimming.
 
 | Setting | Deployed value |
 | --- | --- |
-| GPU | Colab Tesla T4 |
+| Runtime | Colab CPU Standard |
 | Model repository | `unsloth/gemma-4-E4B-it-qat-GGUF` |
 | Model file | `gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf` |
-| MTP draft file | `mtp-gemma-4-E4B-it.gguf` |
-| llama.cpp release | `b11205`, Ubuntu CUDA 12.8 build |
+| llama.cpp release | `b11205`, Ubuntu x64 CPU build |
 | Model slots | `1` |
 | Context | `2048` tokens |
-| Speculative decoding | `draft-mtp`, up to four draft tokens |
+| Speculative decoding | Disabled on CPU |
 | Request settings | Temperature `0`, maximum `400` output tokens, thinking disabled |
 | Output constraint | JSON schema |
 
@@ -91,14 +90,12 @@ The bootstrap runs this configuration inside Colab:
 ```sh
 llama-server \
   -m /content/models/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf \
-  -md /content/models/mtp-gemma-4-E4B-it.gguf \
   --host 127.0.0.1 --port 8092 \
-  --jinja --no-mmproj -ngl 99 -np 1 -c 2048 \
-  --spec-type draft-mtp --spec-draft-n-max 4
+  --jinja --no-mmproj -ngl 0 -t <available-cpu-threads> -np 1 -c 2048
 ```
 
-The MTP model drafts tokens for speculative decoding. The main model remains
-responsible for the completion. The bootstrap pins the llama.cpp release;
+The earlier T4 setup used an MTP drafter for speculative decoding. The CPU
+setup runs the main model alone. The bootstrap pins the llama.cpp release;
 the Hugging Face downloads currently specify filenames without a repository
 revision, so rebuilding a runtime is not a fully immutable model snapshot.
 
@@ -153,10 +150,10 @@ API backed by a queue, rather than a client-facing submit-and-poll job API.
 
 | Queue control | Value |
 | --- | --- |
-| Concurrent waiting HTTP requests | Up to 64 |
-| Pending + processing admission threshold | 1,000 jobs |
-| Per-job deadline and HTTP result wait | 55 seconds |
-| Model HTTP timeout | At most 45 seconds, bounded by remaining job time |
+| Concurrent waiting HTTP requests | Up to 3 |
+| Pending + processing admission threshold | 3 jobs |
+| Per-job deadline and HTTP result wait | 120 seconds |
+| Model HTTP timeout | At most 115 seconds, bounded by remaining job time |
 | Payload expiry | 3,600 seconds; deleted on completion |
 | Unconsumed result expiry | 120 seconds |
 
@@ -183,8 +180,9 @@ after service recovery instead of treating the failed read as authorization.
 
 The Colab bootstrap checks model health every 15 seconds and attempts to start
 the model when unavailable. The tunnel unit restarts after a lost connection
-and can request a runtime through `google-colab-cli`. CLI credentials and SSH
-keys belong to the `moat` service user. Colab capacity, runtime expiry and
+and can request a CPU runtime through `google-colab-cli`. The `ProxyCommand` in
+`/var/lib/moat/.ssh/config` omits `--gpu`, so replacement runtimes use CPU.
+CLI credentials and SSH keys belong to the `moat` service user. Colab capacity, runtime expiry and
 authorization can interrupt service; automatic recovery is attempted and
 does not guarantee continuous availability.
 
@@ -203,7 +201,7 @@ The queue health response reports `pending` and `processing` counts. Its
 health endpoint does not itself test inference. An actual `/v1/read` request
 checks the complete serving path.
 
-## Final deployed measurement
+## Previous T4 deployed measurement
 
 The [saved live run](colab-live-results.json), recorded on 27 September 2026
 at commit `e7e8831`, sent 54 synthetic messages through the deployed
@@ -211,7 +209,7 @@ at commit `e7e8831`, sent 54 synthetic messages through the deployed
 validation messages. Requests ran sequentially and did not register intents
 or execute payments.
 
-| Metric | Final run |
+| Metric | T4 run |
 | --- | ---: |
 | Completely correct readings | 52/54 |
 | Payees, refused names, amounts, currencies, cancellation and destinations | 54/54 each |
@@ -230,6 +228,18 @@ cancellation flag and no spurious destination. Amounts must be absent when
 there is no payment. The timing includes the reader, queue, SSH-forwarded
 model call and grounding; it is not GPU generation time alone. This small
 internal corpus does not measure production accuracy or outage recovery.
+
+## CPU fallback check
+
+On 27 September 2026, Colab allocated a CPU Standard runtime with two CPUs
+and 12 GiB RAM. The first direct completion with the full reader prompt and
+schema took 81.16 seconds while the prompt cache was cold. With that runtime
+warm, a complete `/v1/read` payment request took 37.80 seconds and returned
+the payee, amount, currency and invoice reference. A refusal plus cancellation
+request took 29.75 seconds and returned no payee, the refused name and the
+cancellation flag. These are two synthetic smoke cases, not a CPU corpus or
+capacity benchmark. The 120-second queue deadline covers the measured cold
+start while preserving fail-closed behavior when the model cannot answer.
 
 To repeat the measurement from the repository on SkyLight:
 

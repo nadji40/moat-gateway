@@ -8,7 +8,7 @@ Type=simple
 User=moat
 Group=moat
 WorkingDirectory=/var/lib/moat
-ExecStart=/usr/local/bin/moat-intent --listen 127.0.0.1:7083 --llm-url http://127.0.0.1:8093 --gateway http://127.0.0.1:7082 --model gemma-4-E4B-it-qat-UD-Q4_K_XL
+ExecStart=/usr/local/bin/moat-intent --listen 127.0.0.1:7083 --llm-url http://127.0.0.1:8093 --gateway http://127.0.0.1:7082 --model gemma-4-E4B-it-qat-UD-Q4_K_XL --timeout-secs 130
 Restart=always
 RestartSec=5
 
