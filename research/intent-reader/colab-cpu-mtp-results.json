@@ -1,0 +1,285 @@
+[
+  {
+    "id": "en-1",
+    "expected": {
+      "pay": "Orbit Labs Srl",
+      "refused": [],
+      "amount": "480",
+      "currency_options": [
+        "USD"
+      ],
+      "cancels_previous": false,
+      "references": [
+        "INV-100"
+      ]
+    },
+    "base": {
+      "seconds": 38.68,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 26,
+        "prompt_ms": 5569.27,
+        "prompt_per_token_ms": 214.20269230769233,
+        "prompt_per_second": 4.668475401623551,
+        "predicted_n": 85,
+        "predicted_ms": 33087.48,
+        "predicted_per_token_ms": 393.8985714285715,
+        "predicted_per_second": 2.5387246172872637
+      },
+      "answer": {
+        "pay": [
+          "Orbit Labs Srl"
+        ],
+        "refused": [],
+        "amount": "480",
+        "currency": "USD",
+        "destinations": [],
+        "references": [
+          "INV-100"
+        ],
+        "cancels_previous": false
+      }
+    },
+    "mtp": {
+      "seconds": 32.22,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 26,
+        "prompt_ms": 6069.065,
+        "prompt_per_token_ms": 233.4255769230769,
+        "prompt_per_second": 4.284020685229109,
+        "predicted_n": 85,
+        "predicted_ms": 26138.374,
+        "predicted_per_token_ms": 311.1711190476191,
+        "predicted_per_second": 3.213665853889764,
+        "draft_n": 76,
+        "draft_n_accepted": 67
+      },
+      "answer": {
+        "pay": [
+          "Orbit Labs Srl"
+        ],
+        "refused": [],
+        "amount": "480",
+        "currency": "USD",
+        "destinations": [],
+        "references": [
+          "INV-100"
+        ],
+        "cancels_previous": false
+      }
+    }
+  },
+  {
+    "id": "ar-2",
+    "expected": {
+      "pay": "مؤسسة عسير للحلول السحابية",
+      "refused": [
+        "شركة الأفق الرقمي"
+      ],
+      "amount": "٤٨٠",
+      "currency_options": [
+        "OMR",
+        "QAR",
+        "SAR",
+        "YER"
+      ],
+      "cancels_previous": false,
+      "references": []
+    },
+    "base": {
+      "seconds": 41.82,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 38,
+        "prompt_ms": 6180.313,
+        "prompt_per_token_ms": 162.6398157894737,
+        "prompt_per_second": 6.148555906472698,
+        "predicted_n": 93,
+        "predicted_ms": 35631.708,
+        "predicted_per_token_ms": 387.30117391304344,
+        "predicted_per_second": 2.5819699689950313
+      },
+      "answer": {
+        "pay": [
+          "مؤسسة عسير للحلول السحابية"
+        ],
+        "refused": [
+          "شركة الأفق الرقمي"
+        ],
+        "amount": "480",
+        "currency": "SAR",
+        "destinations": [],
+        "references": [],
+        "cancels_previous": false
+      }
+    },
+    "mtp": {
+      "seconds": 35.29,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 38,
+        "prompt_ms": 6341.12,
+        "prompt_per_token_ms": 166.87157894736842,
+        "prompt_per_second": 5.9926322163907955,
+        "predicted_n": 93,
+        "predicted_ms": 28934.166,
+        "predicted_per_token_ms": 314.5018043478261,
+        "predicted_per_second": 3.179631996304991,
+        "draft_n": 80,
+        "draft_n_accepted": 73
+      },
+      "answer": {
+        "pay": [
+          "مؤسسة عسير للحلول السحابية"
+        ],
+        "refused": [
+          "شركة الأفق الرقمي"
+        ],
+        "amount": "480",
+        "currency": "SAR",
+        "destinations": [],
+        "references": [],
+        "cancels_previous": false
+      }
+    }
+  },
+  {
+    "id": "x-quote",
+    "expected": {
+      "pay": "Orbit Labs Srl",
+      "refused": [
+        "Evil Corp"
+      ],
+      "amount": "480",
+      "currency_options": [
+        "USD"
+      ],
+      "cancels_previous": false,
+      "references": []
+    },
+    "base": {
+      "seconds": 39.18,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 45,
+        "prompt_ms": 7271.068,
+        "prompt_per_token_ms": 161.5792888888889,
+        "prompt_per_second": 6.188912000272863,
+        "predicted_n": 82,
+        "predicted_ms": 31899.714,
+        "predicted_per_token_ms": 393.82362962962964,
+        "predicted_per_second": 2.539207718288634
+      },
+      "answer": {
+        "pay": [
+          "Orbit Labs Srl"
+        ],
+        "refused": [
+          "Evil Corp"
+        ],
+        "amount": "480",
+        "currency": "USD",
+        "destinations": [],
+        "references": [],
+        "cancels_previous": false
+      }
+    },
+    "mtp": {
+      "seconds": 32.21,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 45,
+        "prompt_ms": 7286.382,
+        "prompt_per_token_ms": 161.9196,
+        "prompt_per_second": 6.175904584744528,
+        "predicted_n": 82,
+        "predicted_ms": 24909.355,
+        "predicted_per_token_ms": 307.5229012345679,
+        "predicted_per_second": 3.2517903414199205,
+        "draft_n": 72,
+        "draft_n_accepted": 64
+      },
+      "answer": {
+        "pay": [
+          "Orbit Labs Srl"
+        ],
+        "refused": [
+          "Evil Corp"
+        ],
+        "amount": "480",
+        "currency": "USD",
+        "destinations": [],
+        "references": [],
+        "cancels_previous": false
+      }
+    }
+  },
+  {
+    "id": "x-zh-cancel",
+    "expected": {
+      "pay": null,
+      "refused": [
+        "轨道实验室"
+      ],
+      "amount": null,
+      "currency_options": [
+        "USD"
+      ],
+      "cancels_previous": true,
+      "references": []
+    },
+    "base": {
+      "seconds": 29.9,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 27,
+        "prompt_ms": 4611.2,
+        "prompt_per_token_ms": 170.78518518518518,
+        "prompt_per_second": 5.855308813324081,
+        "predicted_n": 67,
+        "predicted_ms": 25274.864,
+        "predicted_per_token_ms": 382.95248484848486,
+        "predicted_per_second": 2.6112900152499336
+      },
+      "answer": {
+        "pay": [],
+        "refused": [
+          "轨道实验室"
+        ],
+        "amount": null,
+        "currency": null,
+        "destinations": [],
+        "references": [],
+        "cancels_previous": true
+      }
+    },
+    "mtp": {
+      "seconds": 25.91,
+      "timings": {
+        "cache_n": 351,
+        "prompt_n": 27,
+        "prompt_ms": 6185.992,
+        "prompt_per_token_ms": 229.11081481481483,
+        "prompt_per_second": 4.3647001160040295,
+        "predicted_n": 67,
+        "predicted_ms": 19716.766,
+        "predicted_per_token_ms": 298.7388787878788,
+        "predicted_per_second": 3.347404944603998,
+        "draft_n": 60,
+        "draft_n_accepted": 53
+      },
+      "answer": {
+        "pay": [],
+        "refused": [
+          "轨道实验室"
+        ],
+        "amount": null,
+        "currency": null,
+        "destinations": [],
+        "references": [],
+        "cancels_previous": true
+      }
+    }
+  }
+]

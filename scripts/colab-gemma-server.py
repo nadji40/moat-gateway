@@ -50,11 +50,14 @@ def main() -> None:
         raise RuntimeError(f"CPU llama-server has missing libraries: {missing}")
     repo = "unsloth/gemma-4-E4B-it-qat-GGUF"
     model = hf_hub_download(repo, "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf", local_dir=MODEL_DIR)
+    draft = hf_hub_download(repo, "mtp-gemma-4-E4B-it.gguf", local_dir=MODEL_DIR)
     print("Model files ready; starting llama-server", flush=True)
     threads = max(1, min(os.cpu_count() or 1, 8))
     command = [server, "-m", model, "--host", "127.0.0.1", "--port", str(PORT),
                "--jinja", "--no-mmproj", "-ngl", "0", "-t", str(threads),
-               "-np", "1", "-c", "2048"]
+               "-np", "1", "-c", "2048", "-md", draft,
+               "--spec-type", "draft-mtp", "--spec-draft-n-max", "4",
+               "-ngld", "0", "-td", str(threads)]
     with open(ROOT / "moat-llama.log", "ab", buffering=0) as log:
         process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT,
                                    env=env, start_new_session=True)

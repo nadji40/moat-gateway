@@ -78,10 +78,11 @@ Messages must be nonempty and at most 4,000 characters after trimming.
 | Runtime | Colab CPU Standard |
 | Model repository | `unsloth/gemma-4-E4B-it-qat-GGUF` |
 | Model file | `gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf` |
+| MTP draft file | `mtp-gemma-4-E4B-it.gguf` |
 | llama.cpp release | `b11205`, Ubuntu x64 CPU build |
 | Model slots | `1` |
 | Context | `2048` tokens |
-| Speculative decoding | Disabled on CPU |
+| Speculative decoding | `draft-mtp`, up to four draft tokens |
 | Request settings | Temperature `0`, maximum `400` output tokens, thinking disabled |
 | Output constraint | JSON schema |
 
@@ -90,12 +91,15 @@ The bootstrap runs this configuration inside Colab:
 ```sh
 llama-server \
   -m /content/models/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf \
+  -md /content/models/mtp-gemma-4-E4B-it.gguf \
   --host 127.0.0.1 --port 8092 \
-  --jinja --no-mmproj -ngl 0 -t <available-cpu-threads> -np 1 -c 2048
+  --jinja --no-mmproj -ngl 0 -ngld 0 \
+  -t <available-cpu-threads> -td <available-cpu-threads> -np 1 -c 2048 \
+  --spec-type draft-mtp --spec-draft-n-max 4
 ```
 
-The earlier T4 setup used an MTP drafter for speculative decoding. The CPU
-setup runs the main model alone. The bootstrap pins the llama.cpp release;
+The MTP model proposes tokens that the main model verifies. The bootstrap
+pins the llama.cpp release;
 the Hugging Face downloads currently specify filenames without a repository
 revision, so rebuilding a runtime is not a fully immutable model snapshot.
 
@@ -229,7 +233,7 @@ there is no payment. The timing includes the reader, queue, SSH-forwarded
 model call and grounding; it is not GPU generation time alone. This small
 internal corpus does not measure production accuracy or outage recovery.
 
-## CPU fallback check
+## CPU baseline check without MTP
 
 On 27 September 2026, Colab allocated a CPU Standard runtime with two CPUs
 and 12 GiB RAM. The first direct completion with the full reader prompt and
@@ -240,6 +244,30 @@ request took 29.75 seconds and returned no payee, the refused name and the
 cancellation flag. These are two synthetic smoke cases, not a CPU corpus or
 capacity benchmark. The 120-second queue deadline covers the measured cold
 start while preserving fail-closed behavior when the model cannot answer.
+
+## CPU MTP comparison
+
+On the same two-core Colab runtime, four corpus cases were sent directly to
+separate CPU `llama-server` processes with identical prompts and JSON schemas.
+Each process was warmed first. The MTP process used four draft tokens ahead.
+
+| Case | Without MTP | With MTP | Raw answers equal |
+| --- | ---: | ---: | --- |
+| English payment | 38.68 s | 32.22 s | Yes |
+| Arabic payee switch | 41.82 s | 35.29 s | Yes |
+| Quoted injected payee | 39.18 s | 32.21 s | Yes |
+| Chinese cancellation | 29.90 s | 25.91 s | Yes |
+| Median | 38.93 s | 32.22 s | 4/4 |
+
+The [raw paired results](colab-cpu-mtp-results.json) include timings, draft
+acceptance and answers. This is a small direct-model comparison, not a full
+reader corpus evaluation or a guarantee that every request will be faster.
+After the production Colab model switched to MTP, a cold `/v1/read` request
+with a quoted injected payee returned the authorized payee and refused the
+injected name in 93.01 seconds. A warm payment read returned the grounded
+payee, amount, currency and invoice reference in 31.44 seconds. Both passed
+through the reader, Redis worker and SSH tunnel; neither registered an intent
+or executed a payment.
 
 To repeat the measurement from the repository on SkyLight:
 

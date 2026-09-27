@@ -46,12 +46,16 @@ calling the model, but Redis AOF can still retain other message content until
 compaction or backup expiry. Set a customer-data retention and access policy
 before using the queue with real customer messages.
 
-The CPU configuration uses Gemma 4 E4B Q4, one parallel slot, context 2048,
-and no MTP drafter. The earlier T4 notebook configuration measured a median
+The CPU configuration uses Gemma 4 E4B Q4 with its MTP drafter, one parallel
+slot, and context 2048. The earlier T4 notebook configuration measured a median
 0.767 seconds on a 36-message internal corpus; that GPU result does not
-describe CPU latency. On the current two-core Colab CPU Standard runtime, a
-cold full-prompt completion took 81.16 seconds; two warm end-to-end reads
-took 37.80 and 29.75 seconds. These are smoke checks, not a CPU benchmark.
+describe CPU latency. On the current two-core Colab CPU Standard runtime, four
+paired CPU requests had median 38.93 seconds without MTP and 32.22 seconds
+with MTP, with identical raw answers in all four cases. This small comparison
+does not establish corpus-wide accuracy or peak-load throughput. The earlier
+no-drafter cold full-prompt completion took 81.16 seconds. After switching the
+live model to MTP, a cold end-to-end quoted-message read took 93.01 seconds
+and a warm payment read took 31.44 seconds.
 The queue admits up to three waiting requests. Colab uptime is not guaranteed.
 
 The reader preserves this JSON-schema property order on the wire: pay,

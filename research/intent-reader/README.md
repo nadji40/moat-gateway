@@ -7,6 +7,7 @@ SkyLight's Moat reader and Redis queue, the persistent SSH connection to Gemma
 on a Colab CPU runtime, structured output, grounding, failure handling and operation.
 It includes the final deployed measurement and links to the implementation.
 The earlier T4 responses and timings are in [colab-live-results.json](colab-live-results.json).
+The paired CPU MTP comparison is in [colab-cpu-mtp-results.json](colab-cpu-mtp-results.json).
 
 The sections below retain the model-selection and runtime experiments.
 
