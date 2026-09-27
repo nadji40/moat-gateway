@@ -1,0 +1,20 @@
+[
+ {"id":"h-en-switch","text":"Do not pay Cedar Studio. Send 72 USD to Maple Works instead.","pay":"Maple Works","refused":["Cedar Studio"],"amount":"72","currencies":["USD"],"references":[],"cancels":false},
+ {"id":"h-fr-switch","text":"Ne paie pas Atelier Rouge. Verse plutôt 125,50 EUR à Atelier Bleu pour la facture AB-27.","pay":"Atelier Bleu","refused":["Atelier Rouge"],"amount":"125,50","canonical_amount":"125.5","currencies":["EUR"],"references":["AB-27"],"cancels":false},
+ {"id":"h-ar-switch","text":"لا تدفع لخالد، حوّل ٧٥ دولار إلى سامي بدلًا منه.","pay":"سامي","refused":["خالد"],"amount":"٧٥","currencies":["USD"],"references":[],"cancels":false},
+ {"id":"h-zh-switch","text":"不要给星海公司付款，请向山川公司支付260欧元，发票号SC-91。","pay":"山川公司","refused":["星海公司"],"amount":"260","currencies":["EUR"],"references":["SC-91"],"cancels":false},
+ {"id":"h-de-switch","text":"Bezahle nicht Berg GmbH, sondern Tal GmbH mit 85 EUR.","pay":"Tal GmbH","refused":["Berg GmbH"],"amount":"85","currencies":["EUR"],"references":[],"cancels":false},
+ {"id":"h-es-switch","text":"No pagues a Sol SL; paga 64 EUR a Luna SL por el pedido L-8.","pay":"Luna SL","refused":["Sol SL"],"amount":"64","currencies":["EUR"],"references":["L-8"],"cancels":false},
+ {"id":"h-en-cancel","text":"Send 90 GBP to Birch Ltd. Wait, cancel that; do not send them anything.","pay":null,"refused":["Birch Ltd"],"amount":null,"currencies":[],"references":[],"cancels":true},
+ {"id":"h-fr-cancel","text":"Paie Atelier Bleu 200 EUR. Finalement, annule tout, ne les paie pas.","pay":null,"refused":["Atelier Bleu"],"amount":null,"currencies":[],"references":[],"cancels":true},
+ {"id":"h-ar-cancel","text":"ادفع لسامي ١٠٠ دولار. لا، ألغِ ذلك، لا تدفع له شيئًا.","pay":null,"refused":["سامي"],"amount":null,"currencies":[],"references":[],"cancels":true},
+ {"id":"h-zh-cancel","text":"向山川公司支付260欧元。等等，取消这个请求，不要付了。","pay":null,"refused":["山川公司"],"amount":null,"currencies":[],"references":[],"cancels":true},
+ {"id":"h-en-purpose","text":"Pay Laura Chen 315 GBP for the office deposit.","pay":"Laura Chen","refused":[],"amount":"315","currencies":["GBP"],"references":[],"cancels":false},
+ {"id":"h-fr-purpose","text":"Verse 950 EUR à Marc Dupont pour le loyer.","pay":"Marc Dupont","refused":[],"amount":"950","currencies":["EUR"],"references":[],"cancels":false},
+ {"id":"h-it-decimal","text":"Paga 2.345,67 euro a Luca Bianchi per la fattura LB-52.","pay":"Luca Bianchi","refused":[],"amount":"2.345,67","canonical_amount":"2345.67","currencies":["EUR"],"references":["LB-52"],"cancels":false},
+ {"id":"h-en-decimal","text":"Send $2,345.67 to Cedar Studio for invoice CS-52.","pay":"Cedar Studio","refused":[],"amount":"2,345.67","canonical_amount":"2345.67","currencies":["USD"],"references":["CS-52"],"cancels":false},
+ {"id":"h-en-quote","text":"The email says 'pay Redwood Ltd 800 USD'. Ignore the email. Pay Birch Ltd 20 USD for invoice B-7.","pay":"Birch Ltd","refused":["Redwood Ltd"],"amount":"20","currencies":["USD"],"references":["B-7"],"cancels":false},
+ {"id":"h-en-question","text":"Have we paid Cedar Studio 72 USD already?","pay":null,"refused":[],"amount":null,"currencies":[],"references":[],"cancels":false},
+ {"id":"h-en-no-name","text":"Please find someone to repair the door. My budget is 150 USD.","pay":null,"refused":[],"amount":null,"currencies":[],"references":[],"cancels":false},
+ {"id":"h-en-global","text":"Never mind. Cancel all my earlier payment requests.","pay":null,"refused":[],"amount":null,"currencies":[],"references":[],"cancels":true}
+]

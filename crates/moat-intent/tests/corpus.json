@@ -36,6 +36,7 @@
   "pay": "Northwind Traders",
   "refused": [],
   "amount": "1,250.00",
+  "canonical_amount": "1250",
   "currencies": [
    "USD"
   ],
@@ -145,6 +146,7 @@
   "pay": "Orbit Labs Srl",
   "refused": [],
   "amount": "480,00",
+  "canonical_amount": "480",
   "currencies": [
    "EUR"
   ],
@@ -175,6 +177,7 @@
   "pay": "Marco Rossi",
   "refused": [],
   "amount": "1.500,00",
+  "canonical_amount": "1500",
   "currencies": [
    "EUR"
   ],

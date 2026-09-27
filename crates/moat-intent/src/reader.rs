@@ -15,14 +15,13 @@ use anyhow::{anyhow, Context, Result};
 use moat_core::hash::sha256_hex;
 use moat_core::session::IntentFields;
 use serde::Serialize;
-use serde_json::{json, Value};
+use serde_json::{json, value::RawValue, Value};
 
 use crate::ground::{ground, ModelOutput};
 use crate::redact::{redact, Redacted};
 
-/// What the model is told. Measured on 36 messages in 12 languages with
-/// Gemma 4 E4B: every payee and every refusal right, nothing invented.
-/// Changing it changes what reads correctly; rerun the corpus when it does.
+/// What the model is told. Rerun the corpus when the prompt, schema order,
+/// or serving configuration changes; each can change the model's answers.
 pub const SYSTEM_PROMPT: &str = "\
 You read ONE message that a user wrote to their payment assistant, in any language.
 Report what the user asks for. Copy every name and number EXACTLY as it appears in the message:
@@ -43,25 +42,36 @@ Return JSON with these fields:
   put that name in \"refused\" and leave this false.
 A name is only the name: no verbs, no prepositions, no attached particles.";
 
-fn schema() -> Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "pay": {"type": "array", "items": {"type": "string"}},
-            "refused": {"type": "array", "items": {"type": "string"}},
-            "amount": {"type": ["string", "null"]},
-            "currency": {"type": ["string", "null"]},
-            "destinations": {"type": "array", "items": {"type": "string"}},
-            "references": {"type": "array", "items": {"type": "string"}},
-            "cancels_previous": {"type": "boolean"}
-        },
-        "required": ["pay", "refused", "amount", "currency", "destinations", "references", "cancels_previous"]
-    })
+// llama.cpp emits schema properties in their supplied order. A Value sorts
+// them alphabetically, making cancellation precede pay/refused and changing
+// measured accuracy. Keep the notebook's order all the way onto the wire.
+const SCHEMA: &str = include_str!("intent.schema.json");
+
+#[derive(Serialize)]
+struct CompletionRequest<'a> {
+    model: &'a str,
+    messages: [Value; 2],
+    temperature: u8,
+    max_tokens: u16,
+    response_format: ResponseFormat<'a>,
+    chat_template_kwargs: Value,
+}
+
+#[derive(Serialize)]
+struct ResponseFormat<'a> {
+    r#type: &'a str,
+    json_schema: NamedSchema<'a>,
+}
+
+#[derive(Serialize)]
+struct NamedSchema<'a> {
+    name: &'a str,
+    schema: &'a RawValue,
 }
 
 /// A hash of the prompt and the schema together, for the record.
 pub fn prompt_sha256() -> String {
-    sha256_hex(format!("{SYSTEM_PROMPT}\n{}", schema()).as_bytes())
+    sha256_hex(format!("{SYSTEM_PROMPT}\n{}", SCHEMA.trim()).as_bytes())
 }
 
 /// How a message was read.
@@ -161,21 +171,25 @@ impl Reader {
     }
 
     async fn ask(&self, message: &Redacted) -> Result<ModelOutput> {
-        let body = json!({
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": message.for_model},
+        let schema: &RawValue = serde_json::from_str(SCHEMA.trim()).context("intent schema")?;
+        let body = CompletionRequest {
+            model: &self.model,
+            messages: [
+                json!({"role": "system", "content": SYSTEM_PROMPT}),
+                json!({"role": "user", "content": message.for_model}),
             ],
-            "temperature": 0,
-            "max_tokens": 400,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {"name": "intent", "schema": schema()}
+            temperature: 0,
+            max_tokens: 400,
+            response_format: ResponseFormat {
+                r#type: "json_schema",
+                json_schema: NamedSchema {
+                    name: "intent",
+                    schema,
+                },
             },
             // Thinking models answer faster and no worse here without it.
-            "chat_template_kwargs": {"enable_thinking": false},
-        });
+            chat_template_kwargs: json!({"enable_thinking": false}),
+        };
         let response = self
             .client
             .post(format!("{}/v1/chat/completions", self.llm_url))

@@ -22,6 +22,7 @@ use serde_json::{json, Value};
 #[derive(Default)]
 struct Seen {
     model: Vec<String>,
+    model_requests: Vec<String>,
     gateway: Vec<(Option<String>, Value)>,
 }
 
@@ -38,13 +39,15 @@ async fn model(seen: Arc<Mutex<Seen>>, answer: Value) -> String {
         .route(
             "/v1/chat/completions",
             post(
-                |State((seen, answer)): State<(Arc<Mutex<Seen>>, Value)>,
-                 Json(body): Json<Value>| async move {
+                |State((seen, answer)): State<(Arc<Mutex<Seen>>, Value)>, raw: String| async move {
+                    let body: Value = serde_json::from_str(&raw).unwrap();
                     let message = body["messages"][1]["content"]
                         .as_str()
                         .unwrap_or("")
                         .to_owned();
-                    seen.lock().unwrap().model.push(message);
+                    let mut seen = seen.lock().unwrap();
+                    seen.model.push(message);
+                    seen.model_requests.push(raw);
                     Json(json!({"choices": [{"message": {"content": answer.to_string()}}]}))
                 },
             ),
@@ -126,6 +129,24 @@ async fn a_message_is_read_checked_and_registered_under_the_callers_key() {
     assert!(!seen.model[0].contains("DE89"));
     assert!(!seen.model[0].contains("4111"));
     assert!(seen.model[0].contains("DEST_1"));
+    // Property order controls the constrained model's generation order.
+    // Check the actual HTTP body, before parsing into an order-losing Value.
+    let request = &seen.model_requests[0];
+    let properties = request.split_once("\"properties\":").unwrap().1;
+    let mut previous = 0;
+    for field in [
+        "pay",
+        "refused",
+        "amount",
+        "currency",
+        "destinations",
+        "references",
+        "cancels_previous",
+    ] {
+        let at = properties.find(&format!("\"{field}\":")).unwrap();
+        assert!(at > previous, "schema property order changed: {request}");
+        previous = at;
+    }
     // The gateway got the caller's key, the fields, and no card.
     let (key, sent) = &seen.gateway[0];
     assert_eq!(key.as_deref(), Some("Bearer approver-key"));
