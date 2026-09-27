@@ -809,6 +809,11 @@ gateway, which checks it as if the host had called directly. The strongest way
 to use it is `/v1/read`: show the user what was understood, in their language,
 and send the fields they confirm to the gateway yourself.
 
+On SkyLight, both routes send model requests through the single-consumer Redis
+queue to Gemma on a Colab T4. The reader is connected to the gateway intent
+API for the registration route. See [Colab intent queue](docs/colab-intent-queue.md)
+for its service layout and outage behavior.
+
 Measured on 36 messages in 12 languages with Gemma 4 E4B quantised to four
 bits, on a six-core desktop CPU: no message produced a payee the user refused
 or never named, every payee was right, and a message takes about ten seconds,

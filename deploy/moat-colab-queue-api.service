@@ -1,5 +1,5 @@
 [Unit]
-Description=Loopback API for Moat Colab intent queue
+Description=Loopback model proxy for Moat Colab intent queue
 After=network-online.target redis.service
 
 [Service]

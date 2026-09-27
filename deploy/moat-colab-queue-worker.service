@@ -1,7 +1,7 @@
 [Unit]
 Description=Single consumer for Moat Colab intent queue
-After=network-online.target redis.service moat-intent-colab.service
-Wants=moat-intent-colab.service
+After=network-online.target redis.service moat-colab-tunnel.service moat-colab-queue-api.service
+Wants=moat-colab-tunnel.service moat-colab-queue-api.service
 
 [Service]
 Type=simple
