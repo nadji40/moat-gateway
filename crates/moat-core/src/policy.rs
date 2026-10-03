@@ -515,7 +515,7 @@ pub fn evaluate_with(
     }
     if !has_authorization_id && !structured_authorization_required {
         let named_checks = [
-            intent_currency(policy, session, &mapped),
+            intent_currency(policy, session, &mapped, &provenance),
             intent_invoice(session, &call, &mapped),
         ];
         for mut outcome in named_checks.into_iter().flatten() {
@@ -669,12 +669,17 @@ fn recorded_currency(provenance: &BTreeMap<String, FieldProvenance>) -> Option<S
 ///
 /// Names and amounts are traced to what the user said; a currency is three
 /// letters, too short to trace, and without this "4.80 AED" could leave as
-/// 4.80 KWD at a dozen times the value. `None` when the check has nothing to
-/// go on: the policy maps no currency, or the user named none.
+/// 4.80 KWD at a dozen times the value. An amount the user said with no
+/// currency that survived the reading ("200 ريال" read as a word, not a code)
+/// is a number of nothing, so a payment that picks a currency for it fails
+/// too, or it could leave in any currency at all. `None` when the check has
+/// nothing to go on: the policy maps no currency, the user named neither a
+/// currency nor the amount, or neither side names a currency.
 fn intent_currency(
     policy: &Policy,
     session: &Session,
     mapped: &BTreeMap<String, (String, &Value)>,
+    provenance: &BTreeMap<String, FieldProvenance>,
 ) -> Option<RuleOutcome> {
     if !policy.fields.contains_key("currency") {
         return None;
@@ -687,13 +692,24 @@ fn intent_currency(
             None => crate::money::currencies_named_in(&intent.text),
         })
         .collect();
-    if named.is_empty() {
-        return None;
-    }
     let paid = mapped
         .get("currency")
         .and_then(|(_, value)| value.as_str())
         .map(|code| code.trim().to_ascii_uppercase());
+    if named.is_empty() {
+        let amount_said = provenance
+            .get("amount")
+            .is_some_and(|p| p.resolution.source.kind() == SourceKind::User);
+        let code = paid.filter(|_| amount_said)?;
+        return Some(RuleOutcome {
+            id: "intent-currency".to_owned(),
+            field: Some("currency".to_owned()),
+            passed: false,
+            source: None,
+            on_fail: Decision::StepUp,
+            message: format!("the user named an amount but no currency; this payment is in {code}"),
+        });
+    }
     let passed = paid.as_ref().is_some_and(|code| named.contains(code));
     let listed = named.into_iter().collect::<Vec<_>>().join(", ");
     Some(RuleOutcome {
@@ -2008,17 +2024,73 @@ mod tests {
                 .any(|r| r.id == "intent-currency" && r.passed));
         }
 
-        let mut vague = Session::new("s");
-        vague.register_intent("Pay Monitoring Pro Inc 4.80 via the CEO's card");
+        // An amount with no currency is a number of nothing, so the
+        // currency it leaves in is the agent's alone to choose.
+        let mut bare = Session::new("s");
+        bare.register_intent("Pay Monitoring Pro Inc 4.80 via the CEO's card");
         let e = evaluate(
             &policy(),
-            &vague,
+            &bare,
+            call(json!({"payee": "Monitoring Pro Inc", "amount": 4.80, "currency": "SAR"})),
+            1_000_000,
+        );
+        assert_eq!(e.verdict.decision, Decision::StepUp);
+        let failed: Vec<&str> = e.verdict.failures().map(|r| r.id.as_str()).collect();
+        assert_eq!(failed, vec!["intent-currency"]);
+
+        // Nothing traced to the user's words: the currency check has
+        // nothing to stand on and leaves the hold to the other rules.
+        let mut silent = Session::new("s");
+        silent.register_intent("Please sort out this month's bills.");
+        let e = evaluate(
+            &policy(),
+            &silent,
             call(json!({"payee": "Monitoring Pro Inc", "amount": 4.80, "currency": "SAR"})),
             1_000_000,
         );
         assert!(
             !e.verdict.reasons.iter().any(|r| r.id == "intent-currency"),
-            "no currency named, nothing to compare"
+            "no amount named, nothing to compare"
+        );
+    }
+
+    /// Dhoha's currency cases, and the Saudi and Turkish production reads:
+    /// the reader kept the amount but dropped "ريال" and "TL" because they are
+    /// words, not codes. Every currency used to pass; none may now.
+    #[test]
+    fn an_amount_whose_currency_was_dropped_cannot_leave_in_any_currency() {
+        let mut s = Session::new("s");
+        s.register_intent_fields(
+            "لا تدفع لمؤسسة النور، ادفع لمؤسسة القصيم التجارية ٢٠٠ ريال بس",
+            fields(&["مؤسسة القصيم التجارية"], &["مؤسسة النور"], &["200"], &[]),
+        );
+        for currency in ["SAR", "USD", "KWD"] {
+            let e = evaluate(
+                &policy(),
+                &s,
+                call(
+                    json!({"payee": "مؤسسة القصيم التجارية", "amount": 200.0, "currency": currency}),
+                ),
+                10_000,
+            );
+            assert_eq!(e.verdict.decision, Decision::StepUp, "{currency}");
+            let failed: Vec<&str> = e.verdict.failures().map(|r| r.id.as_str()).collect();
+            assert_eq!(failed, vec!["intent-currency"], "{currency}");
+        }
+
+        // Once the currency is read as a code, the right one goes through.
+        let mut read = Session::new("s");
+        read.register_intent_fields(
+            "Yıldız Yazılım'a 450 TL öde",
+            fields(&["Yıldız Yazılım"], &[], &["450"], &["TRY"]),
+        );
+        assert_eq!(
+            pay_decision(&read, "Yıldız Yazılım", 450.0, "TRY"),
+            Decision::Allow
+        );
+        assert_ne!(
+            pay_decision(&read, "Yıldız Yazılım", 450.0, "USD"),
+            Decision::Allow
         );
     }
 
