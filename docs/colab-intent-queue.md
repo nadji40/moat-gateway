@@ -16,6 +16,16 @@ Clients use the normal `moat-intent` routes on `127.0.0.1:7083`:
   at `127.0.0.1:7082`. The key stays in the reader process during that request;
   it is not stored in Redis or Colab. The gateway validates the key and tenant.
 
+The gateway is itself a client of the first route. Its config names the
+reader (`intent_api.reader: "http://127.0.0.1:7083"`), so text sent to the
+public `POST /v1/session/{id}/intent` with no fields is read by Gemma after
+the gateway has checked the caller's key and session. The reply carries
+`read_by`: `model`, `rules` or `caller`. If the reader does not answer within
+`intent_api.reader_timeout_secs` (45 by default), or reports the model
+unavailable, the gateway registers the text as text and the core's rules read
+it, as they did before the reader existed. The public proxy in `demo/` waits
+60 seconds on that one route so it outlasts the gateway's wait.
+
 When Colab is unavailable or a queued read exceeds 120 seconds, the reader
 returns `status=unavailable` with empty intent fields. The registration route
 then forwards those empty fields, so the message cannot provide model-derived

@@ -188,6 +188,8 @@ pub struct Shared {
     /// compromise of one must not be a compromise of the other. Absent
     /// unless the deployment has one.
     cosign: Option<CosignKey>,
+    /// The `moat-intent` reader, when text intents are read by the model.
+    intent_reader: Option<crate::intent_api::IntentReader>,
 }
 
 impl Shared {
@@ -230,6 +232,7 @@ impl Shared {
             storage,
             auth_required,
             cosign: None,
+            intent_reader: None,
         })
     }
 
@@ -244,6 +247,18 @@ impl Shared {
     /// The co-signing key, if this deployment has one.
     pub fn cosign(&self) -> Option<&CosignKey> {
         self.cosign.as_ref()
+    }
+
+    /// Attach the reader that turns text intents into fields.
+    #[must_use]
+    pub fn with_intent_reader(mut self, reader: Option<crate::intent_api::IntentReader>) -> Shared {
+        self.intent_reader = reader;
+        self
+    }
+
+    /// The reader for text intents, if this deployment has one.
+    pub fn intent_reader(&self) -> Option<&crate::intent_api::IntentReader> {
+        self.intent_reader.as_ref()
     }
 
     /// The durable store, when this deployment has one.

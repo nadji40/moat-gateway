@@ -215,6 +215,24 @@ async fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
         }
         None => None,
     };
+    let intent_reader = match cfg.intent_api.as_ref().and_then(|api| {
+        api.reader
+            .as_deref()
+            .map(|url| (url, api.reader_timeout_secs))
+    }) {
+        Some((url, timeout_secs)) => {
+            tracing::info!(
+                reader = url,
+                timeout_secs,
+                "text intents are read by the model"
+            );
+            Some(intent_api::IntentReader::new(
+                url,
+                std::time::Duration::from_secs(timeout_secs),
+            )?)
+        }
+        None => None,
+    };
     Ok(Arc::new(
         state::Shared::new(
             policies,
@@ -223,7 +241,8 @@ async fn build_shared(cfg: &config::Config) -> Result<Arc<state::Shared>> {
             storage,
             cfg.auth.required,
         )?
-        .with_cosign(cosign),
+        .with_cosign(cosign)
+        .with_intent_reader(intent_reader),
     ))
 }
 

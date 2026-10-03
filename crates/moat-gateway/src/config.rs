@@ -120,6 +120,19 @@ pub enum UpstreamTransport {
 pub struct IntentApi {
     /// `host:port` to bind. Loopback, unless `auth.required` is on.
     pub addr: String,
+    /// The `moat-intent` reader, for example `http://127.0.0.1:7083`. With
+    /// it, an intent given as text alone is read into fields by the model;
+    /// without it, or when it does not answer in time, the core's own rules
+    /// read the text.
+    #[serde(default)]
+    pub reader: Option<String>,
+    /// How long to wait for the reader before the rules read the text.
+    #[serde(default = "default_reader_timeout_secs")]
+    pub reader_timeout_secs: u64,
+}
+
+fn default_reader_timeout_secs() -> u64 {
+    45
 }
 
 /// Durable PostgreSQL storage configuration.
@@ -152,17 +165,20 @@ pub struct Auth {
 }
 
 /// Refuse a bind address off the loopback interface.
-fn ensure_loopback(addr: &str, what: &str) -> Result<()> {
+fn is_loopback(addr: &str) -> bool {
     let host = addr
         .rsplit_once(':')
         .map_or(addr, |(host, _)| host)
         .trim_matches(|c| c == '[' || c == ']');
-    let loopback = host.eq_ignore_ascii_case("localhost")
+    host.eq_ignore_ascii_case("localhost")
         || host
             .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback());
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
+fn ensure_loopback(addr: &str, what: &str) -> Result<()> {
     anyhow::ensure!(
-        loopback,
+        is_loopback(addr),
         concat!(
             "{} is {:?}, which is not loopback, and auth.required is off, so anyone ",
             "who can reach it would be trusted; bind it to 127.0.0.1 or turn auth.required on",
@@ -243,6 +259,24 @@ impl Config {
             }
             if let Some(api) = &self.intent_api {
                 ensure_loopback(&api.addr, "intent_api.addr")?;
+            }
+        }
+        if let Some(api) = &self.intent_api {
+            if let Some(reader) = &api.reader {
+                // What users type is sent there, so it is a service on this
+                // machine and never an address somebody else could answer on.
+                let authority = reader
+                    .strip_prefix("http://")
+                    .and_then(|rest| rest.split('/').next());
+                anyhow::ensure!(
+                    authority.is_some_and(is_loopback),
+                    "intent_api.reader is {reader:?}; it must be an http:// URL on loopback, \
+                     because what users type is sent to it"
+                );
+                anyhow::ensure!(
+                    api.reader_timeout_secs > 0,
+                    "intent_api.reader_timeout_secs must be positive"
+                );
             }
         }
         if let Listen::Http {

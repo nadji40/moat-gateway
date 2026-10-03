@@ -31,7 +31,9 @@ use crate::state::{PolicyState, Shared};
 /// user asked for (a form, a checkout, a confirmed mandate), and the path
 /// `moat-intent` takes after reading the words. When fields are given the
 /// core matches against them and never reads the text, which is then kept
-/// for the record only. Text alone is read by the core's own rules.
+/// for the record only. Text alone is read into fields by the model when an
+/// [`IntentReader`] is configured and answers, and by the core's own rules
+/// otherwise.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct IntentBody {
@@ -44,6 +46,74 @@ struct IntentBody {
 /// The longest message kept as an intent. A request to pay somebody is a
 /// sentence or two; anything this long is a document pasted into the chat.
 const MAX_INTENT_CHARS: usize = 4000;
+
+/// The `moat-intent` service, asked to read what a user typed into fields.
+///
+/// It is asked only after the caller's key and session have been checked, so
+/// a stranger cannot spend the model's time, and it registers nothing: the
+/// gateway does that itself, with what the reader returned.
+pub struct IntentReader {
+    read_url: String,
+    client: reqwest::Client,
+}
+
+/// What `moat-intent` answers on `/v1/read`.
+#[derive(Deserialize)]
+struct Reading {
+    status: String,
+    fields: IntentFields,
+    #[serde(default)]
+    dropped: Vec<String>,
+    record: String,
+}
+
+impl IntentReader {
+    /// A reader at `base`, given up on after `timeout`.
+    pub fn new(base: &str, timeout: std::time::Duration) -> Result<IntentReader> {
+        Ok(IntentReader {
+            read_url: format!("{}/v1/read", base.trim_end_matches('/')),
+            client: reqwest::Client::builder()
+                .timeout(timeout)
+                .build()
+                .context("building the intent reader client")?,
+        })
+    }
+
+    /// The message read into fields, or `None` when the model did not read
+    /// it: the reader is down or slow, the model behind it is, or what came
+    /// back is not fields the core accepts. The caller then reads the text
+    /// by the core's rules, which need nothing but the text.
+    async fn read(&self, text: &str) -> Option<Reading> {
+        let answer = self
+            .client
+            .post(&self.read_url)
+            .json(&json!({ "text": text }))
+            .send()
+            .await
+            .and_then(reqwest::Response::error_for_status);
+        let reading = match answer {
+            Ok(response) => response.json::<Reading>().await,
+            Err(error) => Err(error),
+        };
+        match reading {
+            Ok(reading) if reading.status != "read" => {
+                tracing::warn!(status = %reading.status, "the intent reader's model did not answer");
+                None
+            }
+            Ok(reading) => match reading.fields.validate() {
+                Ok(()) => Some(reading),
+                Err(why) => {
+                    tracing::warn!(%why, "the intent reader returned fields the core refuses");
+                    None
+                }
+            },
+            Err(error) => {
+                tracing::warn!(%error, "the intent reader did not answer");
+                None
+            }
+        }
+    }
+}
 
 #[derive(Deserialize)]
 struct ResumeBody {
@@ -234,18 +304,34 @@ async fn post_intent(
         return Err(err(StatusCode::BAD_REQUEST, "text or fields is required"));
     }
     let _session = session_for_request(&shared, &tenant_id, &id).await?;
-    let structured = body.fields.is_some();
+    // Who turned the words into fields: the caller, the model, or nobody,
+    // in which case the core's rules read the text when a payment arrives.
+    let mut reply = json!({ "session": id });
+    let (text, fields, read_by) = match (body.fields, shared.intent_reader()) {
+        (Some(fields), _) => (text, Some(fields), "caller"),
+        (None, Some(reader)) => match reader.read(&text).await {
+            Some(reading) => {
+                reply["fields"] = json!(reading.fields);
+                reply["dropped"] = json!(reading.dropped);
+                (reading.record, Some(reading.fields), "model")
+            }
+            None => (text, None, "rules"),
+        },
+        (None, None) => (text, None, "rules"),
+    };
+    let structured = fields.is_some();
     let turn = mutate(&shared, &tenant_id, &id, move |session| {
-        Ok(match body.fields {
+        Ok(match fields {
             Some(fields) => session.register_intent_fields(&text, fields),
             None => session.register_intent(&text),
         })
     })
     .await?;
-    tracing::info!(session = %id, turn, structured, "intent registered");
-    Ok(Json(
-        json!({ "session": id, "turn": turn, "structured": structured }),
-    ))
+    tracing::info!(session = %id, turn, structured, read_by, "intent registered");
+    reply["turn"] = json!(turn);
+    reply["structured"] = json!(structured);
+    reply["read_by"] = json!(read_by);
+    Ok(Json(reply))
 }
 
 async fn post_resume(

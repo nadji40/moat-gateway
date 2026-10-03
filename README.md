@@ -619,6 +619,8 @@ auth: { required: true }
 | `evidence` | Append-only JSONL file | `./evidence.jsonl` |
 | `keys` | Directory for the ed25519 signing key (step 8) | `./keys` |
 | `intent_api.addr` | Where the intent API listens; must be loopback unless `auth.required` | none → no intents can be registered |
+| `intent_api.reader` | The `moat-intent` service, as an `http://` URL on loopback. Text sent with no fields is read into fields by the model there | none → the core's rules read text |
+| `intent_api.reader_timeout_secs` | How long to wait for the reader before the rules read the text | 45 |
 | `storage` | Dedicated PostgreSQL state; URL is read from the named environment variable | none → memory only |
 | `auth.required` | Require a tenant bearer key on HTTP and intent routes | false |
 | `separator` | Between upstream name and tool name | `__` |
@@ -822,11 +824,26 @@ is `cargo test -p moat-intent --test model_corpus` with
 `MOAT_INTENT_LLM_URL` set; the model comparison behind the choice is in
 `research/intent-reader/`.
 
-**3. Words, read by the core.** Text sent to the gateway with no fields is
-read by the core's own rules, as before. They read English and Arabic well
-and other languages poorly: in Italian, German, French, Portuguese and
-Russian they miss a refusal, and they read no unspaced Chinese or Japanese at
-all. Kept so existing clients keep working. Use one of the first two.
+**3. Words, sent to the gateway.** Text sent to the gateway with no fields is
+read by the model too, when the gateway is configured with a reader
+(`intent_api.reader`). The gateway checks the caller's key and session first,
+so a stranger cannot spend the model's time, then asks `moat-intent` to read
+the text and registers the fields it returns. The reply says who read it:
+
+```
+{ "session": "…", "turn": 1, "structured": true, "read_by": "model",
+  "fields": { "pay": ["Vega Cloud Srl"], … }, "dropped": [] }
+```
+
+`read_by` is `caller` when the request carried fields, `model` when the
+reader read the text, and `rules` when the core's own rules will. The rules
+take over when no reader is configured, when it does not answer within
+`intent_api.reader_timeout_secs`, or when its model is unavailable, so a
+model outage never stops intents from being registered. They read English and
+Arabic well and other languages poorly: in Italian, German, French, Portuguese
+and Russian they miss a refusal, and they read no unspaced Chinese or Japanese
+at all. A client that needs to know its message was read by the model checks
+`read_by`.
 
 With `auth.required: true`, the intent API uses the same tenant bearer key as the
 MCP listener. Session snapshots, signed evidence and single-use approval tokens

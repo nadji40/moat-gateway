@@ -22,6 +22,7 @@ futures = "0.3.34"
 moat-core = { version = "0.1.0", path = "../moat-core" }
 moat-mcp.workspace = true
 rand = "0.10.0"
+reqwest = { version = "0.13.3", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 serde_norway = "0.9.42"
@@ -35,5 +36,4 @@ hex = "0.4.3"
 
 [dev-dependencies]
 axum = "0.8.9"
-reqwest = { version = "0.13.3", default-features = false, features = ["rustls", "json"] }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "io-util", "process", "sync", "time"] }

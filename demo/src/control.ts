@@ -329,11 +329,15 @@ export async function proxyIntent(
   if (typeof auth === "string") headers["authorization"] = auth;
   try {
     const sends = method !== "GET" && method !== "DELETE";
+    // Registering what the user typed may wait for the model to read it; the
+    // gateway gives the model 45 seconds before its rules read the text, so
+    // this waits longer than that. Everything else answers at once.
+    const reads = method === "POST" && path.endsWith("/intent");
     const upstream = await fetch(`${INTENT}${path}`, {
       method,
       headers,
       ...(sends ? { body } : {}),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(reads ? 60_000 : 15_000),
     });
     const text = await upstream.text();
     res.writeHead(upstream.status, {
