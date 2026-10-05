@@ -1299,7 +1299,25 @@ Every payment that policy governs must then name an invoice, and the
 authorization it cites must cover one, or it is denied as `invoice-required`,
 whatever the integration sent. It is off in every shipped policy. Turning it
 on for `supplier-invoice.yaml` would also deny payments made without any
-authorization, which the pilot's test clients make on purpose. Moat then:
+authorization, which the pilot's test clients make on purpose.
+
+A cap written as a bare number compares bare numbers: 500 stops 3,100
+Egyptian pounds and passes 489 Kuwaiti dinars. A policy that pays in more
+than one currency gives its limits a currency and rates:
+
+```yaml
+fx:
+  base: USD
+  rates: { SAR: 0.2667, KWD: 3.258, EGP: 0.0202 }   # one unit, in USD
+```
+
+Every `max` on the amount and the session total are then in `base`, and each
+payment is valued in it first; the session total adds payments across
+currencies. A payment in a currency with no rate, or naming none, fails the
+limit. Rates are the operator's to keep current: a stale rate moves the limit
+with it. `supplier-invoice.yaml` sets them; the other shipped policies do not.
+
+Under an authorization, Moat then:
 
 - denies an unknown, expired or cancelled authorization and any recipient,
   rail-account, currency, invoice-id or invoice-content mismatch;

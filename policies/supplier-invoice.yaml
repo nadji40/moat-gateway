@@ -48,4 +48,24 @@ velocity:
   max_amount_per_session: 1000
   on_exceed: deny
 
+# The caps above are in US dollars. Every payment is valued in dollars
+# before it meets them, so 500 means the same in riyals as in dinars. A
+# currency with no rate here fails the caps rather than passing them.
+# Rates from Dhoha's limits table, 2 October 2026; update them before
+# relying on them, because a stale rate moves the cap with it.
+fx:
+  base: USD
+  rates:
+    EUR: 1.133
+    SAR: 0.2667
+    AED: 0.2723
+    QAR: 0.2747
+    OMR: 2.601
+    BHD: 2.66
+    KWD: 3.258
+    EGP: 0.0202
+    DZD: 0.00747
+    INR: 0.01042
+    JPY: 0.00633
+
 no_human_available: deny

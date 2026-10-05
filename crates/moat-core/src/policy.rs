@@ -184,6 +184,47 @@ pub struct Velocity {
     pub on_exceed: Decision,
 }
 
+/// Rates for holding payments in different currencies to one limit.
+///
+/// Without them a cap compares bare numbers: 500 stops 3,100 Egyptian pounds,
+/// worth about 60 dollars, and passes 489 Kuwaiti dinars, worth about 1,600.
+/// With them every amount is valued in `base` before it meets a limit, and a
+/// currency the table has no rate for fails the limit rather than passing it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Fx {
+    /// The currency the limits are written in.
+    pub base: String,
+    /// What one unit of each currency is worth in `base`. Maintained by the
+    /// operator; a rate that drifts moves the limit with it.
+    pub rates: BTreeMap<String, f64>,
+}
+
+impl Fx {
+    /// `amount` of `currency`, valued in the base, or why it cannot be.
+    pub fn to_base(&self, amount: f64, currency: Option<&str>) -> Result<f64, String> {
+        let Some(code) = currency.map(|c| c.trim().to_ascii_uppercase()) else {
+            return Err(format!(
+                "the payment names no currency, so it cannot be held to a limit in {}",
+                self.base
+            ));
+        };
+        if code.eq_ignore_ascii_case(&self.base) {
+            return Ok(amount);
+        }
+        self.rates
+            .iter()
+            .find(|(listed, _)| listed.eq_ignore_ascii_case(&code))
+            .map(|(_, rate)| amount * rate)
+            .ok_or_else(|| {
+                format!(
+                    "the policy has no rate for {code}, so it cannot be held to a limit in {}",
+                    self.base
+                )
+            })
+    }
+}
+
 /// A loaded policy.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -229,6 +270,10 @@ pub struct Policy {
     /// invoice out and lose the duplicate-invoice check with it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub require_invoice: bool,
+    /// Rates that let one limit hold payments in every currency. Absent, a
+    /// limit compares the bare number, as it always has.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fx: Option<Box<Fx>>,
 }
 
 fn default_no_human() -> Decision {
@@ -292,6 +337,21 @@ impl Policy {
                     "rule {:?}: on_fail: allow makes the rule meaningless",
                     rule.id
                 )));
+            }
+        }
+        if let Some(fx) = &self.fx {
+            if !crate::money::is_currency_code(&fx.base) {
+                return Err(PolicyError::Invalid(format!(
+                    "fx.base {:?} is not a currency code",
+                    fx.base
+                )));
+            }
+            for (code, rate) in &fx.rates {
+                if !crate::money::is_currency_code(code) || !rate.is_finite() || *rate <= 0.0 {
+                    return Err(PolicyError::Invalid(format!(
+                        "fx.rates: {code:?} needs a currency code and a positive rate, got {rate}"
+                    )));
+                }
             }
         }
         if let Some(v) = &self.velocity {
@@ -453,6 +513,22 @@ pub fn evaluate_with(
         );
     }
 
+    // The amount valued in the policy's base currency, for its limits. `None`
+    // when the policy has no rates, or the amount is not a number, which
+    // the limits refuse on their own.
+    let paid_in = mapped.get("currency").and_then(|(_, value)| value.as_str());
+    let in_base = policy.fx.as_ref().and_then(|fx| {
+        let amount: f64 = provenance
+            .get("amount")?
+            .resolution
+            .normalized
+            .number
+            .as_deref()?
+            .parse()
+            .ok()?;
+        Some((fx.base.to_ascii_uppercase(), fx.to_base(amount, paid_in)))
+    });
+
     let mut reasons = Vec::new();
     let mut decision = Decision::Allow;
     let has_authorization_id = call.args.contains_key("authorization_id");
@@ -565,7 +641,7 @@ pub fn evaluate_with(
                 message: APPROVED.to_owned(),
             }
         } else {
-            check_rule(rule, field, prov)
+            check_rule(rule, field, prov, in_base.as_ref())
         };
         if !outcome.passed {
             decision = decision.max(rule.on_fail);
@@ -633,33 +709,70 @@ fn session_total(
         .parse()
         .ok()?;
     let currency = recorded_currency(provenance);
-    let earlier: f64 = session
-        .events()
-        .iter()
-        .filter_map(|e| match &e.event {
-            Event::PaymentEvaluated {
-                verdict,
-                amount: Some(paid),
-                currency: paid_in,
-                ..
-            } if verdict == "allow" && *paid_in == currency => paid.parse::<f64>().ok(),
-            _ => None,
-        })
-        .sum();
-    let total = earlier + amount;
-    let passed = total <= max;
-    Some(RuleOutcome {
+    let outcome = |passed: bool, message: String| RuleOutcome {
         id: "session-total".to_owned(),
         field: Some("amount".to_owned()),
         passed,
         source: None,
         on_fail: velocity.on_exceed,
-        message: if passed {
-            format!("ok: {total} of {max} this session")
+        message,
+    };
+    let allowed = || {
+        session.events().iter().filter_map(|e| match &e.event {
+            Event::PaymentEvaluated {
+                verdict,
+                amount: Some(paid),
+                currency: paid_in,
+                ..
+            } if verdict == "allow" => Some((paid.parse::<f64>().ok()?, paid_in.as_deref())),
+            _ => None,
+        })
+    };
+    // With rates, every payment is valued in the base and they all add up,
+    // whatever currency each was in; without them, per currency.
+    let (earlier, amount, unit) = match &policy.fx {
+        Some(fx) => {
+            let this = match fx.to_base(amount, currency.as_deref()) {
+                Ok(v) => v,
+                Err(why) => return Some(outcome(false, why)),
+            };
+            let mut earlier = 0.0;
+            for (paid, paid_in) in allowed() {
+                match fx.to_base(paid, paid_in) {
+                    Ok(v) => earlier += v,
+                    Err(why) => return Some(outcome(false, why)),
+                }
+            }
+            (earlier, this, format!(" {}", fx.base.to_ascii_uppercase()))
+        }
+        None => (
+            allowed()
+                .filter(|(_, paid_in)| paid_in.map(str::to_owned) == currency)
+                .map(|(paid, _)| paid)
+                .sum(),
+            amount,
+            String::new(),
+        ),
+    };
+    let total = earlier + amount;
+    let passed = total <= max;
+    let (earlier, amount, total) = (round2(earlier), round2(amount), round2(total));
+    Some(outcome(
+        passed,
+        if passed {
+            format!("ok: {total}{unit} of {max}{unit} this session")
         } else {
-            format!("{earlier} already paid this session; {amount} more makes {total}, over {max}")
+            format!(
+                "{earlier}{unit} already paid this session; {amount}{unit} more makes                  {total}{unit}, over {max}{unit}"
+            )
         },
-    })
+    ))
+}
+
+/// Two decimal places, for a message: converted values are long floats. The
+/// added zero turns the -0 an empty sum starts from into 0.
+fn round2(v: f64) -> f64 {
+    (v * 100.0).round() / 100.0 + 0.0
 }
 
 /// A failure when the payment's amount has more decimal places than its
@@ -1362,7 +1475,12 @@ pub fn payment_amount(policy: &Policy, call: &PaymentCall) -> Option<(Asset, Min
     Some((asset, minor))
 }
 
-fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleOutcome {
+fn check_rule(
+    rule: &Rule,
+    field: &str,
+    prov: Option<&FieldProvenance>,
+    in_base: Option<&(String, Result<f64, String>)>,
+) -> RuleOutcome {
     if rule.optional && prov.is_none() {
         return RuleOutcome {
             id: rule.id.clone(),
@@ -1394,7 +1512,15 @@ fn check_rule(rule: &Rule, field: &str, prov: Option<&FieldProvenance>) -> RuleO
         }
     }
 
-    if let Some(max) = rule.max {
+    if let (Some(max), Some((base, valued)), "amount") = (rule.max, in_base, field) {
+        match valued {
+            Ok(v) if *v <= max => satisfied.push(format!(
+                "{field} is worth {v:.2} {base}, within {max} {base}"
+            )),
+            Ok(v) => failures.push(format!("{field} is worth {v:.2} {base}, over {max} {base}")),
+            Err(why) => failures.push(why.clone()),
+        }
+    } else if let Some(max) = rule.max {
         match prov.and_then(|p| p.resolution.normalized.number.as_deref()) {
             Some(n) => match n.parse::<f64>() {
                 Ok(v) if v <= max => satisfied.push(format!("{field} {v} is within {max}")),
@@ -2022,6 +2148,137 @@ mod tests {
             failures("ProMon Billing Ltd", "acct_aseer"),
             vec!["authorization-payee"]
         );
+    }
+
+    /// The policy Dhoha tested, with rates: a 500 dollar cap and a 1,000
+    /// dollar session total, in dollars whatever the payment is in.
+    fn fx_policy() -> Policy {
+        let mut p = policy();
+        p.fx = Some(Box::new(Fx {
+            base: "USD".into(),
+            rates: [
+                ("EGP", 0.0202),
+                ("KWD", 3.258),
+                ("SAR", 0.2667),
+                ("JPY", 0.00633),
+            ]
+            .into_iter()
+            .map(|(code, rate)| (code.to_owned(), rate))
+            .collect(),
+        }));
+        p
+    }
+
+    fn cap_failures(p: &Policy, session: &Session, amount: f64, currency: &str) -> Vec<String> {
+        evaluate(
+            p,
+            session,
+            call(json!({"payee": "Monitoring Pro Inc", "amount": amount, "currency": currency})),
+            1_000_000,
+        )
+        .verdict
+        .failures()
+        .filter(|r| r.id == "amount-cap" || r.id == "session-total")
+        .map(|r| format!("{}: {}", r.id, r.message))
+        .collect()
+    }
+
+    /// Dhoha's limits table: every currency stopped at the same bare number,
+    /// so 3,100 pounds (about 60 dollars) was refused and 489 dinars (about
+    /// 1,600 dollars) passed. Valued in dollars, both are judged by worth.
+    #[test]
+    fn a_limit_with_rates_holds_every_currency_to_its_worth() {
+        let p = fx_policy();
+        let mut s = Session::new("s");
+        s.register_intent("Pay Monitoring Pro Inc 3100 EGP, or 489 KWD, or 150 KWD");
+        assert!(cap_failures(&p, &s, 3100.0, "EGP").is_empty());
+        let dinars = cap_failures(&p, &s, 489.0, "KWD");
+        assert!(
+            dinars
+                .iter()
+                .any(|f| f.starts_with("amount-cap") && f.contains("1593.16 USD")),
+            "{dinars:?}"
+        );
+        assert!(
+            cap_failures(&p, &s, 150.0, "KWD").is_empty(),
+            "about 489 dollars"
+        );
+        assert!(cap_failures(&p, &s, 490.0, "USD").is_empty());
+        assert!(!cap_failures(&p, &s, 510.0, "USD").is_empty());
+
+        // Without rates nothing changes: the bare number, as before.
+        assert!(!cap_failures(&policy(), &s, 3100.0, "EGP").is_empty());
+    }
+
+    /// A currency the table cannot value is not waved through: a limit that
+    /// cannot be applied fails, rather than passing whatever it cannot read.
+    #[test]
+    fn a_currency_without_a_rate_fails_the_limit() {
+        let p = fx_policy();
+        let mut s = Session::new("s");
+        s.register_intent("Pay Monitoring Pro Inc 10 TRY");
+        let failed = cap_failures(&p, &s, 10.0, "TRY");
+        assert!(
+            failed.iter().any(|f| f.contains("no rate for TRY")),
+            "{failed:?}"
+        );
+        let e = evaluate(
+            &p,
+            &s,
+            call(json!({"payee": "Monitoring Pro Inc", "amount": 10.0})),
+            1_000_000,
+        );
+        assert!(
+            e.verdict
+                .failures()
+                .any(|r| r.message.contains("names no currency")),
+            "{:?}",
+            e.verdict.reasons
+        );
+    }
+
+    /// The session total adds every allowed payment in dollars, so splitting
+    /// one sum across currencies does not reset it.
+    #[test]
+    fn the_session_total_with_rates_adds_up_across_currencies() {
+        let p = fx_policy();
+        let mut s = Session::new("s");
+        s.register_intent("Pay Monitoring Pro Inc 400 USD, 1500 SAR and 300 USD");
+        for (amount, currency) in [(400.0, "USD"), (1500.0, "SAR")] {
+            let e = evaluate(
+                &p,
+                &s,
+                call(
+                    json!({"payee": "Monitoring Pro Inc", "amount": amount, "currency": currency}),
+                ),
+                1_000_000,
+            );
+            assert_eq!(e.verdict.decision, Decision::Allow, "{currency}");
+            s.record_evaluation(&e);
+        }
+        // 400 + 400.05 already, and 300 more is over 1,000.
+        let failed = cap_failures(&p, &s, 300.0, "USD");
+        assert!(
+            failed
+                .iter()
+                .any(|f| f.starts_with("session-total") && f.contains("1100.05 USD")),
+            "{failed:?}"
+        );
+    }
+
+    #[test]
+    fn rates_must_be_codes_and_positive() {
+        let with = |fx: &str| {
+            Policy::from_yaml(&format!(
+                "{DEFAULT}
+fx: {fx}
+"
+            ))
+        };
+        assert!(with(r#"{ base: USD, rates: { SAR: 0.2667 } }"#).is_ok());
+        assert!(with(r#"{ base: DOLLARS, rates: {} }"#).is_err());
+        assert!(with(r#"{ base: USD, rates: { SAR: 0 } }"#).is_err());
+        assert!(with(r#"{ base: USD, rates: { riyal: 0.27 } }"#).is_err());
     }
 
     /// Dhoha's limits table: 489.27 yen passed with nothing approved, though
