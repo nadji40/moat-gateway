@@ -98,8 +98,24 @@ llama-server \
   --spec-type draft-mtp --spec-draft-n-max 4
 ```
 
-The MTP model proposes tokens that the main model verifies. The bootstrap
-pins the llama.cpp release;
+The MTP model proposes tokens that the main model verifies. How many it
+should propose depends on the hardware, and the answer differs:
+
+| Draft tokens | CPU, six cores (median s) | T4 GPU, warm (median s) | Correct of 36 |
+| --- | --- | --- | --- |
+| 2 | 5.11 | about 0.9 | 36 |
+| 4 | **3.72** | about 0.83 | 36 |
+| 6 | 4.15 | about 0.83 | 36 |
+| 8 | 4.11 | **about 0.63** | 36 |
+
+On CPU four is fastest and the bootstrap uses four. On a T4, eight is about
+a quarter faster than four with every message still read correctly, so a GPU
+runtime should be started with `--spec-draft-n-max 8` and `-ngl 99`. The GPU
+column is Zahra's measurement (`zahra_speed.csv`, 30 September 2026); her
+runs also found that Q5_K_M and Q8_0 each read 5 of the 36 messages wrong
+where the QAT Q4 model read all 36, so the larger files are not an upgrade.
+
+The bootstrap pins the llama.cpp release;
 the Hugging Face downloads currently specify filenames without a repository
 revision, so rebuilding a runtime is not a fully immutable model snapshot.
 
