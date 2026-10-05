@@ -168,6 +168,15 @@ impl Token {
         if self.lower == word || self.bare == word {
             return true;
         }
+        // "Co.," is the word "Co." and a comma: the full stop belongs to an
+        // abbreviation the user wrote, so a payee ending "Co." still matches.
+        let abbreviated = self
+            .lower
+            .trim_start_matches(WRAPPING)
+            .trim_end_matches(|c: char| c != '.' && WRAPPING.contains(&c));
+        if abbreviated == word {
+            return true;
+        }
         first
             && self
                 .bare
@@ -344,6 +353,20 @@ mod tests {
             "monitoring pro inc"
         ));
         assert!(names("Pay Acme Cloud Ltd's invoice", "acme cloud ltd"));
+    }
+
+    /// Dhoha's L-011: the user wrote "Oman Freight Co., OF-884" and the agent
+    /// paid "Oman Freight Co.", which was held because the comma took the
+    /// full stop with it. Both spellings the user's words support now match;
+    /// one the words do not support still does not.
+    #[test]
+    fn an_abbreviation_keeps_its_full_stop_before_a_comma() {
+        let said = "Pay the logistics invoice from Oman Freight Co., OF-884, 75.750 OMR.";
+        assert!(names(said, "oman freight co."));
+        assert!(names(said, "oman freight co"));
+        assert!(names("Pay Oman Freight Co. 75.750 OMR", "oman freight co."));
+        assert!(!names(said, "freight co."));
+        assert!(!names(said, "oman freight co.."));
     }
 
     #[test]
