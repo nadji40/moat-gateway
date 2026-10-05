@@ -346,6 +346,15 @@ pub fn parse_major_str(text: &str, asset: &Asset, allow_zero: bool) -> Result<Mi
     if !digits_only(whole) || (!fraction.is_empty() && !digits_only(fraction)) {
         return Err(AmountError::Malformed(text.to_owned()));
     }
+    // Zeros past the asset's last place say nothing: "4.800" riyals is 4.80.
+    // Only a digit that would have to be rounded away is too precise.
+    let exponent = usize::from(asset.exponent);
+    let fraction = if fraction.len() > exponent {
+        let significant = fraction.trim_end_matches('0');
+        &fraction[..significant.len().max(exponent)]
+    } else {
+        fraction
+    };
     if fraction.len() > usize::from(asset.exponent) {
         return Err(AmountError::TooPrecise {
             value: text.to_owned(),
@@ -568,6 +577,23 @@ mod tests {
             false
         )
         .is_err());
+        assert!(parse_major(&json!("100.00000010"), &usdc(), false).is_err());
+    }
+
+    /// Meriem's A003 and A031 to A033: "4.800" riyals and "4.8000" dinars are
+    /// the approved 4.80 and 4.800 written with zeros the currency does not
+    /// have. Refusing them refused an honest payment for its spelling.
+    #[test]
+    fn zeros_past_the_last_place_are_not_precision() {
+        let registry = AssetRegistry::new();
+        let sar = registry.lookup("SAR", None).unwrap();
+        let kwd = registry.lookup("KWD", None).unwrap();
+        let jpy = registry.lookup("JPY", None).unwrap();
+        assert_eq!(parse_major(&json!("4.800"), &sar, false), Ok(Minor(480)));
+        assert_eq!(parse_major(&json!("4.8000"), &kwd, false), Ok(Minor(4800)));
+        assert_eq!(parse_major(&json!("489.00"), &jpy, false), Ok(Minor(489)));
+        assert!(parse_major(&json!("4.805"), &sar, false).is_err());
+        assert!(parse_major(&json!("489.27"), &jpy, false).is_err());
     }
 
     #[test]
