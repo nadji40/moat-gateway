@@ -514,6 +514,11 @@ pub fn evaluate_with(
         });
     }
     if !has_authorization_id && !structured_authorization_required {
+        // An approval already refuses these, in the authorization checks.
+        if let Some(outcome) = amount_precision(policy, &mapped) {
+            decision = decision.max(outcome.on_fail);
+            reasons.push(outcome);
+        }
         let named_checks = [
             intent_currency(policy, session, &mapped, &provenance),
             intent_invoice(session, &call, &mapped),
@@ -655,6 +660,31 @@ fn session_total(
             format!("{earlier} already paid this session; {amount} more makes {total}, over {max}")
         },
     })
+}
+
+/// A failure when the payment's amount has more decimal places than its
+/// currency: 489.27 yen, 4.805 riyals. A provider would round it to some
+/// other amount than the one checked, so it is refused, as it is under an
+/// approval. `None` when the amount fits, or is not a plain number at all,
+/// which the cap refuses on its own.
+fn amount_precision(
+    policy: &Policy,
+    mapped: &BTreeMap<String, (String, &Value)>,
+) -> Option<RuleOutcome> {
+    let (_, amount) = mapped.get("amount")?;
+    let code = mapped.get("currency")?.1.as_str()?;
+    let asset = policy.assets().lookup(code, None)?;
+    match parse_major(amount, &asset, true) {
+        Err(why @ crate::money::AmountError::TooPrecise { .. }) => Some(RuleOutcome {
+            id: "amount-precision".to_owned(),
+            field: Some("amount".to_owned()),
+            passed: false,
+            source: None,
+            on_fail: Decision::Deny,
+            message: why.to_string(),
+        }),
+        _ => None,
+    }
 }
 
 /// The currency of a payment as the session log keeps it.
@@ -1992,6 +2022,42 @@ mod tests {
             failures("ProMon Billing Ltd", "acct_aseer"),
             vec!["authorization-payee"]
         );
+    }
+
+    /// Dhoha's limits table: 489.27 yen passed with nothing approved, though
+    /// yen has no decimal places, while the same amount under an approval was
+    /// refused. A provider would round it to an amount nobody checked.
+    #[test]
+    fn an_amount_finer_than_its_currency_is_refused_without_an_approval_too() {
+        let mut s = Session::new("s");
+        s.register_intent("Pay Monitoring Pro Inc 489.27 JPY and 4.805 SAR");
+        let pay = |amount: Value, currency: &str| {
+            evaluate(
+                &policy(),
+                &s,
+                call(
+                    json!({"payee": "Monitoring Pro Inc", "amount": amount, "currency": currency}),
+                ),
+                1_000_000,
+            )
+        };
+        for (amount, currency) in [(json!(489.27), "JPY"), (json!("4.805"), "SAR")] {
+            let e = pay(amount, currency);
+            assert_eq!(e.verdict.decision, Decision::Deny, "{currency}");
+            assert!(
+                e.verdict.failures().any(|r| r.id == "amount-precision"),
+                "{currency}: {:?}",
+                e.verdict.reasons
+            );
+        }
+        // Whole yen, and riyals with a zero too many, are amounts that exist.
+        for (amount, currency) in [(json!(489), "JPY"), (json!("4.800"), "SAR")] {
+            let e = pay(amount, currency);
+            assert!(
+                !e.verdict.reasons.iter().any(|r| r.id == "amount-precision"),
+                "{currency}"
+            );
+        }
     }
 
     /// Meriem's A-024 family: the user said AED, the agent paid in SAR, and
