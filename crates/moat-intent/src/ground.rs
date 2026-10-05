@@ -79,16 +79,19 @@ pub fn ground(out: ModelOutput, message: &Redacted) -> Grounded {
         }
     }
 
-    let currency = out
+    let currencies: Vec<String> = match out
         .currency
-        .map(|c| c.trim().to_ascii_uppercase())
-        .filter(|c| !c.is_empty());
-    let currencies: Vec<String> = match currency {
-        Some(code) if is_currency_code(&code) => vec![code],
-        Some(code) => {
-            dropped.push(format!("currency {code:?}: not a code the core knows"));
-            Vec::new()
-        }
+        .as_deref()
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+    {
+        Some(said) => match currency(said, text) {
+            Ok(code) => vec![code],
+            Err(why) => {
+                dropped.push(format!("currency {said:?}: {why}"));
+                Vec::new()
+            }
+        },
         None => Vec::new(),
     };
 
@@ -177,6 +180,147 @@ pub fn ground(out: ModelOutput, message: &Redacted) -> Grounded {
         },
         dropped,
     }
+}
+
+/// Signs that name exactly one currency, as people write them on Gulf and
+/// North African invoices. The model often copies the sign instead of giving
+/// the code, and a sign the message carries is as good as the code.
+const SIGNS: &[(&str, &str)] = &[
+    ("SR", "SAR"),
+    ("ر.س", "SAR"),
+    ("ريال سعودي", "SAR"),
+    ("QR", "QAR"),
+    ("ر.ق", "QAR"),
+    ("ريال قطري", "QAR"),
+    ("RO", "OMR"),
+    ("ر.ع", "OMR"),
+    ("ريال عماني", "OMR"),
+    ("Dhs", "AED"),
+    ("د.إ", "AED"),
+    ("درهم إماراتي", "AED"),
+    ("درهم مغربي", "MAD"),
+    ("KD", "KWD"),
+    ("د.ك", "KWD"),
+    ("دينار كويتي", "KWD"),
+    ("BD", "BHD"),
+    ("د.ب", "BHD"),
+    ("دينار بحريني", "BHD"),
+    ("دينار أردني", "JOD"),
+    ("دج", "DZD"),
+    ("د.ج", "DZD"),
+    ("dj", "DZD"),
+    ("DA", "DZD"),
+    ("دينار جزائري", "DZD"),
+    ("ج.م", "EGP"),
+    ("جنيه مصري", "EGP"),
+    ("TL", "TRY"),
+    ("₺", "TRY"),
+    ("ليرة تركية", "TRY"),
+];
+
+/// Words that name a currency without saying whose. "ريال" alone is a Saudi,
+/// Qatari, Omani or Yemeni riyal; "دينار" alone is a dinar worth a few
+/// cents in Algiers or three dollars in Kuwait. A model that turns one of
+/// these into a code has guessed, and a guess is not what the user said.
+const AMBIGUOUS: &[(&str, &[&str])] = &[
+    ("ريال", &["SAR", "QAR", "OMR", "YER", "IRR"]),
+    ("riyal", &["SAR", "QAR", "OMR", "YER"]),
+    ("rial", &["SAR", "QAR", "OMR", "YER", "IRR"]),
+    (
+        "دينار",
+        &["KWD", "BHD", "JOD", "DZD", "TND", "IQD", "LYD", "RSD"],
+    ),
+    (
+        "dinar",
+        &["KWD", "BHD", "JOD", "DZD", "TND", "IQD", "LYD", "RSD"],
+    ),
+    ("درهم", &["AED", "MAD"]),
+    ("dirham", &["AED", "MAD"]),
+    ("جنيه", &["EGP", "GBP", "SDG", "SSP"]),
+];
+
+/// The currency the model named, if the message bears it out.
+///
+/// A code is kept when the message writes it, writes a sign for it, or
+/// names its currency in a word this module does not know (the model reads
+/// "euros" and "rupees" well). A sign the model copied in place of the code
+/// becomes the code. A code the message supports only with a word that could
+/// be several currencies is dropped: the model chose among them, the user did
+/// not.
+fn currency(said: &str, text: &str) -> Result<String, String> {
+    let code = if is_currency_code(said) {
+        said.to_ascii_uppercase()
+    } else if let Some((_, code)) = SIGNS
+        .iter()
+        .find(|(sign, _)| same_sign(sign, said) && written(text, sign))
+    {
+        (*code).to_owned()
+    } else {
+        return Err("not a code the core knows".to_owned());
+    };
+    let backed = written(text, &code)
+        || SIGNS
+            .iter()
+            .any(|(sign, of)| *of == code && written(text, sign));
+    if backed {
+        return Ok(code);
+    }
+    match AMBIGUOUS
+        .iter()
+        .find(|(word, could_be)| could_be.contains(&code.as_str()) && written(text, word))
+    {
+        Some((word, could_be)) => Err(format!(
+            "the message says {word:?}, which could be {}; it does not say which",
+            could_be.join(", ")
+        )),
+        None => Ok(code),
+    }
+}
+
+/// Whether `said` is the sign `sign`. A sign in capitals ("SR", "KD", "TL")
+/// is matched in capitals only, or every "Sr" and "Ro" would be a currency.
+fn same_sign(sign: &str, said: &str) -> bool {
+    if sign.chars().any(char::is_lowercase) || !sign.is_ascii() {
+        sign.to_lowercase() == said.trim().to_lowercase()
+    } else {
+        sign == said.trim()
+    }
+}
+
+/// Whether `text` writes `sign` as a word of its own, or as a phrase.
+fn written(text: &str, sign: &str) -> bool {
+    if sign.contains(' ') {
+        let text = moat_core::normalize::normalize_text(text);
+        return text.contains(&moat_core::normalize::normalize_text(sign));
+    }
+    text.split(|c: char| c.is_whitespace() || c.is_ascii_digit() || ('٠'..='٩').contains(&c))
+        .map(|word| {
+            word.trim_matches(|c: char| {
+                matches!(
+                    c,
+                    ',' | ';'
+                        | ':'
+                        | '!'
+                        | '?'
+                        | '('
+                        | ')'
+                        | '"'
+                        | '\''
+                        | '«'
+                        | '»'
+                        | '،'
+                        | '؛'
+                        | '؟'
+                )
+            })
+            .trim_end_matches('.')
+        })
+        .any(|word| {
+            same_sign(sign, word)
+                || word
+                    .strip_prefix(['و', 'ف', 'ب', 'ل', 'ك'])
+                    .is_some_and(|rest| same_sign(sign, rest))
+        })
 }
 
 /// The original text behind a placeholder, or the value itself.
@@ -509,6 +653,76 @@ mod tests {
         assert!(g.fields.currencies.is_empty());
         let g = ground(out(&["Orbit Labs Srl"], &[], Some("480"), Some("eur")), &m);
         assert_eq!(g.fields.currencies, vec!["EUR"]);
+    }
+
+    fn currency_read(message: &str, model_said: &str) -> (Vec<String>, Vec<String>) {
+        let g = ground(
+            out(&["Orbit Labs Srl"], &[], None, Some(model_said)),
+            &redact(message),
+        );
+        (g.fields.currencies, g.dropped)
+    }
+
+    /// Meriem's dialect set: the model copied SR, KD, Dhs and TL instead of
+    /// the code, so the currency was dropped and Dhoha's honest 200 SAR was
+    /// held. A sign the message carries is the code.
+    #[test]
+    fn a_sign_the_user_wrote_is_its_currency() {
+        for (message, model, code) in [
+            ("ودي أسدد SR ٦٠٠ لهيا عشان الإيجار", "SR", "SAR"),
+            ("حول ١٥٠ KD لفهد على فاتورة رقم ٤٥٢١", "KD", "KWD"),
+            ("حول ١٥٠ KD لفهد على فاتورة رقم ٤٥٢١", "KWD", "KWD"),
+            ("ابي اسدد Dhs ٧٠٠ لموزة عشان الشقة", "DHS", "AED"),
+            ("Yıldız Yazılım'a 450 TL öde", "TL", "TRY"),
+            ("حول ٤٨٠ ر.س لعائشة", "ر.س", "SAR"),
+            ("khalles 480 dj l Karim", "dj", "DZD"),
+            ("ادفع ٣٥٠ ريال سعودي لمؤسسة القصيم", "SAR", "SAR"),
+            ("حول ٢٠٠ دينار كويتي لهيفاء", "KWD", "KWD"),
+            ("Pay Orbit Labs Srl 480 USD", "USD", "USD"),
+        ] {
+            let (currencies, dropped) = currency_read(message, model);
+            assert_eq!(currencies, vec![code], "{message}: {dropped:?}");
+        }
+    }
+
+    /// A bare ريال, دينار or درهم does not say whose: the model's code for it
+    /// is a guess and is dropped. Meriem's C-101, a Moroccan "درهم" read as
+    /// AED, and a dinar that could be worth three dollars or one cent.
+    #[test]
+    fn a_word_that_could_be_several_currencies_is_not_a_currency() {
+        for (message, model) in [
+            ("حول ٤٨٠ درهم لياسين على الفاتورة رقم 771", "AED"),
+            ("أبي أسدد ٤٨٠ دينار لأحمد", "KWD"),
+            ("خلص 1500 دينار لشركة الصحراء", "DZD"),
+            ("ادفع لمؤسسة القصيم ٢٠٠ ريال", "SAR"),
+            ("عايز أدي منى ٢٠٠ جنيه", "EGP"),
+        ] {
+            let (currencies, dropped) = currency_read(message, model);
+            assert!(currencies.is_empty(), "{message}: kept {currencies:?}");
+            assert!(
+                dropped.iter().any(|d| d.contains("does not say which")),
+                "{message}: {dropped:?}"
+            );
+        }
+    }
+
+    /// Words this module does not list are left to the model, which reads
+    /// them well; a sign is never found inside another word.
+    #[test]
+    fn other_currency_words_are_the_models_to_read() {
+        for (message, model, code) in [
+            ("Paga 480 euro a Orbit Labs Srl", "EUR", "EUR"),
+            ("Sharma Traders ko 400 rupees bhej do", "INR", "INR"),
+            ("请向深圳云科技有限公司支付300元人民币", "CNY", "CNY"),
+        ] {
+            let (currencies, _) = currency_read(message, model);
+            assert_eq!(currencies, vec![code], "{message}");
+        }
+        // "Srl" is not "SR", and "Ro" in a name is not a rial.
+        let (currencies, _) = currency_read("Pay Orbit Labs Srl 480", "SR");
+        assert!(currencies.is_empty());
+        let (currencies, _) = currency_read("Pay Ro Systems 480", "RO");
+        assert!(currencies.is_empty());
     }
 
     #[test]
