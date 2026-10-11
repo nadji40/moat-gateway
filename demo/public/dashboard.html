@@ -10,6 +10,107 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400;1,500&family=Ubuntu+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="app.css?v=cbb4282">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+/* The workspace shell: a sidebar on a desktop, a row of tabs on a phone, and
+   panes that read left to right like the tools they are. */
+.ws{display:grid;grid-template-columns:216px minmax(0,1fr);gap:22px;align-items:start;margin:26px 0 48px;text-align:left}
+.side{position:sticky;top:96px;border-radius:18px;padding:10px;display:flex;flex-direction:column;gap:3px}
+.side .tab{justify-content:flex-start;width:100%;padding:11px 12px;border-radius:11px}
+.side .tab .tab-n{margin-left:auto}
+.side .tab-sp{flex:none;height:1px;background:var(--line);margin:8px 4px}
+.side-h{padding:6px 12px 12px;display:flex;flex-direction:column;gap:3px}
+.side-k{font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.side-n{font-size:.86rem;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wsmain{min-width:0;overflow-x:clip}
+.wsmain section{padding-block:0}
+.wsmain .pane{display:grid;gap:16px;align-content:start}
+.ph2{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 16px;margin-bottom:4px}
+.ph2 h2{font-size:1.6rem}
+.ph2 .sub{color:var(--ink-3);font-size:.86rem}
+@media(max-width:900px){
+  .ws{grid-template-columns:1fr;gap:14px}
+  .side{position:static;flex-direction:row;overflow-x:auto;scrollbar-width:none;padding:6px}
+  .side::-webkit-scrollbar{display:none}
+  .side-h,.side .tab-sp{display:none}
+  .side .tab{width:auto}
+}
+
+/* get started */
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.steps li{display:grid;grid-template-columns:26px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03)}
+.steps .ck{width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-2);display:grid;place-items:center;color:#000}
+.steps .ck svg{width:13px;height:13px;visibility:hidden}
+.steps li.done .ck{background:var(--green-l);border-color:var(--green-l)}
+.steps li.done .ck svg{visibility:visible}
+.steps li.done .st{color:var(--ink-3)}
+.steps .st{font-weight:600}
+.steps .btn{padding:8px 14px;font-size:.8rem}
+
+/* stat tiles */
+.wsmain .stats{grid-template-columns:repeat(4,minmax(0,1fr));margin:0}
+@media(max-width:620px){.wsmain .stats{grid-template-columns:1fr 1fr}}
+.wsmain .stat{padding:18px 16px}
+.wsmain .stat-v{font-size:2rem}
+.wsmain .stat-l{font-size:.82rem;font-weight:600}
+
+/* verdict lists */
+.vtools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.vtools .seg{margin:0}
+.vtools input{width:220px;max-width:100%;margin:0;padding:9px 12px;font-size:.85rem}
+.vtable{border-radius:16px;overflow:hidden}
+.vhead,.vrow{display:grid;grid-template-columns:22px minmax(0,1.5fr) minmax(0,.8fr) 64px minmax(0,1.7fr) 92px;gap:14px;align-items:center;padding:12px 16px}
+.vhead{font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);border-bottom:1px solid var(--line)}
+.vrow{width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;transition:background .15s}
+.vrow:last-child{border-bottom:0}
+.vrow:hover,.vrow:focus-visible{background:rgba(255,255,255,.045);outline:none}
+.vrow .vi{color:var(--v);display:grid;place-items:center}
+.vrow .vi svg{width:16px;height:16px}
+.vrow .p{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow .a{font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow .r{color:var(--ink-3);font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.vrow .w{color:var(--ink-2);font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow .t{color:var(--ink-3);font-size:.8rem;text-align:right;white-space:nowrap}
+.vempty{padding:24px 12px;text-align:center;color:var(--ink-3);font-size:.9rem}
+.mini .vrow{grid-template-columns:22px minmax(0,1fr) auto 64px;padding:10px 6px;border-radius:10px;border-bottom:0}
+@media(max-width:700px){
+  .vhead{display:none}
+  .vrow{grid-template-columns:22px minmax(0,1fr) auto;row-gap:2px}
+  .vrow .r,.vrow .t{display:none}
+  .vrow .w{grid-column:2 / -1}
+  .mini .vrow{grid-template-columns:22px minmax(0,1fr) auto}
+}
+.wsmain .panel > .ph{justify-content:flex-start}
+.wsmain .panel > .ph h3{font-size:inherit;letter-spacing:inherit}
+.mini{display:grid;gap:2px;margin:-8px -6px}
+.wsmain .headrow{justify-content:space-between;margin:0 0 4px}
+.wsmain .headrow h2{font-size:1.6rem}
+.panel > .ph .ph-a{margin-left:auto;font-size:.8rem;font-weight:700;color:var(--ink-2);text-decoration:none;letter-spacing:0;text-transform:none}
+.panel > .ph .ph-a:hover{color:var(--orange)}
+
+/* the verdict panel */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55)}
+.drawer{position:fixed;top:12px;right:12px;bottom:12px;z-index:41;width:min(430px,calc(100vw - 24px));
+  border-radius:20px;padding:22px;overflow:auto;text-align:left;background:#0B0B0D;border:1px solid var(--line-2);
+  box-shadow:0 30px 80px -20px rgba(0,0,0,1);display:flex;flex-direction:column;gap:18px;
+  transform:translateX(calc(100% + 24px));transition:transform .28s var(--ease),visibility .28s;visibility:hidden}
+.drawer.on{transform:none;visibility:visible;transition:transform .28s var(--ease),visibility 0s}
+.dr-h{display:flex;align-items:center;justify-content:space-between}
+.dr-x{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink-2);display:grid;place-items:center;cursor:pointer;padding:0}
+.dr-x:hover{color:var(--ink)}
+.dr-x svg{width:16px;height:16px}
+.drawer h2{font-size:1.5rem;overflow-wrap:anywhere}
+.dr-amt{font-size:1.15rem;color:var(--ink-2);margin-top:6px}
+.dr-why{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dr-why li{display:grid;grid-template-columns:10px 1fr;gap:10px;align-items:start;padding:12px;border-radius:12px;background:rgba(255,255,255,.035)}
+.dr-why li:before{content:"";width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--v)}
+.dr-why code{display:block;font-size:.75rem;color:var(--ink-3);margin-top:3px}
+.dr-kv{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;margin:0;font-size:.88rem}
+.dr-kv dt{color:var(--ink-3)}
+.dr-kv dd{margin:0;overflow-wrap:anywhere}
+.dr-kv dd.mono{font-family:var(--mono);font-size:.84rem}
+.drawer .row{display:flex;gap:10px}
+</style>
 </head>
 <body>
 
@@ -29,9 +130,7 @@
       <article class="panel glass">
         <div class="ph"><h3>Open a workspace</h3></div>
         <div class="pb">
-          <p class="hint">A workspace holds your keys and every verdict made
-            with them. Pick an id you will recognise later; it cannot be
-            changed.</p>
+          <p class="hint">Your keys and every verdict, in one place.</p>
           <label class="lbl" for="new-id">Workspace id</label>
           <input id="new-id" name="new-id" placeholder="aseer-cloud" autocomplete="off"
                  spellcheck="false" maxlength="64">
@@ -48,8 +147,7 @@
       <article class="panel glass">
         <div class="ph"><h3>Open one you have</h3></div>
         <div class="pb">
-          <p class="hint">Paste an admin key. It is kept in this browser only
-            and never sent anywhere but your own gateway.</p>
+          <p class="hint">Paste an admin key. It stays in this browser.</p>
           <label class="lbl" for="key-in">Admin key</label>
           <input id="key-in" name="key-in" placeholder="moat_..." autocomplete="off"
                  spellcheck="false" type="password">
@@ -65,8 +163,7 @@
   <div class="panel glass">
     <div class="ph"><h3>Save this now</h3></div>
     <div class="pb">
-      <p class="hint">This is the only time the key is shown. The server keeps
-        a hash, never the key, so it cannot be shown again.</p>
+      <p class="hint">Shown once. Moat keeps only a hash of it.</p>
       <pre class="glass" id="secret"></pre>
       <div class="row">
         <button class="btn" id="copy-secret">Copy key</button>
@@ -77,11 +174,12 @@
 </section>
 
 <div id="workspace" hidden>
-
-  <div class="tabbar glass" role="tablist" aria-label="Workspace">
+<div class="ws">
+  <aside class="side glass" role="tablist" aria-label="Workspace" aria-orientation="vertical">
+    <div class="side-h"><span class="side-k">Signed in with</span><span class="side-n" id="ws-key">an admin key</span></div>
     <button class="tab" role="tab" data-pane="pane-usage" aria-selected="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M6 16v-4M11 16V7M16 16v-7"/></svg>
-      Usage</button>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Overview</button>
     <button class="tab" role="tab" data-pane="pane-verdicts" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v16l-7-3-7 3z"/></svg>
       Verdicts<span class="tab-n" id="tab-verdicts-n" hidden></span></button>
@@ -92,10 +190,18 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="7 4 19 12 7 20 7 4"/></svg>
       Playground</button>
     <span class="tab-sp"></span>
-    <button class="tab quiet" id="signout" role="tab" aria-selected="false">Close</button>
-  </div>
+    <button class="tab quiet" id="signout" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/></svg>
+      Sign out</button>
+  </aside>
+  <main class="wsmain">
 
-  <section class="tight pane" id="pane-usage">
+  <section class="pane" id="pane-usage">
+    <div class="ph2"><h2>Overview</h2><span class="sub" id="last-at"></span></div>
+    <div class="panel glass" id="start" hidden>
+      <div class="ph"><h3>Get started</h3></div>
+      <div class="pb"><ol class="steps" id="steps"></ol></div>
+    </div>
     <div class="stats" id="stats"></div>
     <div class="panel glass" id="split-panel">
       <div class="ph"><h3>How the verdicts went</h3></div>
@@ -104,24 +210,43 @@
         <p class="hint" id="usage-note">Loading.</p>
       </div>
     </div>
+    <div class="grid2">
+      <div class="panel glass"><div class="ph"><h3>Held for a person</h3></div><div class="pb"><div class="mini" id="ov-held"></div></div></div>
+      <div class="panel glass"><div class="ph"><h3>Latest</h3><a class="ph-a" href="#pane-verdicts">See all</a></div><div class="pb"><div class="mini" id="ov-latest"></div></div></div>
+    </div>
   </section>
 
-  <section class="tight pane" id="pane-verdicts" hidden>
-    <div class="rows" id="feed"></div>
+  <section class="pane" id="pane-verdicts" hidden>
+    <div class="ph2"><h2>Verdicts</h2>
+      <div class="vtools">
+        <div class="seg" id="vfilter" role="group" aria-label="Show">
+          <button type="button" data-f="all" aria-pressed="true">All</button>
+          <button type="button" data-f="allow" aria-pressed="false">Paid</button>
+          <button type="button" data-f="step_up" aria-pressed="false">Held</button>
+          <button type="button" data-f="deny" aria-pressed="false">Refused</button>
+        </div>
+        <input id="vsearch" type="search" placeholder="Search payee or id" autocomplete="off" spellcheck="false" aria-label="Search verdicts">
+      </div>
+    </div>
+    <div class="vtable glass">
+      <div class="vhead"><span></span><span>Payee</span><span>Amount</span><span>Rail</span><span>Why</span><span style="text-align:right">When</span></div>
+      <div id="feed"></div>
+    </div>
     <p class="hint foot-note" id="feed-note">Loading.</p>
   </section>
 
-  <section class="tight pane" id="pane-keys" hidden>
+  <section class="pane" id="pane-keys" hidden>
+    <div class="ph2"><h2>Keys</h2></div>
     <div class="panel glass">
       <div class="ph"><h3>Issue a key</h3></div>
       <div class="pb">
         <div class="row">
-          <input id="lbl" name="lbl" placeholder="staging agent" maxlength="120"
+          <input id="lbl" name="lbl" placeholder="Key name" maxlength="120"
                  autocomplete="off" style="max-width:280px">
           <select id="role" name="role" aria-label="Role">
-            <option value="agent">agent, makes payments</option>
-            <option value="approver">approver, your own application: intent and approvals</option>
-            <option value="admin">admin, manages keys</option>
+            <option value="agent">Agent</option>
+            <option value="approver">Approver</option>
+            <option value="admin">Admin</option>
           </select>
           <button class="btn" id="mint">Issue</button>
         </div>
@@ -130,8 +255,7 @@
           <div class="scopelist" id="scopelist"></div>
           <p class="hint" id="scope-hint"></p>
         </fieldset>
-        <p class="hint">An agent key cannot manage keys. An admin key cannot pay
-          or approve. The three roles do not overlap.</p>
+        <p class="hint">Agent keys pay. Approver keys register what the user asked and release holds. Admin keys manage keys.</p>
         <!-- Whatever the Issue button has to say belongs beside the Issue
              button. It used to land in #keys-note, which is below the list of
              keys: "Give the key a label" appeared a screen away from the
@@ -143,17 +267,9 @@
     <p class="hint foot-note" id="keys-note">Loading.</p>
 
     <div class="panel glass" style="margin-top:18px">
-      <div class="ph"><h3>Point an agent at it</h3></div>
+      <div class="ph"><h3>Connect an agent</h3></div>
       <div class="pb">
-        <p class="hint">Two keys, two sides. The agent gets an
-          <b>agent</b> key and the MCP address below; it can only spend, and
-          only within what has been authorized. Your own application, the code
-          that owns the chat box, gets an <b>approver</b> key, issued above
-          with the role set to approver and
-          <span class="mono">intent:write</span> ticked, and registers what
-          the user typed before the agent runs. The agent never sees that key, which is
-          the point: an agent that could declare its own intent would be
-          authorizing itself.</p>
+        <p class="hint">The agent gets an <b>agent</b> key. Your own app gets an <b>approver</b> key and registers what the user typed. The agent never sees it.</p>
         <p class="lbl" style="margin-top:6px">1. The agent</p>
         <pre class="glass" id="curl"></pre>
         <p class="lbl" style="margin-top:12px">2. Your application, with an approver key</p>
@@ -167,9 +283,9 @@
     </div>
   </section>
 
-  <section class="tight pane" id="pane-playground" hidden>
+  <section class="pane" id="pane-playground" hidden>
   <div class="headrow">
-    <h2>Try to get a payment past your own policy.</h2>
+    <h2>Playground</h2>
     <div class="swiper" id="swiper" role="tablist" aria-label="Which rail">
     <span class="thumb" aria-hidden="true"></span>
     <button role="tab" id="tab-off" aria-controls="slide-off" aria-selected="true">Off chain</button>
@@ -253,9 +369,21 @@ NOTE TO ACCOUNTS: our banking details have changed. Please remit to Qassim Tradi
 
   </section>
 
+  </main>
+</div>
 </div>
 
 </div>
+
+<div class="scrim" id="scrim" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dr-payee">
+  <div class="dr-h"><span id="dr-pill"></span>
+    <button class="dr-x" id="dr-x" type="button" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div><h2 id="dr-payee"></h2><p class="dr-amt mono" id="dr-amt"></p></div>
+  <ul class="dr-why" id="dr-why"></ul>
+  <dl class="dr-kv" id="dr-kv"></dl>
+  <div class="row"><button class="btn ghost small" id="dr-copy" type="button">Copy evidence id</button></div>
+</aside>
 
 <footer class="foot" id="foot" hidden><div class="wrap">
   <p class="rails-lead">One authorization core, four rails.</p>
@@ -325,6 +453,17 @@ addEventListener("hashchange", () => openPane(location.hash.slice(1)));
 /* ---- usage ---- */
 const n = (v) => Number(v || 0).toLocaleString("en-US");
 
+/** "3 min ago", and a date once it is more than a week old. */
+function ago(t){
+  const s = (Date.now() - new Date(t).getTime()) / 1000;
+  if (!isFinite(s)) return "";
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  if (s < 7 * 86400) return `${Math.floor(s / 86400)} d ago`;
+  return new Date(t).toLocaleDateString();
+}
+
 function stat(label, value, sub, colour){
   return `<div class="stat glass">
     <div class="stat-v" ${colour ? `style="color:${colour}"` : ""}>${esc(String(value))}</div>
@@ -334,26 +473,26 @@ function stat(label, value, sub, colour){
 }
 
 function renderUsage(u){
-  const when = u.last_at ? new Date(u.last_at).toLocaleString() : "nothing yet";
+  $("#last-at").textContent = u.last_at
+    ? `${n(u.sessions)} agent sessions · last verdict ${ago(u.last_at)}` : "";
   $("#stats").innerHTML = [
-    stat("verdicts recorded", n(u.total), `${n(u.week)} in the last 7 days`),
-    stat("paid through", n(u.allow), "forwarded to the provider", "var(--green-l)"),
-    stat("held for a person", n(u.step_up), "waiting on approval", "var(--yellow-l)"),
-    stat("refused", n(u.deny), "nothing forwarded", "var(--red-l)"),
-    stat("agent sessions", n(u.sessions), `last activity ${when}`),
+    stat("verdicts", n(u.total), `${n(u.week)} this week`),
+    stat("paid", n(u.allow), "", "var(--green-l)"),
+    stat("held for a person", n(u.step_up), "", "var(--yellow-l)"),
+    stat("refused", n(u.deny), "", "var(--red-l)"),
   ].join("");
 
   const parts = [
-    ["allow", u.allow, "var(--green-l)"],
-    ["step up", u.step_up, "var(--yellow-l)"],
-    ["deny", u.deny, "var(--red-l)"],
+    ["paid", u.allow, "var(--green-l)"],
+    ["held", u.step_up, "var(--yellow-l)"],
+    ["refused", u.deny, "var(--red-l)"],
     ["other", u.other, "var(--ink-3)"],
   ].filter(([, v]) => v > 0);
   const sum = parts.reduce((a, [, v]) => a + v, 0);
 
   if (!sum) {
     $("#split").innerHTML = "";
-    note("#usage-note", "No verdicts yet. Issue an agent key and point an agent at the gateway.");
+    note("#usage-note", "No verdicts yet.");
     return;
   }
   $("#split").innerHTML =
@@ -361,34 +500,203 @@ function renderUsage(u){
        `<span style="width:${(100 * v / sum).toFixed(2)}%;background:${c}"></span>`).join("")}</div>
      <div class="legend">${parts.map(([k, v, c]) =>
        `<b><span class="dot" style="background:${c}"></span>${esc(k)} ${n(v)}</b>`).join("")}</div>`;
-  note("#usage-note", "Counted from the signed evidence itself, not from a separate tally that could disagree with it.");
+  note("#usage-note", "");
 }
 
-/* ---- verdict feed ---- */
-const SOURCE_COLOUR = { user: "var(--green-l)", allowlist: "var(--green-l)", tool_result: "var(--red-l)", unknown: "var(--red-l)" };
+/* ---- verdicts -----------------------------------------------------------
+   The feed carries the rule ids that failed. An id is for the record; a
+   person reading the dashboard gets the sentence. An id this list does not
+   know is shown as itself rather than hidden. */
+const VERDICT = {
+  allow: { label: "Paid", cls: "allow", c: "var(--green-l)" },
+  step_up: { label: "Held", cls: "step_up", c: "var(--yellow-l)" },
+  deny: { label: "Refused", cls: "deny", c: "var(--red-l)" },
+};
+const vmeta = (k) => VERDICT[k] || { label: k || "unknown", cls: "", c: "var(--ink-3)" };
+
+const RULES = {
+  "payee-provenance": "The payee didn't come from the user or an approval",
+  "amount-provenance": "The amount didn't come from the user or an approval",
+  "payee-allowlist": "The payee isn't on the allowlist",
+  "absolute-spending-cap": "Over the spending limit",
+  "amount-cap": "Over the spending limit",
+  "amount-precision": "More decimals than the currency has",
+  "intent-currency": "Not the currency the user named",
+  "intent-invoice": "Not the invoice the user named",
+  "invoice-required": "No invoice number on the payment",
+  "session-total": "Over the session's total",
+  "velocity": "Over the session's total",
+  "authorization-required": "No approval for this payment",
+  "authorization-exists": "No approval with that id",
+  "authorization-active": "The approval was cancelled",
+  "authorization-expiry": "The approval has expired",
+  "authorization-payee": "Payee doesn't match the approval",
+  "authorization-recipient-account": "Account doesn't match the approval",
+  "authorization-amount": "Amount doesn't match the approval",
+  "authorization-currency": "Currency doesn't match the approval",
+  "authorization-invoice": "Invoice doesn't match the approval",
+  "authorization-network": "Network doesn't match the approval",
+  "authorization-asset-contract": "Token doesn't match the approval",
+  "authorization-usage": "The approval was already used",
+  "authorization-duplicate": "This invoice was already paid",
+  "authorization-invoice-content-duplicate": "This invoice was already paid",
+  "authorization-invoice-fingerprint": "This invoice was already paid",
+  "authorization-aggregate": "Over the approval's total",
+  "authorization-tenant-aggregate": "Over the workspace's total",
+  "authorization-reservation": "Another payment is using this approval",
+  "authorization-quarantine": "The provider's last answer was unclear, so the approval is on hold",
+};
+const ruleText = (id) => RULES[id] || id.replace(/-/g, " ");
+const SOURCE = {
+  user: "the user",
+  allowlist: "your allowlist",
+  tool_result: "a tool result, not the user",
+  unknown: "nowhere Moat could trace",
+};
+const failedOf = (v) => (v.failed_rules || "").split(",").map((s) => s.trim()).filter(Boolean);
+const moneyOf = (v) => [v.amount, v.currency].filter(Boolean).join(" ");
+const iconOf = (v) => v.verdict === "allow" ? OK_ICON : v.verdict === "step_up" ? HOLD_ICON : NO_ICON;
+function whyOf(v){
+  const f = failedOf(v);
+  if (f.length) return ruleText(f[0]) + (f.length > 1 ? ` (+${f.length - 1})` : "");
+  return v.verdict === "allow" ? "Matched what was asked" : "";
+}
 
 function verdictRow(v){
-  const colour = v.verdict === "allow" ? "var(--green-l)"
-    : v.verdict === "step_up" ? "var(--yellow-l)" : "var(--red-l)";
-  const money = [v.amount, v.currency].filter(Boolean).join(" ");
-  const where = v.payee_source
-    ? `<span style="color:${SOURCE_COLOUR[v.payee_source] || "var(--ink-3)"}">payee from ${esc(v.payee_source.replace("_", " "))}</span>`
-    : "";
-  return `<article class="row">
-    <span class="row-i" style="color:${colour}">${
-      v.verdict === "allow" ? OK_ICON : v.verdict === "step_up" ? HOLD_ICON : NO_ICON}</span>
-    <div class="row-t">
-      <h3>${esc(v.payee || v.tool || "call")} ${money ? `<span class="row-e">${esc(money)}</span>` : ""}</h3>
-      <p class="row-s">${where}${v.failed_rules ? ` · <span class="mono">${esc(v.failed_rules)}</span>` : ""}</p>
-      <p class="row-b mono">${esc(new Date(v.at).toLocaleString())} · ${esc(v.rail || "")} · ${esc(v.evidence_id)}</p>
-    </div>
-    <span class="row-r" style="color:${colour};font-size:1rem">${esc(v.verdict.replace("_", " "))}</span>
-  </article>`;
+  const m = vmeta(v.verdict);
+  return `<button type="button" class="vrow" data-ev="${esc(v.evidence_id)}" style="--v:${m.c}">
+    <span class="vi" title="${esc(m.label)}">${iconOf(v)}</span>
+    <span class="p">${esc(v.payee || v.tool || "call")}</span>
+    <span class="a">${esc(moneyOf(v))}</span>
+    <span class="r">${esc(v.rail || "")}</span>
+    <span class="w">${esc(whyOf(v))}</span>
+    <span class="t">${esc(ago(v.at))}</span>
+  </button>`;
+}
+function miniRow(v){
+  const m = vmeta(v.verdict);
+  return `<button type="button" class="vrow" data-ev="${esc(v.evidence_id)}" style="--v:${m.c}">
+    <span class="vi" title="${esc(m.label)}">${iconOf(v)}</span>
+    <span class="p">${esc(v.payee || v.tool || "call")}</span>
+    <span class="a">${esc(moneyOf(v))}</span>
+    <span class="t">${esc(ago(v.at))}</span>
+  </button>`;
 }
 
-const OK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
-const HOLD_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6v12M15 6v12"/></svg>`;
-const NO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+let FEED = [];
+let FILTER = "all";
+
+function drawFeed(){
+  const q = $("#vsearch").value.trim().toLowerCase();
+  const rows = FEED.filter((v) => (FILTER === "all" || v.verdict === FILTER)
+    && (!q || [v.payee, v.evidence_id, v.session_id, v.currency, v.amount]
+      .some((x) => x && String(x).toLowerCase().includes(q))));
+  $("#feed").innerHTML = rows.length
+    ? rows.map(verdictRow).join("")
+    : `<div class="vempty">${FEED.length ? "Nothing matches." : "No verdicts yet."}</div>`;
+}
+
+function drawOverviewLists(){
+  const held = FEED.filter((v) => v.verdict === "step_up").slice(0, 5);
+  $("#ov-held").innerHTML = held.length ? held.map(miniRow).join("")
+    : `<div class="vempty">Nothing held recently.</div>`;
+  $("#ov-latest").innerHTML = FEED.length ? FEED.slice(0, 5).map(miniRow).join("")
+    : `<div class="vempty">No verdicts yet.</div>`;
+}
+
+function drawFilterCounts(){
+  const c = (k) => FEED.filter((v) => v.verdict === k).length;
+  const counts = { all: FEED.length, allow: c("allow"), step_up: c("step_up"), deny: c("deny") };
+  const names = { all: "All", allow: "Paid", step_up: "Held", deny: "Refused" };
+  for (const btn of document.querySelectorAll("#vfilter button")) {
+    btn.textContent = `${names[btn.dataset.f]} ${counts[btn.dataset.f]}`;
+  }
+}
+
+for (const btn of document.querySelectorAll("#vfilter button")) {
+  btn.addEventListener("click", () => {
+    FILTER = btn.dataset.f;
+    for (const o of document.querySelectorAll("#vfilter button")) o.setAttribute("aria-pressed", String(o === btn));
+    drawFeed();
+  });
+}
+$("#vsearch").addEventListener("input", drawFeed);
+
+/* ---- one verdict, in a panel ---- */
+let shown = null;
+let returnTo = null;
+
+function openVerdict(id){
+  const v = FEED.find((x) => x.evidence_id === id);
+  if (!v) return;
+  shown = v;
+  returnTo = document.activeElement;
+  const m = vmeta(v.verdict);
+  $("#dr-pill").innerHTML = `<span class="pill ${m.cls}">${esc(m.label)}</span>`;
+  $("#dr-payee").textContent = v.payee || v.tool || "call";
+  $("#dr-amt").textContent = moneyOf(v);
+  const f = failedOf(v);
+  $("#dr-why").style.setProperty("--v", m.c);
+  $("#dr-why").innerHTML = f.length
+    ? f.map((id) => `<li><span>${esc(ruleText(id))}<code>${esc(id)}</code></span></li>`).join("")
+    : `<li><span>${v.verdict === "allow" ? "Every field traced back to the user or an approval." : "No rule detail on this record."}</span></li>`;
+  const kv = [
+    ["Payee from", v.payee_source ? (SOURCE[v.payee_source] || v.payee_source) : ""],
+    ["Rail", v.rail || ""],
+    ["Tool", v.tool || ""],
+    ["When", new Date(v.at).toLocaleString()],
+    ["Session", v.session_id, true],
+    ["Evidence", v.evidence_id, true],
+  ].filter(([, val]) => val);
+  $("#dr-kv").innerHTML = kv.map(([k, val, mono]) =>
+    `<dt>${esc(k)}</dt><dd${mono ? ' class="mono"' : ""}>${esc(val)}</dd>`).join("");
+  $("#scrim").hidden = false;
+  $("#drawer").classList.add("on");
+  $("#dr-x").focus();
+}
+function closeVerdict(){
+  if (!$("#drawer").classList.contains("on")) return;
+  $("#drawer").classList.remove("on");
+  $("#scrim").hidden = true;
+  if (returnTo && returnTo.focus) returnTo.focus();
+}
+document.addEventListener("click", (e) => {
+  const row = e.target.closest(".vrow[data-ev]");
+  if (row) openVerdict(row.dataset.ev);
+});
+$("#dr-x").addEventListener("click", closeVerdict);
+$("#scrim").addEventListener("click", closeVerdict);
+addEventListener("keydown", (e) => { if (e.key === "Escape") closeVerdict(); });
+$("#dr-copy").addEventListener("click", (e) => shown && copyText(shown.evidence_id, e.currentTarget, "Copied"));
+
+/* ---- get started ----
+   Three things a new workspace needs before it is doing its job, ticked off
+   from what the gateway already reports rather than from a flag kept here. */
+function drawSteps(keys, usage){
+  const live = (role) => keys.some((k) => k.active && k.access_role === role);
+  const steps = [
+    ["Issue an agent key", live("agent"), "agent", "Issue"],
+    ["Issue an approver key", live("approver"), "approver", "Issue"],
+    ["Make a first payment", Number(usage && usage.total) > 0, "play", "Open playground"],
+  ];
+  $("#start").hidden = steps.every(([, done]) => done);
+  $("#steps").innerHTML = steps.map(([title, done, act, cta]) =>
+    `<li class="${done ? "done" : ""}"><span class="ck">${OK_ICON}</span><span class="st">${esc(title)}</span>${
+      done ? "" : `<button class="btn ghost small" type="button" data-step="${act}">${esc(cta)}</button>`}</li>`).join("");
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-step]");
+  if (!b) return;
+  if (b.dataset.step === "play") return openPane("pane-playground");
+  $("#role").value = b.dataset.step;
+  drawScopes();
+  openPane("pane-keys");
+  $("#lbl").focus();
+});
+
+const OK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>`;
+const HOLD_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 6v12M15 6v12"/></svg>`;
+const NO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 
 /* ---- scopes -------------------------------------------------------------
    A role decides which door a key opens. A scope decides how much of the room
@@ -491,12 +799,12 @@ async function refresh(){
   else note("#usage-note", String(usage.reason.message || usage.reason), true);
 
   if (feed.status === "fulfilled") {
-    const rows = feed.value;
-    $("#feed").innerHTML = rows.map(verdictRow).join("");
-    badge("#tab-verdicts-n", rows.length);
-    note("#feed-note", rows.length
-      ? `The ${rows.length} most recent. Every one has a signed record behind it.`
-      : "No verdicts yet. Point an agent at the gateway with an agent key.");
+    FEED = feed.value;
+    drawFeed();
+    drawFilterCounts();
+    drawOverviewLists();
+    badge("#tab-verdicts-n", FEED.length);
+    note("#feed-note", FEED.length ? `The ${FEED.length} most recent. Click one for the details.` : "");
   } else note("#feed-note", String(feed.reason.message || feed.reason), true);
 
   if (keys.status === "fulfilled") {
@@ -504,8 +812,9 @@ async function refresh(){
     $("#keys").innerHTML = rows.map(keyRow).join("");
     const live = rows.filter(k => k.active).length;
     badge("#tab-keys-n", live);
-    note("#keys-note", `${live} active, ${rows.length - live} revoked. A revoked key stays listed: it is part of the record. `
-      + "To rotate the key you are signed in with, issue another admin key, sign in with it, then revoke this one.");
+    note("#keys-note", `${live} active, ${rows.length - live} revoked.`);
+    const me = rows.find((k) => k.current);
+    if (me) $("#ws-key").textContent = me.label;
     for (const b of document.querySelectorAll("[data-revoke]")) {
       b.addEventListener("click", async () => {
         working(b, "Revoking");
@@ -515,6 +824,8 @@ async function refresh(){
       });
     }
   } else note("#keys-note", String(keys.reason.message || keys.reason), true);
+
+  if (keys.status === "fulfilled" && usage.status === "fulfilled") drawSteps(keys.value, usage.value);
 }
 
 function openWorkspace(){
