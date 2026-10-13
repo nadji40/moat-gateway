@@ -1,0 +1,638 @@
+/* Shared by all site pages. */
+:root{
+  --bg:#000000; --bg-2:#0A0A0A; --ink:#F4F4F6; --ink-2:#9C9CA6; --ink-3:#5E5E68;
+  --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16);
+  --glass:rgba(255,255,255,.045);
+  --red:#EB001B; --orange:#FF5F00; --yellow:#F79E1B; --green:#00A650;
+  --red-l:#FF4D5E; --orange-l:#FF8A4C; --yellow-l:#FFB84D; --green-l:#2ED17A;
+  --max:1240px; --pad:clamp(20px,5vw,64px); --sec:clamp(72px,10vw,120px);
+  --font:"Ubuntu","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono:"Ubuntu Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --ease:cubic-bezier(.2,.7,.2,1);
+  /* the default surface: a hairline of light on top, a shadow beneath */
+  --pane:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    0 18px 40px -24px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{scroll-behavior:smooth}
+
+/* Scrollbars in the site's own palette rather than the platform's, and
+   everywhere rather than on the page alone: `scrollbar-color` inherits, so
+   setting it on the root reaches every pane that scrolls, including the
+   textarea.
+
+   The standard two properties do the work, because Chromium ignores the
+   -webkit- pseudo-elements entirely once either of them is set. Those are
+   kept below for Safari, which only has the pseudo-elements, and they are
+   written to land in the same place: a thin orange bar on a track that stays
+   out of the way.
+
+   Orange dimmed against the page rather than at full strength, which on this
+   much black would read as a warning rather than as a brand. `color-mix`
+   keeps --orange the one source of that colour; the flat value above it is
+   what an engine without `color-mix` falls back to.
+
+   `.tabbar` hides its own bar deliberately, and `scrollbar-width:none` on it
+   is more specific than this, so it keeps hiding it. */
+html{scrollbar-width:thin;
+  scrollbar-color:#C24800 transparent;
+  scrollbar-color:color-mix(in srgb,var(--orange) 76%,#000) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{border-radius:999px;border:2px solid transparent;
+  background-clip:padding-box;background-color:#C24800}
+::-webkit-scrollbar-thumb:hover{background-color:var(--orange)}
+html,body{margin:0}
+button,input,select,textarea{font-family:var(--font)}
+code,kbd,samp{font-family:var(--mono)}
+body{background:var(--bg);color:var(--ink);font:500 16px/1.5 var(--font);-webkit-font-smoothing:antialiased;overflow-x:hidden;text-align:center;-webkit-user-select:none;user-select:none}
+@media (hover:hover) and (pointer:fine){
+  body,body *{cursor:url("/cursor.svg") 4 4,auto!important}
+  input,textarea{cursor:text!important}
+}
+/* the page reads as an app, not a document. Two exceptions: a field you
+   cannot select text in is a field you cannot edit, and the curl block
+   exists to be copied. */
+input,textarea,pre{-webkit-user-select:text;user-select:text}
+.wrap{max-width:var(--max);margin:0 auto;padding-inline:var(--pad)}
+a{color:inherit}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.03em;line-height:1.02;text-wrap:balance}
+h1{font-size:clamp(1.9rem,7vw,4rem)}
+h2{font-size:clamp(1.6rem,3.6vw,2.4rem)}
+h3{font-size:1.0625rem;letter-spacing:-.015em;line-height:1.25}
+p{margin:0}
+.mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+::selection{background:rgba(255,95,0,.35)}
+
+.glass{background:var(--glass);border:1px solid var(--line);
+  -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+  box-shadow:var(--pane)}
+
+/* nav */
+nav{position:sticky;top:0;z-index:20;padding-top:14px}
+.navbar{display:flex;align-items:center;gap:20px;border-radius:18px;padding:11px 16px 11px 14px;
+  position:relative;
+  background:rgba(255,255,255,.055);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.17),
+    inset 0 -1px 0 rgba(0,0,0,.5),
+    0 3px 0 rgba(255,255,255,.045),
+    0 14px 30px -16px rgba(0,0,0,1)}
+.mark{width:32px;height:32px;flex:none;color:var(--ink)}
+.navlinks{display:flex;gap:22px;margin-inline:auto;font-size:.875rem;color:var(--ink-2);font-weight:600}
+/* Colour alone carries state here: no rule sliding in underneath, no pill
+   behind the words. The active page and the one under the pointer are both
+   the brand orange, so a link reads as reachable and the current one reads as
+   where you are. */
+.navlinks a{text-decoration:none;transition:color .18s}
+.navlinks a:hover,
+.navlinks a:focus-visible{color:var(--orange)}
+.navlinks a[aria-current]{color:var(--orange)}
+/* The status of the gateway is a fact, not an event, so it sits still and
+   links to the page that measures it. */
+.statusbtn{display:inline-flex;align-items:center;gap:8px;flex:none;text-decoration:none;white-space:nowrap;
+  font:700 .78rem var(--font);color:var(--ink-2);padding:8px 14px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);
+  box-shadow:0 3px 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.13);
+  transition:transform .12s var(--ease),box-shadow .12s var(--ease),color .2s,border-color .2s}
+.statusbtn:hover{color:var(--ink);border-color:var(--line-2)}
+.statusbtn:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+.statusbtn[aria-current]{color:var(--ink);border-color:var(--line-2)}
+.statusbtn b{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
+.statusbtn.on b{background:var(--green-l)}
+.statusbtn.bad b{background:var(--red-l)}
+/* The menu button. Off on a desktop, where the links are already across the
+   bar and a button to reveal them would reveal nothing. */
+.navtoggle{display:none;align-items:center;justify-content:center;flex:none;
+  width:38px;height:38px;padding:0;border-radius:12px;cursor:pointer;color:var(--ink-2);
+  border:1px solid var(--line);background:rgba(255,255,255,.05);
+  box-shadow:0 3px 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.13);
+  transition:transform .12s var(--ease),box-shadow .12s var(--ease),color .2s,border-color .2s}
+.navtoggle svg{width:19px;height:19px}
+.navtoggle:hover{color:var(--ink);border-color:var(--line-2)}
+.navtoggle:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+.navtoggle .i-shut{display:none}
+nav[data-open] .navtoggle{color:var(--orange);border-color:var(--line-2)}
+nav[data-open] .navtoggle .i-open{display:none}
+nav[data-open] .navtoggle .i-shut{display:block}
+
+/* Narrow: the mark holds the left, the way in holds the right, and the links
+   move out of the bar into a panel under it rather than disappearing.
+   `visibility` rather than `display` so the panel can be animated and so a
+   closed menu is out of the tab order and out of the accessibility tree. */
+@media(max-width:760px){
+  .navbar{gap:10px;padding:10px 12px 10px 12px}
+  .navtoggle{display:inline-flex;margin-left:auto}
+  .navlinks{position:absolute;top:calc(100% + 9px);left:0;right:0;z-index:2;
+    display:block;margin:0;padding:6px;text-align:left;font-size:.95rem;
+    border-radius:16px;background:#0B0B0D;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.12),
+      0 1px 0 rgba(255,255,255,.05),
+      0 22px 44px -18px rgba(0,0,0,1);
+    opacity:0;visibility:hidden;transform:translateY(-8px);
+    transition:opacity .18s var(--ease),transform .18s var(--ease),visibility .18s}
+  nav[data-open] .navlinks{opacity:1;visibility:visible;transform:none}
+  .navlinks a{display:block;padding:12px 14px;border-radius:11px}
+  .navlinks a+a{border-top:1px solid var(--line)}
+  .navlinks a:hover,.navlinks a:focus-visible{background:rgba(255,255,255,.05)}
+}
+
+/* the mark turns over when you point at it. The load-in uses fill mode
+   'both' rather than a base opacity of 0, so that replacing the animation
+   on hover cannot make the card vanish. */
+.navmark:hover .e-ring,.navmark:focus-visible .e-ring{animation:e-ring 4s cubic-bezier(.7,0,.3,1) infinite}
+.navmark:hover .e-front,.navmark:focus-visible .e-front{animation:e-front 4s infinite}
+.navmark:hover .e-back,.navmark:focus-visible .e-back{animation:e-back 4s infinite}
+.mark .e-ring{transform-box:view-box;transform-origin:141px 115px}
+.mark .e-front{transform-box:view-box;transform-origin:141.5px 115px}
+.mark .e-back{transform-box:view-box;transform-origin:141.5px 115px;transform:scale(0,1)}
+@keyframes e-front{0%,20%{transform:scale(1,1);animation-timing-function:cubic-bezier(.55,0,1,.45)}32%{transform:scale(0,1.08)}82%{transform:scale(0,1.08);animation-timing-function:cubic-bezier(0,.55,.45,1)}94%,100%{transform:scale(1,1)}}
+@keyframes e-back{0%,32%{transform:scale(0,1.08);animation-timing-function:cubic-bezier(0,.55,.45,1)}44%{transform:scale(1,1)}70%{transform:scale(1,1);animation-timing-function:cubic-bezier(.55,0,1,.45)}82%,100%{transform:scale(0,1.08)}}
+@keyframes e-ring{0%,20%{transform:rotate(0deg)}44%,70%{transform:rotate(90deg)}94%,100%{transform:rotate(0deg)}}
+
+/* logo motion */
+.mark .arc{stroke-dasharray:1;stroke-dashoffset:1;animation:draw 1.3s var(--ease) forwards}
+.mark .arc.two{animation-delay:.18s}
+.mark .dot{opacity:0;animation:pop .5s var(--ease) 1.05s forwards}
+.mark .dot.two{animation-delay:1.2s}
+.mark .body{animation:fade .6s var(--ease) .5s both}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes pop{from{opacity:0;r:2}to{opacity:1;r:11}}
+@keyframes fade{to{opacity:1}}
+
+/* hero */
+/* The mark stands on a perspective stage. The viewBox is padded past the
+   artwork because the layers slide within it and would otherwise clip. */
+.heromark{width:clamp(74px,8.5vw,98px);margin:0 auto clamp(18px,2.2vw,26px)}
+.heromark svg{display:block;width:100%;height:auto;color:var(--ink)}
+header.hero{padding-block:clamp(56px,9vw,112px) clamp(40px,6vw,72px)}
+.kicker{display:inline-block;font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:22px}
+h1 .g{color:var(--orange)}
+.hero .lede{color:var(--ink-2);max-width:48ch;margin:22px auto 0;font-size:1.0625rem}
+/* The cursor trail covers the viewport rather than one section, so it is
+   fixed rather than absolute: the page scrolls over a trail that stays where
+   the cursor left it on screen. It is behind every word and cannot take a
+   click.
+
+   `has-trail` is set by trail.js, so the lift can only reach a page
+   that actually loads it. The nav already carries a z-index of its own and
+   needs nothing here. */
+.trailfx{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.9}
+body.has-trail .wrap,
+body.has-trail footer.foot{position:relative;z-index:1}
+
+.hero .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:36px}
+/* extruded: a solid face with a solid edge beneath it, and the whole
+   thing travels down onto that edge when pressed. No gradients in it. */
+/* Flat, layered rather than extruded: six stacked shadows for depth instead
+   of a hard edge underneath, and it presses by scaling rather than by moving
+   down the page. The old one shifted 5px on :active, which nudged whatever
+   sat beside it. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;color:#000;border:0;border-radius:10px;
+  padding:13px 26px;text-decoration:none;font:700 .9375rem var(--font);cursor:pointer;
+  letter-spacing:-.01em;
+  background-image:linear-gradient(180deg,#FF7A2B 0%,var(--orange) 100%);
+  box-shadow:0 1px 2px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.07),0 4px 8px rgba(0,0,0,.07),
+    0 8px 16px rgba(0,0,0,.07),0 16px 32px rgba(0,0,0,.07),0 32px 64px rgba(0,0,0,.07),
+    inset 0 1px 0 0 rgba(255,255,255,.22);
+  transition:filter 150ms ease-in-out,transform 150ms ease-in-out}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:scale(.95)}
+.btn[disabled]{opacity:.45;cursor:not-allowed;filter:none;transform:none}
+.btn[aria-busy="true"]{opacity:1;cursor:progress;transform:none;filter:none}
+.btn.ghost{color:var(--ink);background-image:none;background:rgba(255,255,255,.07);
+  border:1px solid var(--line-2);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  box-shadow:0 1px 2px rgba(0,0,0,.07),0 4px 8px rgba(0,0,0,.07),0 16px 32px rgba(0,0,0,.07),
+    inset 0 1px 0 0 rgba(255,255,255,.14)}
+.btn.ghost:hover{filter:none;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28)}
+.btn .spin-mark{width:1.15em;height:1.15em}
+@keyframes turn{to{transform:rotate(360deg)}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+section{padding-block:var(--sec);scroll-margin-top:96px}
+section.tight{padding-block:clamp(48px,7vw,80px)}
+.head{max-width:58ch;margin:0 auto 34px}
+/* a heading with the control or the illustration it belongs to, on one
+   line while there is room and stacked when there is not */
+.headrow{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;
+  gap:clamp(18px,3.4vw,44px);margin:0 auto 34px}
+.headrow h2{margin:0}
+.headrow .swiper{margin:0}
+.headrow .apiart{margin:0;width:clamp(260px,30vw,430px)}
+.head p{color:var(--ink-2);margin-top:14px}
+.apiart{width:clamp(304px,52vw,520px);margin:0 auto 24px}
+.apiart svg{display:block;width:100%;height:auto}
+
+/* tests */
+.tests{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(19.5rem,1fr))}
+.test{border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;position:relative;
+  box-shadow:var(--pane);
+  transition:transform .25s var(--ease),border-color .25s,box-shadow .35s var(--ease)}
+.test.enter{opacity:0;animation:rise .55s var(--ease) forwards;animation-delay:calc(var(--i,0)*55ms)}
+.test:hover{transform:translateY(-2px);border-color:var(--line-2);box-shadow:var(--pane),0 26px 50px -28px rgba(0,0,0,1)}
+.test.running{border-color:var(--c)}
+.test.running:before{content:"";position:absolute;inset:-1px;border-radius:19px;border:1px solid var(--c);
+  animation:pulse 1.2s ease-in-out infinite;pointer-events:none}
+@keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+.test.done{border-color:color-mix(in srgb,var(--v) 55%,transparent)}
+.test .icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
+  background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.test .icon svg{width:19px;height:19px}
+.test .top{display:flex;flex-direction:column;gap:12px;align-items:center}
+.test .sum{color:var(--ink-2);font-size:.9rem;margin-top:5px}
+.test .fam{font-size:.6875rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c)}
+.test footer{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding-top:4px}
+.f-red{--c:var(--red-l)} .f-orange{--c:var(--orange-l)} .f-yellow{--c:var(--yellow-l)} .f-green{--c:var(--green-l)}
+.v-allow{--v:var(--green-l)} .v-deny{--v:var(--red-l)} .v-step_up{--v:var(--yellow-l)}
+.pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 12px;font-size:.8125rem;font-weight:700;letter-spacing:-.01em;
+  border:1px solid transparent;animation:fade .3s var(--ease)}
+.pill.allow{background:rgba(0,166,80,.16);color:var(--green-l);border-color:rgba(46,209,122,.35)}
+.pill.deny{background:rgba(235,0,27,.16);color:var(--red-l);border-color:rgba(255,77,94,.35)}
+.pill.step_up{background:rgba(247,158,27,.16);color:var(--yellow-l);border-color:rgba(255,184,77,.35)}
+.why{font-size:.85rem;color:var(--ink-2);border-top:1px solid var(--line);padding-top:11px;margin-top:2px;animation:rise .4s var(--ease)}
+.why code{font-size:.8rem;font-weight:700;color:var(--red-l);font-family:var(--font)}
+.why .ok{color:var(--green-l)} .why .held{color:var(--yellow-l)}
+.test .ms{font-size:.75rem;color:var(--ink-3);font-weight:600}
+.test .link{font-size:.8125rem;color:var(--ink-2);font-weight:700;text-decoration:none;background:none;border:0;cursor:pointer;padding:0;font-family:var(--font);
+  border-bottom:1.5px solid var(--line-2);transition:color .2s,border-color .2s}
+.test .link:hover{color:var(--ink);border-color:var(--c)}
+.test .link[disabled]{opacity:.4;cursor:default}
+.test .link[aria-busy="true"]{opacity:1;cursor:progress;color:var(--ink);border-color:var(--c);
+  display:inline-flex;align-items:center;gap:7px}
+.test .link .spin-mark{width:1.05em;height:1.05em}
+/* the run control is an icon: "run" beside a play triangle said it twice */
+.test .link.play{width:34px;height:34px;border-radius:999px;border:1.5px solid var(--line-2);
+  display:inline-flex;align-items:center;justify-content:center;padding:0}
+.test .link.play:hover{color:var(--ink);border-color:var(--c);background:rgba(255,255,255,.05)}
+.test .link.play svg{width:12px;height:12px}
+.test .link.play[aria-busy="true"]{border-color:var(--c)}
+.test .link.play .spin-mark{width:17px;height:17px}
+details.sc{font-size:.82rem;color:var(--ink-2)}
+details.sc summary{cursor:pointer;list-style:none;font-weight:700;color:var(--ink-3);display:flex;align-items:center;justify-content:center;gap:8px}
+details.sc summary::-webkit-details-marker{display:none}
+details.sc summary:after{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg) translate(-2px,-2px);transition:transform .2s}
+details.sc[open] summary:after{transform:rotate(-135deg)}
+details.sc summary:hover{color:var(--ink-2)}
+details.sc dl{margin:10px 0 0;display:grid;gap:3px}
+details.sc dt{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding-top:7px}
+details.sc dd{margin:0;overflow-wrap:anywhere}
+details.sc dd.q{font-style:italic}
+details.sc .note{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);color:var(--ink-2)}
+
+.summary{display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap;margin-bottom:22px;border-radius:16px;padding:14px 18px;position:relative;overflow:hidden;box-shadow:var(--pane)}
+.summary .bar{position:absolute;left:0;bottom:0;height:2px;width:var(--p,0%);background:var(--orange);transition:width .5s var(--ease)}
+.summary .big{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;line-height:1}
+.summary .big small{font-size:.75rem;color:var(--ink-2);font-weight:600;letter-spacing:0;display:block;margin-top:4px}
+.summary .sep{width:1px;height:30px;background:var(--line)}
+.summary .through{color:var(--green-l)} .summary .through.bad{color:var(--red-l)}
+
+/* composer */
+.grid2{display:grid;gap:18px;grid-template-columns:1fr 1fr}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.col{display:grid;gap:18px;align-content:start}
+.panel{border-radius:18px;overflow:hidden;box-shadow:var(--pane)}
+/* heading for a block inside a card, where a <label> would have nothing to label */
+/* the rail swiper, and the deck it drives */
+.swiper{position:relative;display:flex;gap:4px;padding:4px;margin:0 auto 26px;width:max-content;flex:none;
+  border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+.swiper button{position:relative;z-index:1;font:700 .875rem var(--font);padding:10px 24px;border:0;
+  border-radius:999px;background:none;color:var(--ink-2);cursor:pointer;transition:color .28s var(--ease)}
+.swiper button[aria-selected="true"]{color:#000}
+.swiper .thumb{position:absolute;z-index:0;top:4px;bottom:4px;left:4px;width:0;border-radius:999px;
+  background:var(--orange);box-shadow:0 3px 0 #A33D00,inset 0 2px 0 rgba(255,255,255,.4);
+  transition:transform .42s var(--ease),width .42s var(--ease)}
+.deck{position:relative;transition:height .45s var(--ease)}
+.slide{position:absolute;left:0;right:0;top:0;opacity:0;pointer-events:none;
+  transform:translateX(var(--x,30px));
+  transition:opacity .34s var(--ease),transform .42s var(--ease)}
+.slide.on{opacity:1;pointer-events:auto;transform:translateX(0)}
+.verdicts{margin-top:18px;animation:rise .4s var(--ease)}
+@media(prefers-reduced-motion:reduce){.deck,.slide,.swiper .thumb{transition:none}}
+
+/* network switcher */
+.seg{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:26px}
+.seg button{font:700 .8125rem var(--font);padding:9px 16px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink-2);
+  box-shadow:0 3px 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.14);
+  transition:transform .12s var(--ease),box-shadow .12s var(--ease),background .2s,color .2s}
+.seg button:hover{color:var(--ink)}
+.seg button:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
+.seg button[aria-pressed="true"]{background:var(--orange);color:#000;border-color:transparent;
+  box-shadow:0 3px 0 #A33D00,inset 0 2px 0 rgba(255,255,255,.4)}
+.seg button[aria-pressed="true"]:active{transform:translateY(3px);box-shadow:inset 0 2px 0 rgba(255,255,255,.3)}
+
+/* what you approved */
+.kv{display:grid;gap:11px;margin:0}
+.kv dt{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.kv dd{margin:3px 0 0;overflow-wrap:anywhere;font-weight:600}
+.dim{color:var(--ink-3);font-weight:600}
+.addr{font-size:.82rem;letter-spacing:.01em}
+.two{display:grid;grid-template-columns:1fr auto;gap:10px}
+@media(max-width:520px){.two{grid-template-columns:1fr}}
+.note-sim{color:var(--ink-3);font-size:.85rem;border:1px dashed var(--line-2);border-radius:12px;
+  padding:10px 14px;margin-top:16px}
+.tag-sim{font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+.ok-line{color:var(--green-l)}
+
+.lbl{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px}
+/* a label with its own icon, which says in a glyph what a sentence was saying */
+.lbl.ico{display:flex;align-items:center;justify-content:center;gap:7px}
+.lbl.ico svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+/* the two halves of a card sit side by side wherever there is room for them */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.pair > div + div{border-left:1px solid var(--line);padding-left:22px}
+@media(max-width:780px){
+  .pair{grid-template-columns:1fr;gap:16px}
+  .pair > div + div{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:16px}
+}
+.foot-note{color:var(--ink-3);font-size:.78rem;max-width:72ch;margin-left:auto;margin-right:auto}
+.rule{height:1px;background:var(--line)}
+.panel > .ph{display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 18px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.03);
+  font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2)}
+.panel > .ph .num{display:grid;place-items:center;width:20px;height:20px;border-radius:6px;font-size:.68rem;color:#fff;background:var(--c,var(--orange))}
+.panel .pb{padding:18px;display:grid;gap:13px}
+label{display:block;font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+input,textarea{text-align:center;width:100%;padding:11px 13px;font:600 .9375rem var(--font);color:var(--ink);
+  background:rgba(0,0,0,.45);border:1px solid var(--line-2);border-radius:11px;transition:border-color .2s,box-shadow .2s;
+  box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95),inset 0 -1px 0 rgba(255,255,255,.1)}
+input:focus,textarea:focus{outline:0;border-color:var(--orange);box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95),0 0 0 3px rgba(255,95,0,.18)}
+textarea{resize:vertical;min-height:60px;line-height:1.5;font-weight:500}
+/* the untrusted one reads as a quotation, not as a field you own */
+#page{font-size:.85rem;color:var(--ink-2);font-style:italic}
+.three{display:grid;grid-template-columns:1fr 6rem auto;gap:10px}
+@media(max-width:520px){.three{grid-template-columns:1fr}}
+.hint{font-size:.8125rem;color:var(--ink-2)}
+/* an asset picks its own mark; the ticker is the fallback, not the label */
+.picker{display:flex;gap:5px;justify-content:center}
+.picker button{width:38px;height:40px;display:grid;place-items:center;border-radius:11px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--ink-2);
+  box-shadow:0 3px 0 rgba(255,255,255,.07),inset 0 1px 0 rgba(255,255,255,.16);
+  transition:transform .12s var(--ease),box-shadow .12s var(--ease),color .18s,background .18s,border-color .18s}
+.picker button:hover{color:var(--ink);border-color:var(--line-2)}
+.picker button:active{transform:translateY(3px);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.picker button[aria-checked="true"]{background:var(--orange);color:#000;border-color:transparent;
+  box-shadow:0 3px 0 #A33D00,inset 0 2px 0 rgba(255,255,255,.45)}
+.picker button[aria-checked="true"]:active{transform:translateY(3px);box-shadow:inset 0 2px 0 rgba(255,255,255,.3)}
+.picker .sym{font:800 1.0625rem var(--font);line-height:1}
+.assetchip{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 15px;border-radius:11px;
+  border:1px solid var(--line);background:rgba(0,0,0,.45);color:var(--ink);
+  box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95)}
+.assetchip svg{width:19px;height:19px;fill:currentColor}
+.assetchip .dim{font-size:.8125rem}
+input[aria-invalid]{border-color:var(--red-l)}
+input[aria-invalid]:focus{border-color:var(--red-l);box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95),0 0 0 3px rgba(235,0,27,.22)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.chip{font:600 .8125rem var(--font);padding:7px 13px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.05);color:var(--ink-2);cursor:pointer;
+  box-shadow:0 3px 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.14);
+  transition:transform .12s var(--ease),box-shadow .12s var(--ease),background .2s,color .2s,border-color .2s}
+.chip:active{transform:translateY(3px);box-shadow:0 0 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.1)}
+.chip:hover{border-color:var(--orange);color:var(--ink);background:rgba(255,95,0,.1)}
+.out{display:grid;gap:10px;max-height:26rem;overflow:auto}
+.rec{border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:8px;background:rgba(255,255,255,.025);animation:rise .4s var(--ease)}
+.rec .call{font-size:.85rem;color:var(--ink-2);overflow-wrap:anywhere}
+.rec ul{margin:0;padding:0;list-style:none;font-size:.85rem;color:var(--ink-2)}
+.rec ul strong{color:var(--ink)}
+
+/* pre-wrap keeps the newlines that separate the commands while letting a
+   long URL fold; anywhere is what actually breaks an unspaced URL. */
+pre{text-align:left;border-radius:18px;padding:22px;font-size:.8125rem;line-height:1.7;margin:0;color:#E6E6EA;
+  white-space:pre-wrap;overflow-wrap:anywhere;
+  font-family:var(--mono);background:rgba(255,255,255,.03)}
+pre.glass{box-shadow:var(--pane)}
+pre .c{color:var(--ink-3)} pre .k{color:var(--yellow-l)} pre .u{color:var(--green-l)} pre .s{color:var(--orange-l)}
+
+footer.foot{border-top:1px solid var(--line);padding-block:36px 56px;color:var(--ink-2);font-size:.875rem}
+footer.foot .wrap{display:flex;flex-direction:column;gap:20px;align-items:center}
+footer.foot p{max-width:64ch;margin:0 auto}
+.rails-lead{color:var(--ink);font-weight:700;letter-spacing:-.01em}
+.rails{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.rail{display:inline-flex;align-items:center;gap:9px;padding:9px 15px;border-radius:999px;
+  font-size:.8125rem;font-weight:700;color:var(--ink-2);
+  border:1px solid var(--line);background:rgba(255,255,255,.05);
+  box-shadow:0 3px 0 rgba(255,255,255,.06),inset 0 1px 0 rgba(255,255,255,.13)}
+.rail svg{width:18px;height:18px;flex:none;color:var(--c,var(--ink-2))}
+/* work in progress, drawn as the mark: arcs spinning and breathing, dots
+   going the other way, the card holding still */
+.spin-mark{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-.15em}
+.spin-mark .s-arcs{transform-box:view-box;transform-origin:141px 115px;animation:d-spin 1.6s linear infinite}
+.spin-mark .s-arc{animation:d-breathe 1.6s ease-in-out infinite}
+.spin-mark .s-dots{transform-box:view-box;transform-origin:141px 115px;animation:d-spin 3.2s linear infinite reverse}
+@keyframes d-spin{to{transform:rotate(360deg)}}
+@keyframes d-breathe{0%{stroke-dasharray:6 94;stroke-dashoffset:0}50%{stroke-dasharray:70 30;stroke-dashoffset:-20}100%{stroke-dasharray:6 94;stroke-dashoffset:-100}}
+
+/* the comparison: one card per mechanism, ours last */
+.cmp-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(17.5rem,1fr))}
+.cmp{border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:var(--pane);--c:var(--ink-2)}
+.cmp-h{display:flex;flex-direction:column;align-items:center;gap:11px}
+.cmp-h h3{color:var(--ink)}
+.cmp .icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
+  background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.cmp .icon svg{width:19px;height:19px}
+.cmp-eg{font-size:.76rem;color:var(--ink-3);line-height:1.5}
+.cmp-kv{display:grid;gap:3px;margin:0;font-size:.86rem}
+.cmp-kv dt{font-size:.65rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin-top:8px}
+.cmp-kv dd{margin:0;color:var(--ink-2)}
+.cmp-score{margin-top:auto;padding-top:13px;border-top:1px solid var(--line);font-size:.875rem;font-weight:700;color:var(--red-l)}
+.cmp.us{border-color:color-mix(in srgb,var(--green-l) 50%,transparent);--c:var(--green-l)}
+.cmp.us .icon{background:color-mix(in srgb,var(--green-l) 12%,transparent);border-color:color-mix(in srgb,var(--green-l) 32%,transparent)}
+.cmp.us .cmp-score{color:var(--green-l);border-top-color:color-mix(in srgb,var(--green-l) 30%,transparent)}
+.cmp-note{max-width:70ch;margin:22px auto 0;line-height:1.6}
+
+.lbl.gap{margin-top:34px}
+
+/* the dashboard: two panels side by side, a key list, and the controls that
+   issue and withdraw. Everything else on the page is borrowed from the rest
+   of the site, so only what is genuinely new lives here. */
+/* the dashboard's own navigation: which pane is open, and how many things
+   are in each, without scrolling to find out */
+/* thirty days of availability, one column a day */
+.strip{display:flex;gap:3px;align-items:flex-end;height:44px}
+.strip .day{flex:1 1 0;min-width:4px;height:100%;border-radius:3px;opacity:.9}
+.strip .day.partial{opacity:.45}
+/* A declared day is drawn hollow. It reads as up without reading as a sample,
+   which is the distinction the strip exists to make. */
+.strip .day.declared{background:transparent!important;
+  border:1.5px solid var(--green-l);opacity:.5}
+.strip-ends{display:flex;justify-content:space-between;margin-top:8px;
+  font-size:.72rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* Scopes on the issue form. One row per scope, the plain-English name on the
+   left and the name the gateway actually checks on the right, because the
+   second is what an error message will quote back. */
+.scopes{border:0;margin:0;padding:0;display:grid;gap:8px;text-align:left}
+.scopes legend{padding:0;float:left;width:100%}
+.scopelist{display:grid;gap:6px}
+.scope{display:flex;align-items:center;gap:10px;cursor:pointer;
+  border:1px solid var(--line);border-radius:11px;padding:9px 12px;
+  background:rgba(255,255,255,.03);font-size:.875rem;font-weight:600;
+  transition:border-color .15s,background .15s}
+.scope:hover{border-color:var(--line-2);background:rgba(255,255,255,.055)}
+.scope input{accent-color:var(--orange);width:15px;height:15px;flex:none;margin:0}
+.scope span{flex:1}
+.scope code{font-size:.72rem;color:var(--ink-3)}
+.scope:has(input:checked){border-color:var(--orange);background:rgba(255,95,0,.08)}
+.scope:has(input:checked) code{color:var(--orange)}
+/* what a key carries, on its row in the list */
+.chip-sc{font-size:.68rem;color:var(--ink-2);border:1px solid var(--line);
+  border-radius:999px;padding:2px 8px;white-space:nowrap}
+
+/* the way in, in the navbar: primary, compact, and never hidden */
+.btn.tiny{padding:9px 18px;font-size:.82rem;flex:none}
+
+/* The auth forms are a single column of short fields, so they read better
+   narrow than stretched across a desktop, and centred rather than ranged left:
+   there is nothing beside them for a left edge to line up with. */
+#gate .panel{max-width:440px;margin:0 auto}
+#gate .pb{gap:11px;padding:16px;text-align:center;justify-items:center}
+#gate input{padding:10px 12px;font-size:.9rem;width:100%;text-align:center}
+#gate .lbl{margin-bottom:0}
+#gate .btn{width:100%;max-width:260px;margin-top:4px}
+#gate .hint{font-size:.82rem}
+@media(max-width:520px){
+  #gate .pb{padding:14px}
+  .swiper button{padding:9px 16px;font-size:.8125rem}
+  .strip{height:34px}
+}
+
+.tabbar{display:flex;align-items:center;gap:6px;border-radius:16px;padding:7px;margin:26px 0 18px;
+  overflow-x:auto;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;border:0;cursor:pointer;
+  border-radius:11px;padding:10px 15px;font:700 .875rem var(--font);color:var(--ink-2);
+  background:transparent;transition:color .15s,background .15s}
+.tab svg{width:15px;height:15px;flex:none}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:#000;background:var(--orange);
+  box-shadow:0 3px 0 #A33D00,0 8px 16px -8px rgba(0,0,0,.9)}
+.tab.quiet{color:var(--ink-3)}
+.tab.quiet:hover{color:var(--red-l)}
+.tab-sp{flex:1 1 auto;min-width:8px}
+.tab-n{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;
+  border-radius:999px;font-size:.7rem;background:rgba(255,255,255,.12);color:inherit}
+/* the tab text goes black on orange when selected, and a black count on a
+   dark pill disappears, so the badge inverts with it */
+.tab[aria-selected="true"] .tab-n{background:rgba(0,0,0,.3);color:#fff}
+
+/* the numbers, and the one bar that shows how the verdicts split */
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px}
+.stat{border-radius:16px;padding:16px 14px;box-shadow:var(--pane)}
+.stat-v{font-size:1.9rem;font-weight:800;letter-spacing:-.03em;line-height:1.05;
+  font-variant-numeric:tabular-nums}
+.stat-l{font-size:.78rem;color:var(--ink-2);margin-top:5px}
+.stat-s{font-size:.72rem;color:var(--ink-3);margin-top:3px}
+.bar{display:flex;height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.06)}
+.bar span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:.8rem;color:var(--ink-2)}
+.legend b{display:inline-flex;align-items:center;gap:7px;font-weight:600;color:var(--ink)}
+.legend .dot{width:9px;height:9px;border-radius:3px;flex:none}
+
+.cards{display:grid;gap:14px}
+@media(min-width:820px){.cards{grid-template-columns:1fr 1fr;align-items:start}}
+
+select{text-align:center;width:auto;padding:11px 13px;font:600 .9375rem var(--font);
+  color:var(--ink);background:rgba(255,255,255,.04);border:1px solid var(--line);
+  border-radius:12px;box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95);
+  -webkit-appearance:none;appearance:none;cursor:pointer}
+select:focus{outline:0;border-color:var(--orange);
+  box-shadow:inset 2px 3px 7px -3px rgba(0,0,0,.95),0 0 0 3px rgba(255,95,0,.18)}
+select option{background:#101013;color:var(--ink)}
+
+.btn.small{padding:9px 16px;font-size:.82rem}
+
+/* a revoked key is still listed, so it has to read as past rather than as a
+   row that failed to load */
+.rows .row.spent{opacity:.55}
+.rows .row.spent .row-i{color:var(--ink-3)}
+
+.rows .btn{justify-self:end}
+#secret{font-size:.8rem;word-break:break-all;text-align:center}
+
+
+/* the thesis, drawn in the same hand as the agent animation on the front page */
+.flowart{width:min(100%,520px);margin:10px auto 40px}
+.flowart svg{display:block;width:100%;height:auto;overflow:visible}
+
+/* one row per mechanism: mark, what it sees, what it comes to */
+.rows{display:grid;gap:10px}
+.rows .row{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;text-align:left;
+  padding:18px 22px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);
+  box-shadow:var(--pane);--c:var(--ink-3)}
+.row-i{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;color:var(--c);
+  background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.row-i svg{width:19px;height:19px}
+.row-t h3{font-size:1rem;margin-bottom:5px}
+.row-e{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-left:9px}
+.row-s{font-size:.86rem;color:var(--ink-2)}
+.row-b{font-size:.86rem;color:var(--ink-3)}
+.row-r{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;white-space:nowrap;text-align:right;text-decoration:none}
+.row-r i{display:block;font-size:.7rem;font-style:normal;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-3);margin-top:3px}
+.row-r.bad{color:var(--red-l)} .row-r.warn{color:var(--yellow-l)} .row-r.good{color:var(--green-l)}
+.rows .row.us{border-color:color-mix(in srgb,var(--green-l) 45%,transparent);--c:var(--green-l)}
+.rows .row.us .row-i{background:color-mix(in srgb,var(--green-l) 12%,transparent);
+  border-color:color-mix(in srgb,var(--green-l) 32%,transparent)}
+@media(max-width:700px){
+  .rows .row{grid-template-columns:1fr;gap:12px;text-align:center;justify-items:center;padding:20px}
+  .row-r{text-align:center}
+  .row-r i{margin-top:2px}
+}
+
+/* the two protocol probes, under the comparison grid */
+.probes{margin-top:30px;display:grid;gap:14px}
+.probes > .lbl{margin-bottom:2px}
+.probe{border-radius:18px;padding:20px;box-shadow:var(--pane);display:grid;gap:12px}
+.probe-h{display:flex;align-items:baseline;justify-content:center;gap:12px;flex-wrap:wrap}
+.probe-h h3{font-size:1.125rem}
+.probe-v{font-size:.72rem;color:var(--ink-3);font-weight:600}
+.probe-q{font-size:.875rem;color:var(--ink-2)}
+.probe-r{display:grid;gap:7px;margin:0;font-size:.875rem}
+.probe-r dt{color:var(--ink-2)}
+.probe-r dd{margin:0 0 6px;font-weight:700}
+.probe-r dd.bad{color:var(--red-l)}
+.probe-r dd.good{color:var(--green-l)}
+.probe-n{font-size:.82rem;color:var(--ink-3);line-height:1.6;border-top:1px solid var(--line);padding-top:12px;max-width:68ch;margin:0 auto}
+@media(min-width:820px){
+  .probe-r{grid-template-columns:1fr auto;align-items:baseline;text-align:left;gap:9px 20px}
+  .probe-r dd{margin:0;text-align:right}
+}
+
+/* the bar above the curl block */
+.codewrap{display:grid;gap:12px}
+.codebar{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.codebar .chip{text-decoration:none}
+.codebar-lbl{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.codebar-sep{width:1px;height:18px;background:var(--line)}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .test,.test.enter,.mark .dot,.mark .body{opacity:1}
+  .mark .arc{stroke-dashoffset:0}
+}
+
+/* the link for the page you are on */
+
+.navmark{display:block;line-height:0;flex:none}
+
+/* one row per endpoint, on the status page */
+.checks{display:grid;gap:8px}
+.check{display:grid;grid-template-columns:4.6rem 1fr auto 3.4rem;gap:12px;align-items:center;text-align:left;
+  padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.check.up{border-color:color-mix(in srgb,var(--green-l) 40%,transparent)}
+.check.slow{border-color:color-mix(in srgb,var(--yellow-l) 45%,transparent)}
+.check.down{border-color:color-mix(in srgb,var(--red-l) 45%,transparent)}
+.check .verb{font-size:.68rem;font-weight:800;letter-spacing:.08em;text-align:center;
+  padding:4px 0;border-radius:6px;background:rgba(255,255,255,.06);color:var(--ink-2)}
+.check .verb.get{color:var(--green-l)} .check .verb.post{color:var(--orange-l)} .check .verb.delete{color:var(--red-l)}
+.check .path{font-size:.8rem;color:var(--ink-2);overflow-wrap:anywhere}
+.check .ms{font-size:.8rem;font-weight:700;color:var(--ink)}
+.check .code{font-size:.78rem;color:var(--ink-3);text-align:right}
+.check.up .code{color:var(--green-l)} .check.slow .code{color:var(--yellow-l)} .check.down .code{color:var(--red-l)}
+@media(max-width:560px){
+  .check{grid-template-columns:4.2rem 1fr auto;gap:8px}
+  .check .code{grid-column:2/4;text-align:left}
+}

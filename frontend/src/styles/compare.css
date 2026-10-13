@@ -1,0 +1,57 @@
+/*
+ * Compare page styles. Loaded alongside shared.css (pinned from demo/public/app.css).
+ *
+ * Some selectors below — .rows, .row-*, .flowart, .probes, .probe-*, .rails,
+ * .rail — also exist in shared.css. The redeclarations here are intentional:
+ * shared.css contains the legacy site's definitions for those classes, which
+ * serve the Dashboard and Tests pages. The versions here tune the same classes
+ * for the Compare page's layout and animation needs without touching shared.css.
+ *
+ * Do not remove the duplicates assuming they are accidents.
+ */
+.compare-page .hero { padding-block: clamp(56px, 9vw, 112px) clamp(40px, 6vw, 72px); }
+.compare-page .flowart { width: min(100%, 520px); margin: 10px auto 40px; }
+.flowart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.c-line { fill: none; stroke: var(--ink-3); stroke-width: 2; }
+.c-ink { fill: none; stroke: var(--ink-2); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.c-wire { stroke-dasharray: 4 7; animation: compare-flow 1.3s linear infinite; }
+.c-lbl { fill: var(--ink-3); font: 700 11.5px var(--font); letter-spacing: 1.6px; text-anchor: middle; }
+.c-leg { opacity: 0; animation: compare-leg 12s cubic-bezier(.55,0,.45,1) infinite; }
+.c-gate { transform-box: fill-box; transform-origin: center; animation: compare-gate 12s ease-out infinite; }
+.c-paid, .c-no { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.c-paid { animation: compare-paid 12s ease-out infinite; }
+.c-no { animation: compare-no 12s ease-out infinite; }
+@keyframes compare-flow { to { stroke-dashoffset: -11; } }
+@keyframes compare-leg { 0% { opacity: 0; transform: translate(0,0); } 1% { opacity: 1; } 7.5% { opacity: 1; transform: translate(var(--dx),var(--dy)); } 8.7%,100% { opacity: 0; transform: translate(var(--dx),var(--dy)); } }
+@keyframes compare-gate { 0%,8% { transform: scale(1); } 9.4% { transform: scale(1.08); } 12%,56% { transform: scale(1); } 57.4% { transform: scale(1.08); } 60%,100% { transform: scale(1); } }
+@keyframes compare-paid { 0%,17.5% { opacity: 0; transform: scale(.7); } 19% { opacity: 1; transform: scale(1); } 30% { opacity: 1; } 34%,100% { opacity: 0; } }
+@keyframes compare-no { 0%,57% { opacity: 0; transform: scale(.7); } 58.5% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 74%,100% { opacity: 0; } }
+.rows { display: grid; gap: 10px; }
+.rows .row { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; text-align: left; padding: 18px 22px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.03); box-shadow: var(--pane); --c: var(--ink-3); }
+.row-i { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; color: var(--c); background: rgba(255,255,255,.04); border: 1px solid var(--line); }
+.row-i svg { width: 19px; height: 19px; }
+.row-t h3 { font-size: 1rem; margin-bottom: 5px; }
+.row-e { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-left: 9px; }
+.row-s { font-size: .86rem; color: var(--ink-2); }
+.row-r { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; text-align: right; text-decoration: none; }
+.row-r i { display: block; font-size: .7rem; font-style: normal; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-top: 3px; }
+.row-r.bad { color: var(--red-l); } .row-r.warn { color: var(--yellow-l); } .row-r.good { color: var(--green-l); }
+.rows .row.us { border-color: color-mix(in srgb,var(--green-l) 45%,transparent); --c: var(--green-l); }
+.rows .row.us .row-i { background: color-mix(in srgb,var(--green-l) 12%,transparent); border-color: color-mix(in srgb,var(--green-l) 32%,transparent); }
+.probes { margin-top: 30px; display: grid; gap: 14px; }
+.probe { border-radius: 18px; padding: 20px; box-shadow: var(--pane); display: grid; gap: 12px; }
+.probe-h { display: flex; align-items: baseline; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.probe-h h3 { font-size: 1.125rem; }
+.probe-v { font-size: .72rem; color: var(--ink-3); font-weight: 600; }
+.probe-r { display: grid; gap: 7px; margin: 0; font-size: .875rem; }
+.probe-r dt { color: var(--ink-2); }
+.probe-r dd { margin: 0 0 6px; font-weight: 700; }
+.probe-r dd.bad { color: var(--red-l); } .probe-r dd.good { color: var(--green-l); }
+.probe-n { font-size: .82rem; color: var(--ink-3); line-height: 1.6; border-top: 1px solid var(--line); padding-top: 12px; max-width: 68ch; margin: 0 auto; }
+.rails-section { padding-block: 0 clamp(48px, 7vw, 80px); }
+.rails-lead { color: var(--ink); font-weight: 700; letter-spacing: -.01em; }
+.rails { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; color: var(--ink-2); }
+.rail { border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; }
+@media (min-width: 820px) { .probe-r { grid-template-columns: 1fr auto; align-items: baseline; text-align: left; gap: 9px 20px; } .probe-r dd { margin: 0; text-align: right; } }
+@media (max-width: 700px) { .rows .row { grid-template-columns: 1fr; gap: 12px; text-align: center; justify-items: center; padding: 20px; } .row-r { text-align: center; } .row-r i { margin-top: 2px; } }
+@media (prefers-reduced-motion: reduce) { .flowart * { animation: none; } }
