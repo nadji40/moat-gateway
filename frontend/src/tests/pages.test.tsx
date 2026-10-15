@@ -32,15 +32,26 @@ describe('documentation and team pages', () => {
     expect(writeText).toHaveBeenCalledWith(document.querySelector('#quickstart pre')!.textContent)
   })
 
-  it('renders every team member with a placeholder until a photo is given', () => {
+  it('draws the team as a molecule: founder at the centre, four teams, ten people', () => {
     window.history.replaceState({}, '', '/team')
     render(<App />)
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/pay only what was asked/i)
-    const cards = document.querySelectorAll('.tm-card')
-    expect(cards).toHaveLength(10)
-    expect(document.querySelectorAll('.tm-initials[data-photo="pending"]')).toHaveLength(10)
-    expect(screen.getByText('Nadji Sabri')).toBeInTheDocument()
-    expect(screen.getByText('Adam Belkadi')).toBeInTheDocument()
+    expect(document.querySelectorAll('.mol-node.center')).toHaveLength(1)
+    expect([...document.querySelectorAll('.mol-node.team')].map((n) => n.getAttribute('aria-label')))
+      .toEqual(['Engineering team', 'Research team', 'Data team', 'Security team'])
+    expect(document.querySelectorAll('.mol-node.member')).toHaveLength(9)
+    expect(document.querySelectorAll('.mol-edge')).toHaveLength(13)
+
+    // Choosing a person shows who they are and lights their path.
+    fireEvent.click(screen.getByRole('button', { name: 'Dhoha Boumediene, Policy data' }))
+    expect(document.querySelector('.mol-card h3')).toHaveTextContent('Dhoha Boumediene')
+    expect(document.querySelector('.mol-card .tm-role')).toHaveTextContent('Data team')
+    expect(document.querySelectorAll('.mol-edge.on')).toHaveLength(2)
+
+    // The list for phones has all ten, with a placeholder until a photo is given.
+    expect(document.querySelectorAll('.tm-groups .tm-card')).toHaveLength(10)
+    expect(document.querySelectorAll('.tm-groups .tm-initials[data-photo="pending"]')).toHaveLength(10)
   })
+
 })
