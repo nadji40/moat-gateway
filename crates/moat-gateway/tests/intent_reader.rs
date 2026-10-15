@@ -52,7 +52,14 @@ async fn read(State(calls): State<Arc<AtomicUsize>>, Json(body): Json<Value>) ->
     }))
 }
 
+/// The tests in this file take turns. Each picks free ports by binding and
+/// releasing them, and two harnesses starting at once could be handed the
+/// same port: one test's intent call then lands on another test's gateway,
+/// which does not know its session and answers 404.
+static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 struct Harness {
+    _serial: tokio::sync::MutexGuard<'static, ()>,
     _gw: Peer,
     api: String,
     session: String,
@@ -63,6 +70,7 @@ impl Harness {
     /// A gateway whose intent API points at a reader. `reader_up` false
     /// points it at a port nobody listens on.
     async fn start(session: &str, reader_up: bool) -> Harness {
+        let serial = SERIAL.lock().await;
         let reader_calls = Arc::new(AtomicUsize::new(0));
         let reader_port = free_port();
         if reader_up {
@@ -74,7 +82,15 @@ impl Harness {
                 .with_state(Arc::clone(&reader_calls));
             tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
         }
-        let api = format!("127.0.0.1:{}", free_port());
+        // A reader that is down holds no port, so the gateway could be handed
+        // the same one; it would then be asking itself to read.
+        let api_port = loop {
+            let port = free_port();
+            if port != reader_port {
+                break port;
+            }
+        };
+        let api = format!("127.0.0.1:{api_port}");
         let cfg = write_config(
             &format!("intent-reader-{session}"),
             &format!(
@@ -108,6 +124,7 @@ intent_api:
             .await;
         wait_for_api(&api).await;
         Harness {
+            _serial: serial,
             _gw: gw,
             api,
             session: session.to_owned(),
