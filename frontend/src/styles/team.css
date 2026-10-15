@@ -1,5 +1,8 @@
 /* The team page: a grid of people, then three facts. */
 .team .hero .lede { max-width: 60ch; }
+.tm-groups { display: grid; gap: 36px; }
+.tm-group { display: grid; gap: 14px; text-align: left; }
+.tm-h { font-size: .75rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); padding-left: 2px; }
 .tm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; text-align: left; }
 .tm-card { border-radius: 18px; padding: 22px 20px 22px; display: flex; flex-direction: column; gap: 6px; }
 .tm-card h3 { font-size: 1.05rem; margin-top: 14px; }

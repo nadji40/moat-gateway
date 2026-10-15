@@ -9,17 +9,34 @@ type Member = {
   photo?: string
 }
 
-const team: Member[] = [
-  { name: 'Nadji Sabri', role: 'Founder', line: 'Started Moat. Builds the gateway, the policy engine and the infrastructure it runs on.' },
-  { name: 'Mounya Hasni', role: 'Research analyst', line: 'Regulation and market research: what the rules require, and who needs this.' },
-  { name: 'Zahra Boucheta', role: 'Data and ML', line: 'The intent reader: which model, how accurate, how fast.' },
-  { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', line: 'Design and front-end work across the site.' },
-  { name: 'Meriem Sara Aounallah', role: 'Language testing', line: 'Arabic dialects, names and currencies: how Moat reads what people actually write.' },
-  { name: 'Dhoha Boumediene', role: 'Policy testing', line: 'Honest payments, limits and currencies: making sure the right payments go through.' },
-  { name: 'Redwan Ben', role: 'Adversarial testing', line: 'The attack corpus: every way to get a payment past Moat, tried.' },
-  { name: 'Khawla Hammouda', role: 'Front-end engineer', line: 'The React site you are reading.' },
-  { name: 'Rofeida Imoussaine', role: 'Security engineer', line: 'Attacks on the payment checks, the reader and the evidence chain.' },
-  { name: 'Adam Belkadi', role: 'Security engineer', line: 'Keys, permissions, workspace isolation and the dashboard.' },
+type Group = { title: string; members: Member[] }
+
+/** In the order the work flows: who started it, who builds it, who makes it
+ *  read, who attacks it, who checks it lets the right payments through, and
+ *  who studies the market it goes into. */
+const groups: Group[] = [
+  { title: 'Leadership', members: [
+    { name: 'Nadji Sabri', role: 'Founder', line: 'Started Moat. Builds the gateway, the policy engine and the infrastructure it runs on.' },
+  ] },
+  { title: 'Engineering', members: [
+    { name: 'Khawla Hammouda', role: 'Front-end engineer', line: 'The React site you are reading.' },
+    { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', line: 'Design and front-end work across the site.' },
+  ] },
+  { title: 'Data and ML', members: [
+    { name: 'Zahra Boucheta', role: 'Data and ML', line: 'The intent reader: which model, how accurate, how fast.' },
+  ] },
+  { title: 'Security', members: [
+    { name: 'Adam Belkadi', role: 'Security engineer', line: 'Keys, permissions, workspace isolation and the dashboard.' },
+    { name: 'Rofeida Imoussaine', role: 'Security engineer', line: 'Attacks on the payment checks, the reader and the evidence chain.' },
+  ] },
+  { title: 'Testing', members: [
+    { name: 'Redwan Ben', role: 'Adversarial testing', line: 'The attack corpus: every way to get a payment past Moat, tried.' },
+    { name: 'Dhoha Boumediene', role: 'Policy testing', line: 'Honest payments, limits and currencies: making sure the right payments go through.' },
+    { name: 'Meriem Sara Aounallah', role: 'Language testing', line: 'Arabic dialects, names and currencies: how Moat reads what people actually write.' },
+  ] },
+  { title: 'Research', members: [
+    { name: 'Mounya Hasni', role: 'Research analyst', line: 'Regulation and market research: what the rules require, and who needs this.' },
+  ] },
 ]
 
 const initials = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('')
@@ -42,17 +59,22 @@ export default function Team() {
             <p className="lede">Moat started in 2026 as one question: when an AI agent pays the wrong company, who could have stopped it? The answer was a gateway that checks every payment against the user's own words. We build it, and we spend most of our time trying to break it.</p>
           </header>
 
-          <section className="tight">
-            <div className="tm-grid">
-              {team.map((m) => (
-                <article className="tm-card glass" key={m.name}>
-                  <Avatar member={m} />
-                  <h3>{m.name}</h3>
-                  <p className="tm-role">{m.role}</p>
-                  <p className="tm-line">{m.line}</p>
-                </article>
-              ))}
-            </div>
+          <section className="tight tm-groups">
+            {groups.map((g) => (
+              <div className="tm-group" key={g.title}>
+                <h2 className="tm-h">{g.title}</h2>
+                <div className="tm-grid">
+                  {g.members.map((m) => (
+                    <article className="tm-card glass" key={m.name}>
+                      <Avatar member={m} />
+                      <h3>{m.name}</h3>
+                      <p className="tm-role">{m.role}</p>
+                      <p className="tm-line">{m.line}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ))}
           </section>
 
           <section className="tight">
