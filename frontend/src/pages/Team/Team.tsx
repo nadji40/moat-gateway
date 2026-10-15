@@ -13,7 +13,7 @@ const team: Member[] = [
   { name: 'Nadji Sabri', role: 'Founder', line: 'Started Moat. Builds the gateway, the policy engine and the infrastructure it runs on.' },
   { name: 'Mounya Hasni', role: 'Research analyst', line: 'Regulation and market research: what the rules require, and who needs this.' },
   { name: 'Zahra Boucheta', role: 'Data and ML', line: 'The intent reader: which model, how accurate, how fast.' },
-  { name: 'Rayan Yasser', role: 'Design and front-end', line: 'Design and front-end work across the site.' },
+  { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', line: 'Design and front-end work across the site.' },
   { name: 'Meriem Sara Aounallah', role: 'Language testing', line: 'Arabic dialects, names and currencies: how Moat reads what people actually write.' },
   { name: 'Dhoha Boumediene', role: 'Policy testing', line: 'Honest payments, limits and currencies: making sure the right payments go through.' },
   { name: 'Redwan Ben', role: 'Adversarial testing', line: 'The attack corpus: every way to get a payment past Moat, tried.' },
