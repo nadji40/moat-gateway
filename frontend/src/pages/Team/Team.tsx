@@ -15,6 +15,7 @@ const founder: Member = {
   name: 'Nadji Sabri',
   role: 'Founder',
   line: 'Started Moat. Builds the gateway, the policy engine and the infrastructure it runs on.',
+  photo: '/team/nadji.jpg',
 }
 
 /** Data has the most people, so it gets the right side of the molecule,
@@ -219,10 +220,12 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
           <g key={n.id} ref={(el) => { if (el) nodeRefs.current.set(n.id, el) }} transform={`translate(${n.x} ${n.y})`}>
             <g className={`mol-node ${n.kind}${lit.has(n.id) ? ' on' : ''}${selected === n.id ? ' sel' : ''}`} style={{ animationDelay: delay }}
                tabIndex={0} role="button" aria-label={n.member ? `${name}, ${n.member.role}` : `${name} team`} aria-pressed={selected === n.id} {...handlers(n.id)}>
-              {n.kind === 'center' && <circle className="mol-ring" r={n.r + 12} />}
               <circle className="mol-dot" r={n.r} />
               {n.member?.photo
-                ? <image href={n.member.photo} x={-(n.r - 2)} y={-(n.r - 2)} width={(n.r - 2) * 2} height={(n.r - 2) * 2} clipPath={`url(#${clipId(n.id)})`} preserveAspectRatio="xMidYMid slice" />
+                ? <>
+                    <image href={n.member.photo} x={-(n.r - 2)} y={-(n.r - 2)} width={(n.r - 2) * 2} height={(n.r - 2) * 2} clipPath={`url(#${clipId(n.id)})`} preserveAspectRatio="xMidYMid slice" />
+                    <circle className="mol-rim" r={n.r - 1} />
+                  </>
                 : n.kind === 'team'
                   ? <text className="mol-team" textAnchor="middle" dy="5">{name}</text>
                   : <text className="mol-ini" textAnchor="middle" dy={n.kind === 'center' ? 9 : 6}>{initials(name)}</text>}

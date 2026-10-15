@@ -18,9 +18,10 @@
 .mol-dot { fill: #0D0D10; stroke: rgba(255,255,255,.22); stroke-width: 1.5; transition: stroke .4s, fill .4s; }
 .mol-node.team .mol-dot { fill: #141418; stroke: rgba(255,138,76,.55); stroke-width: 2; }
 .mol-node.center .mol-dot { fill: url(#mol-core); stroke: none; }
-.mol-ring { fill: none; stroke: rgba(255,138,76,.35); stroke-width: 1.5; stroke-dasharray: 4 7;
-  animation: mol-spin 40s linear infinite; transform-box: fill-box; transform-origin: center; }
-@keyframes mol-spin { to { transform: rotate(360deg); } }
+/* a photo keeps the node's edge, in orange at the centre */
+.mol-rim { fill: none; stroke: rgba(255,255,255,.25); stroke-width: 2; pointer-events: none; }
+.mol-node.center .mol-rim { stroke: var(--orange); stroke-width: 3; }
+.mol-node.on .mol-rim { stroke: var(--orange); }
 .mol-node.on .mol-dot { stroke: var(--orange); }
 .mol-node.sel .mol-dot { stroke-width: 3; }
 .mol-node:hover .mol-dot, .mol-node:focus-visible .mol-dot { stroke: var(--orange-l); stroke-width: 3; }
@@ -42,7 +43,7 @@
 .mol-card .tm-line { margin-top: 6px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mol-halo, .mol-ring { animation: none; }
+  .mol-halo { animation: none; }
   .mol-node { animation: none; opacity: 1; }
 }
 

@@ -49,9 +49,12 @@ describe('documentation and team pages', () => {
     expect(document.querySelector('.mol-card .tm-role')).toHaveTextContent('Data team')
     expect(document.querySelectorAll('.mol-edge.on')).toHaveLength(2)
 
-    // The list for phones has all ten, with a placeholder until a photo is given.
+    // A given photo is used in the molecule and the list; everyone else
+    // keeps a placeholder until theirs arrives.
+    expect(document.querySelector('.mol-node.center image')).toHaveAttribute('href', '/team/nadji.jpg')
     expect(document.querySelectorAll('.tm-groups .tm-card')).toHaveLength(10)
-    expect(document.querySelectorAll('.tm-groups .tm-initials[data-photo="pending"]')).toHaveLength(10)
+    expect(document.querySelectorAll('.tm-groups img.tm-pic')).toHaveLength(1)
+    expect(document.querySelectorAll('.tm-groups .tm-initials[data-photo="pending"]')).toHaveLength(9)
   })
 
 })
