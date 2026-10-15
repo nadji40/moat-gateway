@@ -36,6 +36,19 @@ import {
 
 const HERE = dirname(dirname(fileURLToPath(import.meta.url)));
 const PUBLIC = join(HERE, "public");
+/** Where `npm run build` in frontend/ puts the React pages. Optional. */
+const FRONTEND = join(HERE, "..", "frontend", "dist");
+
+/** The built file for a path, or nothing: `/` and `/compare` are directories
+ *  holding an index.html, assets are files, and anything else is not ours. */
+function builtFile(path: string): string | undefined {
+  const tries = extname(path) ? [path] : [`${path.replace(/\/$/, "")}/index.html`];
+  for (const t of tries) {
+    const file = resolve(FRONTEND, `.${t}`);
+    if (file.startsWith(FRONTEND) && existsSync(file)) return file;
+  }
+  return undefined;
+}
 const CFG: SandboxConfig = {
   repo: resolve(HERE, ".."),
   config: process.env["MOAT_DEMO_CONFIG"] ?? join(resolve(HERE, ".."), "arena", "moat.demo.yaml"),
@@ -236,13 +249,18 @@ const server = createServer(async (req, res) => {
     // the storage permanent. An extensionless path that matches a page is
     // served as that page; the old .html paths still resolve, so a link
     // already sent out does not break.
+    //
+    // The React build in frontend/dist answers first, when there is one: its
+    // pages (/ and /compare) and their assets. A path it does not have falls
+    // through to the classic pages here, so a page not yet ported keeps
+    // working, and a server with no build serves the classic site unchanged.
     let wanted = path === "/" ? "/index.html" : path;
     if (!extname(wanted)) {
       const asPage = resolve(PUBLIC, `.${wanted}.html`);
       if (asPage.startsWith(PUBLIC) && existsSync(asPage)) wanted = `${wanted}.html`;
     }
-    const file = resolve(PUBLIC, `.${wanted}`);
-    if (!file.startsWith(PUBLIC) || !existsSync(file)) {
+    const file = builtFile(path) ?? resolve(PUBLIC, `.${wanted}`);
+    if (!(file.startsWith(PUBLIC) || file.startsWith(FRONTEND)) || !existsSync(file)) {
       res.writeHead(404, { "content-type": "text/plain" });
       return res.end("not found");
     }
