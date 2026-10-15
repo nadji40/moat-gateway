@@ -22,17 +22,17 @@ const founder: Member = {
  *  where there is room for four branches. */
 const teams: Team[] = [
   { name: 'Engineering', members: [
-    { name: 'Khawla Hammouda', role: 'Front-end engineer', line: 'The React site you are reading.' },
-    { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', line: 'Design and front-end work across the site.' },
+    { name: 'Khawla Hammouda', role: 'Front-end engineer', line: 'The React site you are reading.', photo: '/team/khawla.jpg' },
+    { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', line: 'Design and front-end work across the site.', photo: '/team/rayan.jpg' },
   ] },
   { name: 'Research', members: [
     { name: 'Mounya Hasni', role: 'Research analyst', line: 'Regulation and market research: what the rules require, and who needs this.' },
   ] },
   { name: 'Data', members: [
-    { name: 'Zahra Boucheta', role: 'Data and ML', line: 'The intent reader: which model, how accurate, how fast.' },
-    { name: 'Redwan Ben', role: 'Adversarial data', line: 'The attack corpus: every way to get a payment past Moat, tried.' },
+    { name: 'Zahra Boucheta', role: 'Data and ML', line: 'The intent reader: which model, how accurate, how fast.', photo: '/team/zahra.jpg' },
+    { name: 'Redwan Ben', role: 'Adversarial data', line: 'The attack corpus: every way to get a payment past Moat, tried.', photo: '/team/redwan.jpg' },
     { name: 'Dhoha Boumediene', role: 'Policy data', line: 'Honest payments, limits and currencies: making sure the right payments go through.' },
-    { name: 'Meriem Sara Aounallah', role: 'Language data', line: 'Arabic dialects, names and currencies: how Moat reads what people actually write.' },
+    { name: 'Meriem Sara Aounallah', role: 'Language data', line: 'Arabic dialects, names and currencies: how Moat reads what people actually write.', photo: '/team/meriem.jpg' },
   ] },
   { name: 'Security', members: [
     { name: 'Adam Belkadi', role: 'Security engineer', line: 'Keys, permissions, workspace isolation and the dashboard.' },

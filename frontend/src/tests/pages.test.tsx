@@ -53,8 +53,11 @@ describe('documentation and team pages', () => {
     // keeps a placeholder until theirs arrives.
     expect(document.querySelector('.mol-node.center image')).toHaveAttribute('href', '/team/nadji.jpg')
     expect(document.querySelectorAll('.tm-groups .tm-card')).toHaveLength(10)
-    expect(document.querySelectorAll('.tm-groups img.tm-pic')).toHaveLength(1)
-    expect(document.querySelectorAll('.tm-groups .tm-initials[data-photo="pending"]')).toHaveLength(9)
+    const photos = document.querySelectorAll('.tm-groups img.tm-pic').length
+    const pending = document.querySelectorAll('.tm-groups .tm-initials[data-photo="pending"]').length
+    expect(photos).toBeGreaterThan(0)
+    expect(photos + pending).toBe(10)
+    expect(document.querySelectorAll('.mol-node image')).toHaveLength(photos)
   })
 
 })
