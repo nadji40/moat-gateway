@@ -22,6 +22,8 @@ export default defineConfig(({ mode }) => {
         input: {
           home: resolve(process.cwd(), 'index.html'),
           compare: resolve(process.cwd(), 'compare/index.html'),
+          docs: resolve(process.cwd(), 'docs/index.html'),
+          team: resolve(process.cwd(), 'team/index.html'),
         },
       },
     },

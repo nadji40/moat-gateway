@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 
 const links = [
-  { href: '/#api', label: 'API', page: 'index' },
+  { href: '/docs', label: 'Docs', page: 'docs' },
   { href: '/compare', label: 'Compare', page: 'compare' },
   { href: '/tests', label: 'The tests', page: 'tests' },
   { href: '/status', label: 'Status', page: 'status' },
+  { href: '/team', label: 'Team', page: 'team' },
 ]
 
 function Mark() {

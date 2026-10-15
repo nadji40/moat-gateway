@@ -30,7 +30,7 @@ describe('unchanged shared navigation behavior', () => {
     expect(document.querySelector('#auth')?.textContent).toBe(signedIn ? 'Dashboard' : 'Log in')
     expect(document.querySelector('#auth')?.getAttribute('href')).toBe('/dashboard')
     expect([...document.querySelectorAll('#navlinks a')].map(a => a.getAttribute('href')))
-      .toEqual(['/#api', '/compare', '/tests', '/status'])
+      .toEqual(['/docs', '/compare', '/tests', '/status', '/team'])
     const toggle = document.querySelector<HTMLButtonElement>('#navtoggle')!
     toggle.click()
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
@@ -38,7 +38,11 @@ describe('unchanged shared navigation behavior', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(toggle)
     toggle.click()
-    document.querySelector<HTMLAnchorElement>('#navlinks a')!.click()
+    // A hash link: jsdom cannot navigate to another page, and the point is
+    // only that choosing a link closes the menu.
+    const link = document.querySelector<HTMLAnchorElement>('#navlinks a')!
+    link.setAttribute('href', '#top')
+    link.click()
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
   })
 })
