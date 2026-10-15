@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/tests/fixtures/approved-home.html",
+    "origin": "demo/public/index.html",
+    "sha256": "d25813eb4d0ae7b953524f230f6a1335d78919afa03a4d2321514e926b54b8aa"
+  },
+  {
+    "file": "src/styles/shared.css",
+    "origin": "demo/public/app.css",
+    "sha256": "cfb884cf1852983187839c5192dc4633954e12813bb45e85d8057a0f1fb85a44"
+  },
+  {
+    "file": "public/shared/app.js",
+    "origin": "demo/public/app.js",
+    "sha256": "808ce1731833e7270e1b1f9d758faa4d12336b7a2671fb882198307b7b79a1e1"
+  },
+  {
+    "file": "public/shared/trail.js",
+    "origin": "demo/public/trail.js",
+    "sha256": "b5f3188c52e57d44662caf2feded3223cfab8e17b0f1a819e04d2c5de810d14d"
+  },
+  {
+    "file": "public/cursor.svg",
+    "origin": "demo/public/cursor.svg",
+    "sha256": "a95145c153182c37364fa3f2773a95da72aacee423791dcef3943b6753e317a2"
+  },
+  {
+    "file": "public/favicon.svg",
+    "origin": "demo/public/favicon.svg",
+    "sha256": "9d9fc8af4c281ab6a660e91d37dd9b8c4258e61c4245d121ce36f1c84519e1ef"
+  }
+]

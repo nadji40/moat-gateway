@@ -1,0 +1,140 @@
+/* Shared footer layout used by React-managed pages. */
+footer.foot {
+  padding-block: 48px 60px;
+}
+footer.foot .wrap {
+  gap: 28px;
+  align-items: stretch;
+}
+
+.fcols {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.5fr) repeat(3, minmax(0, 1fr));
+  gap: 32px;
+  width: 100%;
+  text-align: left;
+  align-items: start;
+}
+.fcols > * { min-width: 0; }
+
+.fcols h4 {
+  margin: 2px 0 12px;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.fcols a {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 4px 0;
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: color 0.18s ease;
+}
+.fcols a:hover,
+.fcols a:focus-visible { color: var(--orange); }
+.fcols a:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.fbrand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+}
+.fbrand .mark { width: 36px; height: 36px; }
+.fbrand p {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.footer-social {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.social-link {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0 !important;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--ink-2);
+  transition:
+    color 0.18s ease,
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    transform 0.18s ease;
+}
+.social-link:hover,
+.social-link:focus-visible {
+  border-color: var(--line-2);
+  background: rgba(255, 95, 0, 0.08);
+  color: var(--orange);
+  transform: translateY(-1px);
+}
+.social-link svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+}
+.social-link-unavailable {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+.social-link:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+
+.fbase {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  padding-top: 4px;
+  color: var(--ink-3);
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 1024px) {
+  .fcols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 24px;
+  }
+  .fcols a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding-block: 10px;
+  }
+  .fbase {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .fbase > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 560px) {
+  .fcols { gap: 24px 16px; }
+  .fbrand p { max-width: 25ch; }
+  .fbase { flex-direction: column; }
+}
+@media (max-width: 400px) {
+  .fcols { gap: 22px 14px; }
+  .fbrand p { max-width: 22ch; }
+}
