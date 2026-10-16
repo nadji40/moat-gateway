@@ -363,10 +363,11 @@ $("#attempt").addEventListener("click", async () => {
    wallets abbreviate the middle, so the two look identical in a list.
    --------------------------------------------------------------------- */
 const PAYEE="Northwind Cloud Co";
-/* The networks are shown as "On chain 1" to "On chain 4", with no network or
-   asset names: the point of the demo is the address checks, which are the
-   same on every chain, and a name would only say which coin it is. */
-const CHAIN_LABEL=(i)=>L(`On chain ${i+1}`,`على السلسلة ${i+1}`);
+/* drawn rather than fetched, so the page ships no third-party asset */
+const MARK={
+  ETH:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5.2 12.1 12 15.9l6.8-3.8z" opacity=".55"/><path d="M12 17.2 5.2 13.4 12 22l6.8-8.6z"/></svg>',
+  SOL:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.8 5.6H20.5L17.2 8.9H3.5z"/><path d="M3.5 10.4h13.7l3.3 3.3H6.8z" opacity=".65"/><path d="M6.8 15.1H20.5L17.2 18.4H3.5z"/></svg>',
+};
 const CHAINS=[
   {id:"eip155:84532", name:"Base Sepolia", kind:"evm", asset:"ETH", amount:"0.00002",
    approved:"0x8F3A9c21D5e74B0aC6fE18b2D7c4E90a1B3f52D7",
@@ -403,22 +404,22 @@ function decide(to,amt){
   const t=to.trim();
   if(!t) return {decision:"deny",reasons:[["destination-missing",L("no destination address was given","لم يُعطَ عنوان وجهة")]]};
   if(!shapeOk(chain,t)) return {decision:"deny",reasons:[["destination-format",
-    L("that is not a valid address on this chain, so nothing could be signed for it",
-      "هذا ليس عنوانًا صالحًا على هذه السلسلة، فلا يمكن توقيع شيء له")]]};
+    L(`that is not a valid ${chain.kind==="evm"?"EVM":"Solana"} address, so nothing could be signed for it`,
+      `هذا ليس عنوان ${chain.kind==="evm"?"EVM":"Solana"} صالحًا، فلا يمكن توقيع شيء له`)]]};
 
   if(same(chain,t,chain.approved)){
     const a=Number(amt), cap=Number(chain.amount);
     if(!isFinite(a)||a<=0) return {decision:"deny",reasons:[["amount-invalid",L("that is not an amount","هذا ليس مبلغًا")]]};
     if(a>cap) return {decision:"step_up",reasons:[["authorization-amount",
-      L(`${amt} is more than the ${chain.amount} you approved, so a person has to confirm it`,
-        `${amt} أكثر من ${chain.amount} التي وافقت عليها، لذا يجب أن يؤكدها شخص`)]]};
+      L(`${amt} ${chain.asset} is more than the ${chain.amount} ${chain.asset} you approved, so a person has to confirm it`,
+        `${amt} ${chain.asset} أكثر من ${chain.amount} ${chain.asset} التي وافقت عليها، لذا يجب أن يؤكدها شخص`)]]};
     return {decision:"allow",reasons:[]};
   }
 
   const elsewhere=CHAINS.find(c=>c!==chain&&same(c,t,c.approved));
   if(elsewhere) return {decision:"deny",reasons:[["authorization-network",
-    L(`that is the address you approved for ${CHAIN_LABEL(CHAINS.indexOf(elsewhere))}. This transfer is ${CHAIN_LABEL(CHAINS.indexOf(chain))}, and an approval does not carry across networks`,
-      `هذا هو العنوان الذي وافقت عليه على ${CHAIN_LABEL(CHAINS.indexOf(elsewhere))}. هذا التحويل على ${CHAIN_LABEL(CHAINS.indexOf(chain))}، والموافقة لا تنتقل بين الشبكات`)]]};
+    L(`that is the address you approved on ${elsewhere.name}. This transfer is on ${chain.name}, and an approval does not carry across networks`,
+      `هذا هو العنوان الذي وافقت عليه على ${elsewhere.name}. هذا التحويل على ${chain.name}، والموافقة لا تنتقل بين الشبكات`)]]};
 
   if(looksLike(chain,t,chain.approved)) return {decision:"deny",reasons:[["destination-provenance",
     L("the first and last characters match the address you approved and the middle does not. Wallets abbreviate the middle; the comparison here is on the whole string",
@@ -430,7 +431,7 @@ function decide(to,amt){
 
 function drawChains(){
   $("#chains").innerHTML=CHAINS.map((c,i)=>
-    `<button type="button" data-i="${i}" aria-pressed="${c===chain}">${esc(CHAIN_LABEL(i))}</button>`).join("");
+    `<button type="button" data-i="${i}" aria-pressed="${c===chain}">${esc(c.name)}</button>`).join("");
   for(const b of $("#chains").querySelectorAll("button"))
     b.addEventListener("click",()=>{chain=CHAINS[+b.dataset.i];drawChain()});
 }
@@ -439,15 +440,15 @@ function drawChain(){
     b.setAttribute("aria-pressed",String(CHAINS[+b.dataset.i]===chain));
   $("#mandate").innerHTML=[
     [L("Payee","المستفيد"),esc(PAYEE)],
-    [L("Network","الشبكة"),esc(CHAIN_LABEL(CHAINS.indexOf(chain)))],
-    [L("Amount","المبلغ"),`<span dir="ltr">${esc(chain.amount)}</span>`],
+    [L("Network","الشبكة"),`${esc(chain.name)} <span class="dim mono">${esc(chain.id)}</span>`],
+    [L("Amount","المبلغ"),`<span dir="ltr">${esc(chain.amount)} ${esc(chain.asset)}</span>`],
     [L("Address","العنوان"),`<span class="mono addr">${esc(chain.approved)}</span>`],
   ].map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("");
   $("#to").value=chain.approved;
   $("#amt").value=chain.amount;
   $("#amt").removeAttribute("aria-invalid");
-  $("#asset").innerHTML="<span class=\"dim\">"+L("on chain","على السلسلة")+"</span>";
-  $("#asset").setAttribute("aria-label",L("on chain","على السلسلة"));
+  $("#asset").innerHTML=MARK[chain.asset]+"<span class=\"dim\">"+chain.asset+"</span>";
+  $("#asset").setAttribute("aria-label",chain.asset);
   $("#fills").innerHTML=[
     [L("The address you approved","العنوان الذي وافقت عليه"),chain.approved],
     [L("A poisoned lookalike","شبيه مسموم"),chain.poisoned],
@@ -463,7 +464,7 @@ $("#go").addEventListener("click",()=>{
   const to=$("#to").value.trim(), v=decide(to,$("#amt").value);
   verdict(row(v.decision,v.decision==="allow"?L("the wallet would be asked to sign","سيُطلب من المحفظة التوقيع")
       :L("no transaction exists","لا توجد معاملة"),L("simulated","محاكاة"))+
-    `<div class="call mono">${esc(short(to))} <span class="dim">${esc(CHAIN_LABEL(CHAINS.indexOf(chain)))}</span></div>`+
+    `<div class="call mono">${esc(short(to))} <span class="dim">${L("on","على")} ${esc(chain.name)}</span></div>`+
     (v.reasons.length?why(v.reasons):`<p class="hint ok-line">${L("Every field matches what you approved, so there is nothing to refuse.",
       "كل حقل يطابق ما وافقت عليه، فلا شيء يُرفض.")}</p>`));
 });
