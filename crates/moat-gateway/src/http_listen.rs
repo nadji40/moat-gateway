@@ -730,6 +730,30 @@ struct NewKey {
     /// What the key may do inside that role. Absent or empty means all of it.
     #[serde(default)]
     scopes: Vec<String>,
+    /// How many days the key works for, counted from now. Absent means it
+    /// does not expire.
+    #[serde(default)]
+    expires_in_days: Option<i64>,
+}
+
+/// The longest a key may be issued for, in days: ten years. Longer than that
+/// is "never" said with a number, and never is already on offer.
+const MAX_EXPIRY_DAYS: i64 = 3650;
+
+/// Check a requested expiry and turn it into what the database takes.
+fn expiry_days(requested: Option<i64>) -> Result<Option<i32>, String> {
+    match requested {
+        None => Ok(None),
+        Some(days) if (1..=MAX_EXPIRY_DAYS).contains(&days) => {
+            Ok(Some(i32::try_from(days).map_err(|_| {
+                "expires_in_days is out of range".to_owned()
+            })?))
+        }
+        Some(_) => Err(format!(
+            "expires_in_days must be a whole number of days from 1 to {MAX_EXPIRY_DAYS}, \
+             or left out for a key that does not expire"
+        )),
+    }
 }
 
 /// The one and only time the raw key is returned.
@@ -849,7 +873,7 @@ async fn create_key(
     let tenant = caller.tenant_id.as_str();
     let Ok(request) = serde_json::from_slice::<NewKey>(&body) else {
         return bad_request(
-            "body must be {\"label\": string, \"access_role\": string, \"scopes\": [string]}",
+            "body must be {\"label\": string, \"access_role\": string, \"scopes\": [string], \"expires_in_days\": number}",
         );
     };
     let label = request.label.trim();
@@ -859,6 +883,10 @@ async fn create_key(
     if !ROLES.contains(&request.access_role.as_str()) {
         return bad_request("access_role must be agent, approver or admin");
     }
+    let expires_in_days = match expiry_days(request.expires_in_days) {
+        Ok(days) => days,
+        Err(message) => return bad_request(&message),
+    };
 
     // Scopes are checked against the role now, because this is the only moment
     // anyone is looking. A key minted with a scope its role can never reach
@@ -907,16 +935,19 @@ async fn create_key(
     match storage
         .create_api_key(
             tenant,
-            label,
-            &request.access_role,
-            &hash,
-            Some(caller.key_id.as_str()),
-            &scopes,
+            &crate::storage::NewApiKey {
+                label,
+                access_role: &request.access_role,
+                key_hash: &hash,
+                created_by: Some(caller.key_id.as_str()),
+                scopes: &scopes,
+                expires_in_days,
+            },
         )
         .await
     {
         Ok(key) => {
-            tracing::info!(tenant = %tenant, key = %key.id, role = %key.access_role, scopes = %key.scopes.join(","), "key minted");
+            tracing::info!(tenant = %tenant, key = %key.id, role = %key.access_role, scopes = %key.scopes.join(","), expires_at = ?key.expires_at, "key minted");
             (StatusCode::CREATED, axum::Json(MintedKey { key, secret })).into_response()
         }
         Err(error) => storage_unavailable(&error),
@@ -1096,6 +1127,20 @@ keys: ./keys
                 required_rail_scope(&cfg, &frame(raw)).is_none(),
                 "{raw} carries no rail"
             );
+        }
+    }
+
+    /// No expiry means a key that does not expire; a number of days in range
+    /// is taken as given; zero, a negative number or more than ten years is
+    /// refused rather than quietly clamped.
+    #[test]
+    fn an_expiry_is_a_whole_number_of_days_or_nothing() {
+        assert_eq!(expiry_days(None), Ok(None));
+        assert_eq!(expiry_days(Some(1)), Ok(Some(1)));
+        assert_eq!(expiry_days(Some(30)), Ok(Some(30)));
+        assert_eq!(expiry_days(Some(MAX_EXPIRY_DAYS)), Ok(Some(3650)));
+        for bad in [0, -1, MAX_EXPIRY_DAYS + 1, i64::MAX] {
+            assert!(expiry_days(Some(bad)).is_err(), "{bad} should be refused");
         }
     }
 

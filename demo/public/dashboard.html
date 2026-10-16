@@ -265,6 +265,18 @@ html[dir="rtl"] .vrow .a{text-align:right}
             <option value="approver" data-ar="المُوافِق">Approver</option>
             <option value="admin" data-ar="المسؤول">Admin</option>
           </select>
+          <select id="expiry" name="expiry" aria-label="Expires" data-ar-aria="ينتهي">
+            <option value="" data-ar="لا ينتهي">Never expires</option>
+            <option value="1" data-ar="ينتهي بعد يوم">Expires in 1 day</option>
+            <option value="7" data-ar="ينتهي بعد 7 أيام">Expires in 7 days</option>
+            <option value="30" data-ar="ينتهي بعد 30 يومًا">Expires in 30 days</option>
+            <option value="90" data-ar="ينتهي بعد 90 يومًا">Expires in 90 days</option>
+            <option value="365" data-ar="ينتهي بعد سنة">Expires in 1 year</option>
+            <option value="custom" data-ar="مدة مخصّصة">Custom…</option>
+          </select>
+          <input id="expiry-days" name="expiry-days" type="number" min="1" max="3650" step="1"
+                 placeholder="Days" data-ar-ph="أيام" aria-label="Expires in how many days"
+                 data-ar-aria="ينتهي بعد كم يومًا" class="mono" style="max-width:110px" hidden>
           <button class="btn" id="mint" data-ar="أصدِر">Issue</button>
         </div>
         <fieldset class="scopes" id="scopes">
@@ -787,13 +799,20 @@ function roleChip(role){
 
 function keyRow(k){
   const when = (t) => t ? new Date(t).toLocaleString(LOCALE) : L("never", "أبدًا");
-  return `<article class="row${k.active ? "" : " spent"}">
-    <span class="row-i">${k.active ? KEY_ICON : GONE_ICON}</span>
+  // A key works only while it is active and not expired; one that is either
+  // revoked or past its expiry reads as spent.
+  const live = k.active && !k.expired;
+  const expiry = !k.expires_at ? L("never expires", "لا ينتهي")
+    : k.expired ? L(`expired ${when(k.expires_at)}`, `انتهى ${when(k.expires_at)}`)
+    : L(`expires ${when(k.expires_at)}`, `ينتهي ${when(k.expires_at)}`);
+  return `<article class="row${live ? "" : " spent"}">
+    <span class="row-i">${live ? KEY_ICON : GONE_ICON}</span>
     <div class="row-t">
       <h3>${esc(k.label)} ${roleChip(k.access_role)}</h3>
       <p class="row-s mono">${esc(k.id)}</p>
       <p class="row-b">${L(`created ${esc(when(k.created_at))} · last used ${esc(when(k.last_used_at))}`,
-        `أُنشئ ${esc(when(k.created_at))} · آخر استخدام ${esc(when(k.last_used_at))}`)}</p>
+        `أُنشئ ${esc(when(k.created_at))} · آخر استخدام ${esc(when(k.last_used_at))}`)}
+        · <span${k.expired ? ' style="color:var(--red-l)"' : ""}>${esc(expiry)}</span></p>
       <p class="row-b">${k.scopes && k.scopes.length
         ? k.scopes.map((sc) => `<code class="chip-sc mono">${esc(sc)}</code>`).join(" ")
         : `<span style="color:var(--ink-3)">${L(`the whole ${esc(k.access_role)} role`,
@@ -801,6 +820,8 @@ function keyRow(k){
     </div>
     ${!k.active
       ? `<span class="row-r" style="font-size:.8rem;color:var(--ink-3)">${L("revoked", "مُلغى")}</span>`
+      : k.expired
+      ? `<span class="row-r" style="font-size:.8rem;color:var(--red-l)">${L("expired", "منتهٍ")}</span>`
       : k.current
       // The key this browser is signed in with. Offering to revoke it offers
       // to lock the workspace, since revoking is admin-only and this is the
@@ -930,19 +951,42 @@ $("#copy-secret").addEventListener("click", (e) => copyText($("#secret").textCon
 $("#copy-curl").addEventListener("click", (e) => copyText($("#curl").textContent, e.currentTarget, L("Copied", "تم النسخ")));
 $("#copy-curl-intent").addEventListener("click", (e) => copyText($("#curl-intent").textContent, e.currentTarget, L("Copied", "تم النسخ")));
 
+$("#expiry").addEventListener("change", () => {
+  const custom = $("#expiry").value === "custom";
+  $("#expiry-days").hidden = !custom;
+  if (custom) $("#expiry-days").focus();
+});
+
+/** The expiry asked for, in days; null for a key that does not expire, and
+ *  undefined when the custom box holds something that is not a valid count. */
+function pickedExpiry(){
+  const v = $("#expiry").value;
+  if (!v) return null;
+  const days = Number(v === "custom" ? $("#expiry-days").value : v);
+  return Number.isInteger(days) && days >= 1 && days <= 3650 ? days : undefined;
+}
+
 $("#mint").addEventListener("click", async () => {
   const label = $("#lbl").value.trim();
   if (!label) return note("#mint-note", L("Give the key a label.", "أعطِ المفتاح اسمًا."), true);
+  const days = pickedExpiry();
+  if (days === undefined) {
+    $("#expiry-days").focus();
+    return note("#mint-note", L("Give the expiry as a whole number of days, from 1 to 3650.",
+      "اكتب مدة الانتهاء بعدد صحيح من الأيام، من 1 إلى 3650."), true);
+  }
   const btn = $("#mint"); working(btn, L("Issuing", "جارٍ الإصدار"));
   try {
     const out = await control("/v1/keys", {
       method: "POST",
-      body: JSON.stringify({ label, access_role: $("#role").value, scopes: pickedScopes() }),
+      body: JSON.stringify({ label, access_role: $("#role").value, scopes: pickedScopes(),
+        ...(days ? { expires_in_days: days } : {}) }),
     });
     $("#secret").textContent = out.secret;
     show("#workspace", false); show("#minted", true);
     $("#lbl").value = "";
     for (const b of document.querySelectorAll("#scopelist input")) b.checked = false;
+    $("#expiry").value = ""; $("#expiry-days").value = ""; $("#expiry-days").hidden = true;
     note("#mint-note", "");
   } catch (e) { note("#mint-note", String(e.message || e), true); }
   finally { idle(btn); }

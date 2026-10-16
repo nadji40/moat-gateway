@@ -170,6 +170,7 @@ curl -s -XDELETE ${base}/v1/sandbox/$S`}</Code>
               ['admin', L('Whoever manages the workspace. Cannot pay or approve.', 'المدير: من يدير مساحة العمل. لا يستطيع الدفع ولا الموافقة.'), 'keys:read, keys:write, usage:read, verdicts:read'],
             ]} />
             <p>{L('Keys are issued and revoked on the dashboard. The server keeps a hash, never the key, so a key cannot be shown twice.', 'تُصدَر المفاتيح وتُلغى من لوحة التحكم. يحتفظ الخادم بتجزئة المفتاح لا بالمفتاح نفسه، لذا لا يمكن عرض المفتاح مرتين.')}</p>
+            <p>{L(<>A key can also be issued for a set time: give <code>expires_in_days</code> (1 to 3650) when you create it, or pick an expiry on the dashboard. Past it, the key is refused everywhere, as if it had been revoked, and stays in the list marked expired. Leave it out and the key does not expire.</>, <>يمكن أيضًا إصدار مفتاح لمدة محدّدة: مرّر <code>expires_in_days</code> (من 1 إلى 3650) عند إنشائه، أو اختر مدة الانتهاء من لوحة التحكم. بعدها يُرفض المفتاح في كل مكان كأنه أُلغي، ويبقى في القائمة موسومًا بأنه منتهٍ. وإن لم تحدّد مدة فلا ينتهي المفتاح.</>)}</p>
           </section>
 
           <section id="intent">

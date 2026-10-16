@@ -29,7 +29,8 @@ pub struct DurableStore {
 /// a compile-time literal that `concat!` can splice into each query.
 macro_rules! api_key_columns {
     () => {
-        "id, label, access_role, active, created_at, last_used_at, revoked_at, scopes"
+        "id, label, access_role, active, created_at, last_used_at, revoked_at, scopes, \
+         expires_at, (expires_at IS NOT NULL AND expires_at <= now()) AS expired"
     };
 }
 
@@ -110,7 +111,9 @@ impl DurableStore {
         Ok(())
     }
 
-    /// Resolve an active bearer key to its active tenant.
+    /// Resolve an active, unexpired bearer key to its active tenant. A key
+    /// past its expiry is refused here the same way a revoked one is, on
+    /// every route, because every route authenticates through this.
     pub async fn authenticate(&self, key_hash: &str, access_role: &str) -> Result<Option<Caller>> {
         let client = self.pool.get().await.context("auth database connection")?;
         let row = client
@@ -122,6 +125,7 @@ impl DurableStore {
                    AND k.key_hash = $1
                    AND k.access_role = $2
                    AND k.active
+                   AND (k.expires_at IS NULL OR k.expires_at > now())
                    AND t.active
                  RETURNING k.tenant_id, k.id, k.scopes",
                 &[&key_hash, &access_role],
@@ -372,33 +376,28 @@ impl DurableStore {
 
     /// Record a new key. Only its SHA-256 is stored; the raw key is the
     /// caller's to hand over once and then forget.
-    pub async fn create_api_key(
-        &self,
-        tenant_id: &str,
-        label: &str,
-        access_role: &str,
-        key_hash: &str,
-        created_by: Option<&str>,
-        scopes: &[String],
-    ) -> Result<ApiKey> {
+    pub async fn create_api_key(&self, tenant_id: &str, key: &NewApiKey<'_>) -> Result<ApiKey> {
         let client = self.pool.get().await.context("key database connection")?;
         let row = client
             .query_one(
                 concat!(
                     "INSERT INTO moat.api_keys
-                         (id, tenant_id, label, key_hash, access_role, created_by, scopes)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7)
+                         (id, tenant_id, label, key_hash, access_role, created_by, scopes, expires_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7,
+                             CASE WHEN $8::int IS NULL THEN NULL
+                                  ELSE now() + make_interval(days => $8::int) END)
                      RETURNING ",
                     api_key_columns!()
                 ),
                 &[
                     &new_key_id(),
                     &tenant_id,
-                    &label,
-                    &key_hash,
-                    &access_role,
-                    &created_by,
-                    &scopes,
+                    &key.label,
+                    &key.key_hash,
+                    &key.access_role,
+                    &key.created_by,
+                    &key.scopes,
+                    &key.expires_in_days,
                 ],
             )
             .await
@@ -660,6 +659,24 @@ pub struct Verdict {
     pub failed_rules: Option<String>,
 }
 
+/// What a new key is made of, everything but the tenant it belongs to.
+#[derive(Debug)]
+pub struct NewApiKey<'a> {
+    /// Whatever the tenant wants to call it.
+    pub label: &'a str,
+    /// `agent`, `approver` or `admin`.
+    pub access_role: &'a str,
+    /// The SHA-256 of the secret; the secret itself is never stored.
+    pub key_hash: &'a str,
+    /// The key that minted this one, for attribution.
+    pub created_by: Option<&'a str>,
+    /// What it may do within its role. Empty means the whole role.
+    pub scopes: &'a [String],
+    /// How many days it works for, from the database's clock now. `None`
+    /// means it does not expire.
+    pub expires_in_days: Option<i32>,
+}
+
 /// A key as the control plane reports it. Never carries the key itself.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ApiKey {
@@ -679,6 +696,12 @@ pub struct ApiKey {
     pub revoked_at: Option<String>,
     /// What the key may do within its role. Empty means the whole role.
     pub scopes: Vec<String>,
+    /// When it stops working, RFC 3339, or `None` if it never does.
+    pub expires_at: Option<String>,
+    /// True once `expires_at` has passed, by the database's clock. A key can
+    /// be active (never revoked) and expired at once; it works only if it is
+    /// active and not expired.
+    pub expired: bool,
 }
 
 /// Who is making a request: the tenant they belong to, which key it was, and
@@ -717,6 +740,8 @@ impl ApiKey {
             last_used_at: stamp(row.get::<_, Option<SystemTime>>("last_used_at")),
             revoked_at: stamp(row.get::<_, Option<SystemTime>>("revoked_at")),
             scopes: row.get::<_, Vec<String>>("scopes"),
+            expires_at: stamp(row.get::<_, Option<SystemTime>>("expires_at")),
+            expired: row.get("expired"),
         }
     }
 }
