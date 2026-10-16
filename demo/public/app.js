@@ -337,3 +337,43 @@ function mountSwiper(barSel, deckSel) {
 }
 
 mountNav();
+
+/* ---------------------------------------------------------------- footer ---
+   The same footer as the React pages (frontend/src/components/layout/
+   Footer.tsx), built here for the classic pages so the two cannot drift. It
+   goes in once the page has parsed, at the end of the body. */
+function mountFooter() {
+  if (document.querySelector("footer.foot")) return;
+  const t = navText;
+  const group = (title, links) =>
+    `<div class="footer-group"><h4>${title}</h4>` +
+    links.map(([href, label]) => `<a href="${href}">${label}</a>`).join("") +
+    "</div>";
+  const f = document.createElement("footer");
+  f.className = "foot";
+  f.innerHTML =
+    '<div class="wrap"><div class="fcols">' +
+    `<div class="fbrand">${NAV_MARK}<p>${t(
+      "Moat helps AI agents make authorized payments by verifying every action against the user's intent",
+      "يساعد Moat وكلاء الذكاء الاصطناعي على إجراء دفعات موافَق عليها، بمطابقة كل إجراء مع نية المستخدم")}</p></div>` +
+    group(t("Product", "المنتج"), [
+      ["/#how", t("How it works", "كيف يعمل")],
+      ["/#checks", t("What it checks", "ما الذي يتحقق منه")],
+      ["/docs", t("Documentation", "التوثيق")],
+      ["/docs#quickstart", t("API quickstart", "البدء السريع مع API")],
+    ]) +
+    group(t("Proof", "الإثبات"), [
+      ["/compare", t("Compared", "المقارنة")],
+      ["/tests", t("The tests", "الاختبارات")],
+      ["/status", t("Status", "الحالة")],
+    ]) +
+    group(t("Company", "الشركة"), [
+      ["/team", t("Who we are", "من نحن")],
+      ["/dashboard", t("Open a workspace", "افتح مساحة عمل")],
+      ["/dashboard#pane-playground", t("Playground", "ساحة التجربة")],
+    ]) +
+    '</div><div class="fbase"><span>© 2026 Moat</span></div></div>';
+  document.body.appendChild(f);
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mountFooter);
+else mountFooter();
