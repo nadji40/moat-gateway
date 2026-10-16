@@ -30,7 +30,7 @@ describe('unchanged shared navigation behavior', () => {
     expect(document.querySelector('#auth')?.textContent).toBe(signedIn ? 'Dashboard' : 'Log in')
     expect(document.querySelector('#auth')?.getAttribute('href')).toBe('/dashboard')
     expect([...document.querySelectorAll('#navlinks a')].map(a => a.getAttribute('href')))
-      .toEqual(['/docs', '/compare', '/tests', '/status', '/team'])
+      .toEqual(['/', '/team', '/compare', '/status', '/docs'])
     const toggle = document.querySelector<HTMLButtonElement>('#navtoggle')!
     toggle.click()
     expect(toggle.getAttribute('aria-expanded')).toBe('true')

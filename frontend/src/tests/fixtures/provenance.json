@@ -12,7 +12,7 @@
   {
     "file": "public/shared/app.js",
     "origin": "demo/public/app.js",
-    "sha256": "7e8ab077b6dd390c9c1f0a5576b8b11ff7993741b978ca565b8e6186f91ceb7b"
+    "sha256": "aa2c8b634bcb1a1cd2b2aefbf792d6a02ae27699f0d47488020653753e4e42a5"
   },
   {
     "file": "public/shared/trail.js",
@@ -27,6 +27,6 @@
   {
     "file": "public/favicon.svg",
     "origin": "demo/public/favicon.svg",
-    "sha256": "9d9fc8af4c281ab6a660e91d37dd9b8c4258e61c4245d121ce36f1c84519e1ef"
+    "sha256": "acb80061f0ee1065733e48a8ab0825755dc319eeef928b3163a3798495f1dce1"
   }
 ]

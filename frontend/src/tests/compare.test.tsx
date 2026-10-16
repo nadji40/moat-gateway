@@ -10,8 +10,8 @@ describe('native Compare page', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: /It is not what they check/i })).toBeInTheDocument()
-    expect(screen.getByText('Run against their own code.')).toBeInTheDocument()
-    expect(screen.getByText('Moat helps AI agents make authorized payments by verifying every action against the user\'s intent.')).toBeInTheDocument()
+    expect(screen.getByText('Run against their own code')).toBeInTheDocument()
+    expect(screen.getByText('Moat helps AI agents make authorized payments by verifying every action against the user\'s intent')).toBeInTheDocument()
     expect(document.querySelectorAll('footer.foot')).toHaveLength(1)
     expect(document.querySelectorAll('.fcols > *')).toHaveLength(4)
   })

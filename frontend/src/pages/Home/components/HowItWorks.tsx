@@ -1,3 +1,5 @@
+import { L } from '../../../i18n'
+
 /**
  * HowItWorks — the animated flow diagram and three verdict cards.
  *
@@ -10,7 +12,7 @@ export default function HowItWorks() {
   return (
     <section id="how" className="tight">
       <div className="head">
-        <h2>Three answers. Under a millisecond.</h2>
+        <h2>{L('Three answers: under a millisecond', 'ثلاث إجابات: في أقل من ثانية')}</h2>
       </div>
 
       {/* Flow diagram — aria-hidden because the verdict cards below
@@ -64,13 +66,13 @@ export default function HowItWorks() {
           <rect className="a-line" x="10" y="30" width="54" height="44" rx="13" />
           <circle cx="37" cy="45" r="6" fill="none" stroke="var(--ink-2)" strokeWidth="2.4" />
           <path className="a-ink" d="M27 64 a10 10 0 0 1 20 0" />
-          <text className="a-lbl" x="37" y="94">YOU</text>
+          <text className="a-lbl" x="37" y="94">{L('YOU', 'أنت')}</text>
 
           {/* The agent */}
           <rect className="a-line" x="118" y="30" width="58" height="44" rx="13" />
           <path className="a-ink" d="M132 46 l7 6 -7 6" />
           <rect className="a-cur" x="143" y="56" width="12" height="2.6" rx="1.3" />
-          <text className="a-lbl" x="147" y="94">AGENT</text>
+          <text className="a-lbl" x="147" y="94">{L('AGENT', 'الوكيل')}</text>
 
           {/* Moat label */}
           <text className="a-lbl" x="262" y="94">MOAT</text>
@@ -79,7 +81,7 @@ export default function HowItWorks() {
           <rect className="a-line" x="354" y="30" width="54" height="44" rx="13" />
           <rect x="366" y="42" width="30" height="20" rx="4" fill="none" stroke="var(--ink-2)" strokeWidth="2.2" />
           <path className="a-ink" d="M366 49 H396" />
-          <text className="a-lbl" x="381" y="94">PAYEE</text>
+          <text className="a-lbl" x="381" y="94">{L('PAYEE', 'المستفيد')}</text>
 
           {/* Act one: allowed → payee paid */}
           <g className="a-leg" style={{ ['--d' as string]: '26px', animationDelay: '.2s' }}>
@@ -154,19 +156,61 @@ export default function HowItWorks() {
         </svg>
       </div>
 
-      {/* Verdict cards */}
+      {/* Verdict cards: one case at a time, the one the diagram above is
+          playing (the same 18 s loop: allowed, then refused, then held and
+          approved). All three stay in the page for screen readers; the
+          example rows are illustration and are hidden from them. */}
       <div className="verdict3">
-        <article className="vcard glass">
-          <span className="pill allow">Allowed</span>
-          <p>It matches what was asked.</p>
+        <article className="vcard glass v-allow">
+          <div className="vc-top">
+            <span className="vc-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12.3l2.7 2.7L16 9.6" /></svg>
+            </span>
+            <span className="pill allow">{L('Allowed', 'مسموح بها')}</span>
+          </div>
+          <p className="vc-rule">{L('It matches what was asked', 'تطابق ما طُلب')}</p>
+          <div className="vc-case" aria-hidden="true">
+            <span className="vc-who">Atlas Supplies</span>
+            <span className="vc-amt">480 USD</span>
+            <span className="vc-out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+              {L('Paid', 'مدفوعة')}
+            </span>
+          </div>
         </article>
-        <article className="vcard glass">
-          <span className="pill step_up">Held</span>
-          <p>Unclear, so a person decides.</p>
+        <article className="vcard glass v-hold">
+          <div className="vc-top">
+            <span className="vc-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M10 9v6M14 9v6" /></svg>
+            </span>
+            <span className="pill step_up">{L('Held', 'مُعلَّقة')}</span>
+          </div>
+          <p className="vc-rule">{L('Unclear, so a person decides', 'غير واضحة، فيحسمها شخص')}</p>
+          <div className="vc-case" aria-hidden="true">
+            <span className="vc-who">{L('New supplier', 'مورّد جديد')}</span>
+            <span className="vc-amt">480 USD</span>
+            <span className="vc-out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.6" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
+              {L('Waits for a person', 'بانتظار شخص')}
+            </span>
+          </div>
         </article>
-        <article className="vcard glass">
-          <span className="pill deny">Refused</span>
-          <p>Nobody with the right asked for it.</p>
+        <article className="vcard glass v-deny">
+          <div className="vc-top">
+            <span className="vc-ic" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
+            </span>
+            <span className="pill deny">{L('Refused', 'مرفوضة')}</span>
+          </div>
+          <p className="vc-rule">{L('Nobody with the right asked for it', 'لم يطلبها أحد يملك الصلاحية')}</p>
+          <div className="vc-case" aria-hidden="true">
+            <span className="vc-who">Nova Studio</span>
+            <span className="vc-amt">480 USD</span>
+            <span className="vc-out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+              {L('Stopped', 'أُوقفت')}
+            </span>
+          </div>
         </article>
       </div>
     </section>

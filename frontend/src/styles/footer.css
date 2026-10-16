@@ -138,3 +138,10 @@ footer.foot .wrap {
   .fcols { gap: 22px 14px; }
   .fbrand p { max-width: 22ch; }
 }
+
+/* Right to left (Arabic). */
+html[dir="rtl"] .fcols { text-align: right; }
+html[dir="rtl"] .fcols h4 { letter-spacing: 0; }
+@media (max-width: 1024px) {
+  html[dir="rtl"] .fbase { text-align: right; }
+}

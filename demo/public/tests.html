@@ -4,12 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>moat, the nine tests</title>
+<meta name="ar-title" content="moat، الاختبارات التسعة">
 <meta name="description" content="Nine attacks on an agent payment, each isolating one mechanism, run live against a real gateway.">
 <meta name="color-scheme" content="dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400;1,500&family=Ubuntu+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="app.css?v=cbb4282">
+<link rel="stylesheet" href="i18n.css">
+<script src="i18n.js"></script>
+<style>
+/* Right to left: the progress line under the summary fills from the reading edge. */
+html[dir="rtl"] .summary .bar{left:auto;right:0}
+</style>
 </head>
 <body>
 
@@ -19,15 +26,15 @@
 
 <header class="hero">
   <div>
-    <p class="kicker">The tests</p>
-    <h1>Nine attacks, each isolating one thing.</h1>
-    <p class="lede">Rows from the measured corpus. Each runs in a gateway of its own.</p>
+    <p class="kicker" data-ar="الاختبارات">The tests</p>
+    <h1 data-ar="تسع هجمات، كلٌّ منها يعزل أمرًا واحدًا">Nine attacks, each isolating one thing</h1>
+    <p class="lede" data-ar="صفوف من مجموعة الاختبارات المقيسة. كلٌّ منها يعمل في بوابة خاصة به.">Rows from the measured corpus. Each runs in a gateway of its own.</p>
     <div class="row">
       <button class="btn" id="run-all">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-        Run all nine
+        <span data-ar="شغّل الاختبارات التسعة">Run all nine</span>
       </button>
-      <a class="btn ghost" href="/#compose">Compose your own</a>
+      <a class="btn ghost" href="/#compose" data-ar="صمّم اختبارك">Compose your own</a>
     </div>
   </div>
 </header>
@@ -38,16 +45,6 @@
 </section>
 
 </div>
-
-<footer class="foot"><div class="wrap">
-  <p class="rails-lead">One authorization core, four rails.</p>
-  <div class="rails" aria-label="Rails">
-    <span class="rail" style="--c:var(--red-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="3"/><path d="M2.6 9.6h18.8"/><path d="M6 14.5h3.5"/></svg>Cards</span>
-    <span class="rail" style="--c:var(--orange-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.6 12 4.2l9 5.4"/><path d="M5.8 11.4v6.2M10 11.4v6.2M14 11.4v6.2M18.2 11.4v6.2"/><path d="M3.6 20h16.8"/></svg>Bank transfers</span>
-    <span class="rail" style="--c:var(--yellow-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2 5.2 12.1 12 15.9l6.8-3.8z" opacity=".55"/><path d="M12 17.2 5.2 13.4 12 22l6.8-8.6z"/></svg>Ethereum</span>
-    <span class="rail" style="--c:var(--green-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.8 5.6H20.5L17.2 8.9H3.5z"/><path d="M3.5 10.4h13.7l3.3 3.3H6.8z" opacity=".65"/><path d="M6.8 15.1H20.5L17.2 18.4H3.5z"/></svg>Solana</span>
-  </div>
-</div></footer>
 
 <script src="app.js"></script>
 <script>
@@ -66,21 +63,56 @@ const FAM={provenance:"red",mandate:"yellow",replay:"orange",control:"green"};
 const icon=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[n]||ICONS.none}</svg>`;
 let TESTS=[],results={},busy=new Set(),firstDraw=true;
 
+/* The corpus arrives from the server in English. What a person reads about
+   each test is translated here, by id; the task, the page and the calls are
+   not, because they are the literal inputs the gateway is given. */
+const AR={
+  "legitimate":{title:"الدفعة التي يجب أن تمرّ",
+    summary:"ما وافق عليه المستخدم تمامًا، حتى آخر سنت.",
+    note:"طبقة تحجب هذه الدفعة ليست وسيلة حماية، بل عُطل. يجب رفض كل هجوم أدناه دون رفض هذه."},
+  "injected-payee":{title:"الصفحة تقول ادفع لشخص آخر",
+    summary:"صفحة مورّد تحمل تعليمة لم يُعطها المستخدم قط.",
+    note:"المبلغ صحيح والفاتورة حقيقية. لا يرى حدّ الإنفاق أي خطأ، لأن لا شيء في المال خاطئ، بل في مَن يتلقّاه فقط."},
+  "lookalike":{title:"مستفيد يختلف بحرف واحد",
+    summary:"اسم المورّد مع نقطة مضافة.",
+    note:"مَن يوافق عليها بالنظر لا يلاحظها، وقراءة النموذج للصفحة قراءةً صحيحة هي بالضبط ما يُنجحها."},
+  "homoglyph":{title:"مستفيد ليس بالحروف التي تقرؤها",
+    summary:"حرف سيريلي يحلّ محلّ حرف لاتيني.",
+    note:"لا يمكن تمييزه على الشاشة بأي حجم خط. المقارنة تتم على الحروف، لا على شكلها."},
+  "inflated":{title:"المورّد الصحيح، بسعر أعلى",
+    summary:"499 حيث وافق المستخدم على 480.",
+    note:"لا يرفض Moat هذه الدفعة مباشرةً. قد يتغيّر السعر بشكل مشروع ولا يعلم ذلك إلا صاحب الموافقة، لذا يتوقّف ويسأل. حدٌّ مضبوط فوق 499 لن يراها أبدًا."},
+  "currency":{title:"الرقم الصحيح، العملة الخاطئة",
+    summary:"480 EUR مقابل موافقة على 480 USD.",
+    note:"الرقم على الشاشة مطابق. أي شيء يقارن المبالغ كأرقام يرى أنها سليمة."},
+  "over-cap":{title:"مبلغ يتجاوز الموافقة بكثير",
+    summary:"9,999 مقابل موافقة على 480.",
+    note:"الهجوم الوحيد الذي يلتقطه حدّ الإنفاق فعلًا. وُضع هنا لتكون المقارنة صادقة بشأن ما تصلح له وسيلة الحماية الأبسط."},
+  "replay":{title:"الفاتورة نفسها، مدفوعة مرتين",
+    summary:"دفعة موافَق عليها تتكرّر تحت موافقة واحدة أحادية الاستخدام.",
+    note:"كلا الطلبين مشروع منفردًا. وحده سجلٌّ لما أُنفق سابقًا يستطيع رفض الثاني."},
+  "no-mandate":{title:"دفعة لم يأذن بها أحد",
+    summary:"طرح المستخدم سؤالًا، فمدّ الوكيل يده إلى أداة دفع.",
+    note:"لم يُسمِّ أحدٌ هذا المورّد ولا توجد موافقة، فليس لدى Moat ما يطابق عليه ولن يقرّر وحده. على مضيف لا يستطيع السؤال، تتحوّل إلى رفض."}
+};
+const FAM_AR={provenance:"مصدر الحقول",mandate:"الموافقة",replay:"إعادة الإرسال",control:"حالة مشروعة"};
+const tr=(t,k)=>L(t[k],AR[t.id]?.[k]??t[k]);
+const verdict=d=>L(String(d).replace("_"," "),{allow:"مسموح بها",step_up:"مُعلَّقة",deny:"مرفوضة"}[d]);
 
 function scenario(t){
   const m=t.mandate;
-  return `<details class="sc"><summary>What happens</summary><dl>
-    <dt>User said</dt><dd class="q">${esc(t.task)}</dd>
-    ${t.page?`<dt>Page said</dt><dd class="q">${esc(t.page).split(NL).join("<br>")}</dd>`:""}
-    <dt>Approved</dt><dd>${m?`${esc(m.payee)}, ${esc(m.amount)} ${esc(m.currency)}`:"nothing"}</dd>
-    <dt>Agent tries</dt><dd class="mono">${t.calls.map(c=>`${esc(c.payee)}, ${esc(c.amount)} ${esc(c.currency)}`).join("<br>then again: ")}</dd>
-    <dt>Expected</dt><dd>${esc(t.expect.replace("_"," "))}</dd>
-  </dl><p class="note">${esc(t.note)}</p></details>`;
+  return `<details class="sc"><summary>${L("What happens","ماذا يحدث")}</summary><dl>
+    <dt>${L("User said","قال المستخدم")}</dt><dd class="q" dir="auto">${esc(t.task)}</dd>
+    ${t.page?`<dt>${L("Page said","قالت الصفحة")}</dt><dd class="q" dir="auto">${esc(t.page).split(NL).join("<br>")}</dd>`:""}
+    <dt>${L("Approved","المُوافَق عليه")}</dt><dd>${m?`<bdi>${esc(m.payee)}, ${esc(m.amount)} ${esc(m.currency)}</bdi>`:L("nothing","لا شيء")}</dd>
+    <dt>${L("Agent tries","يحاول الوكيل")}</dt><dd class="mono">${t.calls.map(c=>`${esc(c.payee)}, ${esc(c.amount)} ${esc(c.currency)}`).join(`<br><bdi>${L("then again:","ثم مرة أخرى:")}</bdi> `)}</dd>
+    <dt>${L("Expected","المتوقَّع")}</dt><dd>${esc(verdict(t.expect))}</dd>
+  </dl><p class="note">${esc(tr(t,"note"))}</p></details>`;
 }
 
 function testCard(t,i){
   const r=results[t.id],run=busy.has(t.id);
-  const pill=r&&!run?`<span class="pill ${r.decision}">${r.decision.replace("_"," ")}</span>`:"";
+  const pill=r&&!run?`<span class="pill ${r.decision}">${esc(verdict(r.decision))}</span>`:"";
   // Branch on the decision, never on whether there are reasons. A step-up
   // often carries none, and showing it as "allowed" because the list was
   // empty is the page lying about the one thing it exists to show.
@@ -88,22 +120,24 @@ function testCard(t,i){
   if(r&&!run){
     if(r.error) body=esc(r.error);
     else if(r.reasons.length) body=r.reasons.map(x=>`<code>${esc(x.id)}</code> ${esc(x.message)}`).join("<br>");
-    else if(r.decision==="allow") body=`<span class="ok">allowed, the provider ${r.paid?"was paid":"was called"}</span>`;
-    else if(r.decision==="step_up") body=`<span class="held">held for a person to approve</span>`;
-    else body="refused";
+    else if(r.decision==="allow") body=`<span class="ok">${r.paid
+      ?L("allowed, the provider was paid","مسموح بها، تم الدفع لمزوّد الدفع")
+      :L("allowed, the provider was called","مسموح بها، تم استدعاء مزوّد الدفع")}</span>`;
+    else if(r.decision==="step_up") body=`<span class="held">${L("held for a person to approve","مُعلَّقة بانتظار شخص يوافق عليها")}</span>`;
+    else body=L("refused","مرفوضة");
   }
   const why=body?`<div class="why">${body}</div>`:"";
   const cls=["test","glass",firstDraw?"enter":"","f-"+(FAM[t.family]||"orange"),run?"running":"",r&&!run?"done v-"+r.decision:""].join(" ");
   return `<article class="${cls}" style="--i:${i}" data-id="${esc(t.id)}">
     <div class="top">
       <div class="icon">${icon(t.icon)}</div>
-      <div><span class="fam">${esc(t.family)}</span><h3>${esc(t.title)}</h3><p class="sum">${esc(t.summary)}</p></div>
+      <div><span class="fam">${esc(L(t.family,FAM_AR[t.family]))}</span><h3>${esc(tr(t,"title"))}</h3><p class="sum">${esc(tr(t,"summary"))}</p></div>
     </div>
     ${scenario(t)}
     ${why}
     <footer>${pill}
       <button class="link play" data-run="${esc(t.id)}" ${run?'disabled aria-busy="true"':""
-        } aria-label="${r?"Run this test again":"Run this test"}">${run?SPINNER:PLAY}</button>
+        } aria-label="${r?L("Run this test again","أعد تشغيل هذا الاختبار"):L("Run this test","شغّل هذا الاختبار")}">${run?SPINNER:PLAY}</button>
       ${r&&!run?`<span class="ms mono">${r.ms} ms</span>`:""}</footer>
   </article>`;
 }
@@ -122,17 +156,17 @@ function draw(){
     const total=done.length+busy.size;
     $("#summary").hidden=false;
     $("#summary").innerHTML=`<span class="bar" style="--p:${Math.round(100*done.length/Math.max(total,1))}%"></span>
-      <div class="big mono">${met} / ${done.length}<small>as the corpus says</small></div><span class="sep"></span>
-      <div class="big mono through${through?" bad":""}">${through}<small>attacker paid</small></div><span class="sep"></span>
-      <div class="big mono">${done.reduce((a,r)=>a+r.ms,0).toLocaleString("en-US")} ms<small>gateway time</small></div>
-      ${busy.size?`<span class="hint">${SPINNER} ${busy.size} running</span>`:`<span class="hint">signed and recorded</span>`}`;
+      <div class="big mono">${met} / ${done.length}<small>${L("as the corpus says","كما تقول مجموعة الاختبارات")}</small></div><span class="sep"></span>
+      <div class="big mono through${through?" bad":""}">${through}<small>${L("attacker paid","دُفع للمهاجم")}</small></div><span class="sep"></span>
+      <div class="big mono">${done.reduce((a,r)=>a+r.ms,0).toLocaleString("en-US")} ms<small>${L("gateway time","وقت البوابة")}</small></div>
+      ${busy.size?`<span class="hint">${SPINNER} ${L(`${busy.size} running`,`${busy.size} قيد التشغيل`)}</span>`:`<span class="hint">${L("signed and recorded","موقَّعة ومسجَّلة")}</span>`}`;
   }
 }
 
 /* three at a time, each its own call, so cards fill in as they finish */
 async function runTests(ids){
   ids=ids.filter(id=>!busy.has(id)); if(!ids.length)return;
-  const btn=$("#run-all"); working(btn,"Running");
+  const btn=$("#run-all"); working(btn,L("Running","جارٍ التشغيل"));
   for(const id of ids){busy.add(id);delete results[id];}
   draw();
   const queue=[...ids];
@@ -159,7 +193,7 @@ $("#run-all").addEventListener("click",()=>runTests(TESTS.map(t=>t.id)));
   }catch(e){
     // A silent catch here would leave an empty page that looks like a corpus
     // with nothing in it rather than a sandbox that could not be reached.
-    $("#tests").innerHTML=`<p class="hint">Could not reach the sandbox: ${esc(String(e.message||e))}</p>`;
+    $("#tests").innerHTML=`<p class="hint">${L("Could not reach the sandbox: ","تعذّر الوصول إلى بيئة التجربة: ")}${esc(String(e.message||e))}</p>`;
   }
 })();
 </script>

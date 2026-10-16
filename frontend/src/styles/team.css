@@ -8,7 +8,8 @@
 .mol-halo { opacity: .55; animation: mol-breathe 9s ease-in-out infinite; transform-origin: 500px 400px; transform-box: view-box; }
 @keyframes mol-breathe { 50% { opacity: .9; transform: scale(1.06); } }
 
-.mol-edge { stroke: rgba(255,255,255,.14); stroke-width: 1.6; transition: stroke .5s, stroke-width .5s; }
+.mol-edge { stroke: rgba(255,255,255,.14); stroke-width: 1.6; opacity: 0; transition: opacity .8s var(--ease), stroke .5s, stroke-width .5s; }
+.mol-edges.in .mol-edge { opacity: 1; }
 .mol-edge.core { stroke: rgba(255,138,76,.32); stroke-width: 2.2; }
 .mol-edge.on { stroke: var(--orange); stroke-width: 2.6; }
 .mol-pulses circle { fill: var(--orange-l); filter: drop-shadow(0 0 4px rgba(255,138,76,.9)); }
@@ -45,6 +46,7 @@
 @media (prefers-reduced-motion: reduce) {
   .mol-halo { animation: none; }
   .mol-node { animation: none; opacity: 1; }
+  .mol-edge { opacity: 1; transition: none; }
 }
 
 /* ---- the list, for phones ---- */
@@ -70,3 +72,17 @@
 .tm-fact { border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
 .tm-fact b { font-size: 1rem; }
 .tm-fact span { color: var(--ink-2); font-size: .92rem; line-height: 1.5; }
+
+/* ---- right to left (Arabic) ---- */
+/* The molecule itself keeps direction: ltr (set on the svg) so its label
+   anchors hold; the card and the list read from the right. */
+html[dir="rtl"] .mol-card,
+html[dir="rtl"] .tm-group,
+html[dir="rtl"] .tm-grid,
+html[dir="rtl"] .tm-how { text-align: right; }
+html[dir="rtl"] .tm-h { padding-left: 0; padding-right: 2px; }
+/* Arabic letters must stay joined: no tracking on the small caps labels. */
+html[dir="rtl"] .tm-h,
+html[dir="rtl"] .tm-role,
+html[dir="rtl"] .mol-role,
+html[dir="rtl"] .mol-team { letter-spacing: 0; }

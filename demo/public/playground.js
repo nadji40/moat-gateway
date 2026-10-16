@@ -137,8 +137,9 @@ function verdict(html){
   $("#out").prepend(el);
   sizeDeck();
 }
+const DECISION={allow:"مسموح بها",step_up:"مُعلَّقة",deny:"مرفوضة"};
 const row=(decision,note,tag)=>`<div style="display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap">
-    <span class="pill ${esc(decision)}">${esc(decision).replace("_"," ")}</span>
+    <span class="pill ${esc(decision)}">${esc(L(String(decision).replace("_"," "),DECISION[decision]))}</span>
     <span class="hint">${esc(note)}</span>${tag?`<span class="tag-sim">${esc(tag)}</span>`:""}</div>`;
 const why=rs=>rs.length?`<ul>${rs.map(([id,m])=>`<li><strong>${esc(id)}</strong>: ${esc(m)}</li>`).join("")}</ul>`:"";
 
@@ -170,10 +171,13 @@ function show(i,focus){
   sizeDeck();
   if(focus) t.focus();
 }
+// In Arabic the tabs run right to left, so "next" is the arrow pointing left.
+const RTL=document.documentElement.dir==="rtl";
+const NEXT=RTL?"ArrowLeft":"ArrowRight";
 TABS.forEach((t,i)=>{
   t.addEventListener("click",()=>show(i));
   t.addEventListener("keydown",e=>{
-    if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();show(active+(e.key==="ArrowRight"?1:-1),true)}
+    if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();show(active+(e.key===NEXT?1:-1),true)}
   });
 });
 
@@ -189,7 +193,7 @@ deck.addEventListener("pointerup",e=>{
   if(!dragging) return; dragging=false;
   const dx=e.clientX-sx, dy=e.clientY-sy;
   if(Math.abs(dx)<44||Math.abs(dx)<=Math.abs(dy)) return;   // a scroll, not a swipe
-  show(active+(dx<0?1:-1));
+  show(active+((RTL?dx>0:dx<0)?1:-1));
 });
 deck.addEventListener("pointercancel",()=>{dragging=false});
 // the cards change height as content lands in them
@@ -209,19 +213,19 @@ function payeeFromPage(){
   const m=$("#page").value.match(/(?:remit to|pay to|transfer to|beneficiary is|beneficiary:)\s*([^.\n]+)/i);
   return m?m[1].trim():null;
 }
-const PRESETS=[["Do what the invoice says","@page"],
-  ["Exactly what was approved",["Monitoring Pro Inc","4.80","USD"]],
-  ["One character off",["Monitoring Pro Inc.","4.80","USD"]],
-  ["A higher price",["Monitoring Pro Inc","9.60","USD"]],
-  ["Over the spending cap",["Monitoring Pro Inc","501","USD"]],
-  ["Another currency",["Monitoring Pro Inc","4.80","EUR"]]];
+const PRESETS=[[L("Do what the invoice says","نفّذ ما تقوله الفاتورة"),"@page"],
+  [L("Exactly what was approved","ما وُوفق عليه تمامًا"),["Monitoring Pro Inc","4.80","USD"]],
+  [L("One character off","حرف واحد مختلف"),["Monitoring Pro Inc.","4.80","USD"]],
+  [L("A higher price","سعر أعلى"),["Monitoring Pro Inc","9.60","USD"]],
+  [L("Over the spending cap","فوق حد الإنفاق"),["Monitoring Pro Inc","501","USD"]],
+  [L("Another currency","عملة أخرى"),["Monitoring Pro Inc","4.80","EUR"]]];
 $("#chips").innerHTML=PRESETS.map(([l],i)=>`<button type="button" class="chip" data-i="${i}">${esc(l)}</button>`).join("");
 for(const el of $("#chips").querySelectorAll(".chip"))
   el.addEventListener("click",()=>{
     const[,v]=PRESETS[+el.dataset.i];
     if(v==="@page"){
       const p=payeeFromPage();
-      $("#attempt-status").textContent=p?"":"the invoice names nobody to remit to";
+      $("#attempt-status").textContent=p?"":L("the invoice names nobody to remit to","لا تذكر الفاتورة أحدًا للتحويل إليه");
       if(p) $("#p-payee").value=p;
       return;
     }
@@ -254,9 +258,9 @@ async function ensureSession() {
     jsonrpc: "2.0", id: 1, method: "initialize",
     params: { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "playground", version: "1" } },
   });
-  if (open.body.error) throw new Error(open.body.error.message || "the gateway refused the session");
+  if (open.body.error) throw new Error(open.body.error.message || L("the gateway refused the session","رفضت البوابة الجلسة"));
   const session = open.session;
-  if (!session) throw new Error("the gateway returned no session id");
+  if (!session) throw new Error(L("the gateway returned no session id","لم تُرجع البوابة معرّف جلسة"));
   await asAgent(keys.agent.secret, session, { jsonrpc: "2.0", method: "notifications/initialized" });
 
   // The trusted side. Note the key: the agent never holds this one.
@@ -305,10 +309,10 @@ for (const id of ["intent", "a-payee", "a-amount", "a-currency"])
 $("#attempt").addEventListener("click", async () => {
   const s = $("#attempt-status");
   const amount = amountOf($("#p-amount"));
-  if (amount === null) { s.textContent = "that is not an amount"; $("#p-amount").focus(); return; }
-  if (amountOf($("#a-amount")) === null) { s.textContent = "the approved amount is not a number"; $("#a-amount").focus(); return; }
+  if (amount === null) { s.textContent = L("that is not an amount", "هذا ليس مبلغًا"); $("#p-amount").focus(); return; }
+  if (amountOf($("#a-amount")) === null) { s.textContent = L("the approved amount is not a number", "المبلغ الموافَق عليه ليس رقمًا"); $("#a-amount").focus(); return; }
   s.textContent = "";
-  working($("#attempt"), "Evaluating");
+  working($("#attempt"), L("Evaluating", "جارٍ التقييم"));
   const call = { payee: $("#p-payee").value, amount, currency: $("#p-currency").value };
   try {
     const session = await ensureSession();
@@ -331,14 +335,15 @@ $("#attempt").addEventListener("click", async () => {
     const said = !err && out.body.result
       ? String((out.body.result.content || [{}])[0].text || "").slice(0, 220)
       : "";
-    const paidNote = err ? "the provider was never called" : (said || "forwarded to the provider");
+    const paidNote = err ? L("the provider was never called", "لم يُستدعَ مزوّد الدفع")
+      : (said || L("forwarded to the provider", "أُحيلت إلى مزوّد الدفع"));
 
     const reasons = moat && moat.reasons ? moat.reasons.map((r) => [r.id, r.message]) : [];
     verdict(row(decision, paidNote) +
       `<div class="call mono">${esc(JSON.stringify(call))}</div>` +
       why(reasons) +
       (moat && moat.prompt && !reasons.length ? `<p class="hint">${esc(moat.prompt)}</p>` : "") +
-      (moat && moat.evidence_id ? `<div class="call mono dim">evidence ${esc(moat.evidence_id)}</div>` : ""));
+      (moat && moat.evidence_id ? `<div class="call mono dim">${L("evidence", "الأدلة")} ${esc(moat.evidence_id)}</div>` : ""));
     s.textContent = "";
   } catch (e) {
     // A revoked playground key is the common case, and minting a new pair is
@@ -357,12 +362,11 @@ $("#attempt").addEventListener("click", async () => {
    with the approved one, which is how address poisoning works in practice:
    wallets abbreviate the middle, so the two look identical in a list.
    --------------------------------------------------------------------- */
-const PAYEE="Aseer Cloud Co";
-/* drawn rather than fetched, so the page ships no third-party asset */
-const MARK={
-  ETH:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5.2 12.1 12 15.9l6.8-3.8z" opacity=".55"/><path d="M12 17.2 5.2 13.4 12 22l6.8-8.6z"/></svg>',
-  SOL:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.8 5.6H20.5L17.2 8.9H3.5z"/><path d="M3.5 10.4h13.7l3.3 3.3H6.8z" opacity=".65"/><path d="M6.8 15.1H20.5L17.2 18.4H3.5z"/></svg>',
-};
+const PAYEE="Northwind Cloud Co";
+/* The networks are shown as "On chain 1" to "On chain 4", with no network or
+   asset names: the point of the demo is the address checks, which are the
+   same on every chain, and a name would only say which coin it is. */
+const CHAIN_LABEL=(i)=>L(`On chain ${i+1}`,`على السلسلة ${i+1}`);
 const CHAINS=[
   {id:"eip155:84532", name:"Base Sepolia", kind:"evm", asset:"ETH", amount:"0.00002",
    approved:"0x8F3A9c21D5e74B0aC6fE18b2D7c4E90a1B3f52D7",
@@ -397,32 +401,36 @@ const short=a=>a.length>20?a.slice(0,10)+"…"+a.slice(-8):a;
 
 function decide(to,amt){
   const t=to.trim();
-  if(!t) return {decision:"deny",reasons:[["destination-missing","no destination address was given"]]};
+  if(!t) return {decision:"deny",reasons:[["destination-missing",L("no destination address was given","لم يُعطَ عنوان وجهة")]]};
   if(!shapeOk(chain,t)) return {decision:"deny",reasons:[["destination-format",
-    `that is not a valid ${chain.kind==="evm"?"EVM":"Solana"} address, so nothing could be signed for it`]]};
+    L("that is not a valid address on this chain, so nothing could be signed for it",
+      "هذا ليس عنوانًا صالحًا على هذه السلسلة، فلا يمكن توقيع شيء له")]]};
 
   if(same(chain,t,chain.approved)){
     const a=Number(amt), cap=Number(chain.amount);
-    if(!isFinite(a)||a<=0) return {decision:"deny",reasons:[["amount-invalid","that is not an amount"]]};
+    if(!isFinite(a)||a<=0) return {decision:"deny",reasons:[["amount-invalid",L("that is not an amount","هذا ليس مبلغًا")]]};
     if(a>cap) return {decision:"step_up",reasons:[["authorization-amount",
-      `${amt} ${chain.asset} is more than the ${chain.amount} ${chain.asset} you approved, so a person has to confirm it`]]};
+      L(`${amt} is more than the ${chain.amount} you approved, so a person has to confirm it`,
+        `${amt} أكثر من ${chain.amount} التي وافقت عليها، لذا يجب أن يؤكدها شخص`)]]};
     return {decision:"allow",reasons:[]};
   }
 
   const elsewhere=CHAINS.find(c=>c!==chain&&same(c,t,c.approved));
   if(elsewhere) return {decision:"deny",reasons:[["authorization-network",
-    `that is the address you approved on ${elsewhere.name}. This transfer is on ${chain.name}, and an approval does not carry across networks`]]};
+    L(`that is the address you approved for ${CHAIN_LABEL(CHAINS.indexOf(elsewhere))}. This transfer is ${CHAIN_LABEL(CHAINS.indexOf(chain))}, and an approval does not carry across networks`,
+      `هذا هو العنوان الذي وافقت عليه على ${CHAIN_LABEL(CHAINS.indexOf(elsewhere))}. هذا التحويل على ${CHAIN_LABEL(CHAINS.indexOf(chain))}، والموافقة لا تنتقل بين الشبكات`)]]};
 
   if(looksLike(chain,t,chain.approved)) return {decision:"deny",reasons:[["destination-provenance",
-    "the first and last characters match the address you approved and the middle does not. Wallets abbreviate the middle; the comparison here is on the whole string"]]};
+    L("the first and last characters match the address you approved and the middle does not. Wallets abbreviate the middle; the comparison here is on the whole string",
+      "الأحرف الأولى والأخيرة تطابق العنوان الذي وافقت عليه، أما الوسط فلا. تختصر المحافظ الوسط؛ والمقارنة هنا على العنوان كاملًا")]]};
 
   return {decision:"deny",reasons:[["destination-provenance",
-    "this address never appeared in anything you approved"]]};
+    L("this address never appeared in anything you approved","لم يظهر هذا العنوان قط في أي شيء وافقت عليه")]]};
 }
 
 function drawChains(){
   $("#chains").innerHTML=CHAINS.map((c,i)=>
-    `<button type="button" data-i="${i}" aria-pressed="${c===chain}">${esc(c.name)}</button>`).join("");
+    `<button type="button" data-i="${i}" aria-pressed="${c===chain}">${esc(CHAIN_LABEL(i))}</button>`).join("");
   for(const b of $("#chains").querySelectorAll("button"))
     b.addEventListener("click",()=>{chain=CHAINS[+b.dataset.i];drawChain()});
 }
@@ -430,21 +438,21 @@ function drawChain(){
   for(const b of $("#chains").querySelectorAll("button"))
     b.setAttribute("aria-pressed",String(CHAINS[+b.dataset.i]===chain));
   $("#mandate").innerHTML=[
-    ["Payee",esc(PAYEE)],
-    ["Network",`${esc(chain.name)} <span class="dim mono">${esc(chain.id)}</span>`],
-    ["Amount",`${esc(chain.amount)} ${esc(chain.asset)}`],
-    ["Address",`<span class="mono addr">${esc(chain.approved)}</span>`],
+    [L("Payee","المستفيد"),esc(PAYEE)],
+    [L("Network","الشبكة"),esc(CHAIN_LABEL(CHAINS.indexOf(chain)))],
+    [L("Amount","المبلغ"),`<span dir="ltr">${esc(chain.amount)}</span>`],
+    [L("Address","العنوان"),`<span class="mono addr">${esc(chain.approved)}</span>`],
   ].map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join("");
   $("#to").value=chain.approved;
   $("#amt").value=chain.amount;
   $("#amt").removeAttribute("aria-invalid");
-  $("#asset").innerHTML=MARK[chain.asset]+"<span class=\"dim\">"+chain.asset+"</span>";
-  $("#asset").setAttribute("aria-label",chain.asset);
+  $("#asset").innerHTML="<span class=\"dim\">"+L("on chain","على السلسلة")+"</span>";
+  $("#asset").setAttribute("aria-label",L("on chain","على السلسلة"));
   $("#fills").innerHTML=[
-    ["The address you approved",chain.approved],
-    ["A poisoned lookalike",chain.poisoned],
-    ["Someone else entirely",chain.other],
-    ["Another chain's address",CHAINS[(CHAINS.indexOf(chain)+1)%CHAINS.length].approved],
+    [L("The address you approved","العنوان الذي وافقت عليه"),chain.approved],
+    [L("A poisoned lookalike","شبيه مسموم"),chain.poisoned],
+    [L("Someone else entirely","شخص آخر تمامًا"),chain.other],
+    [L("Another chain's address","عنوان من سلسلة أخرى"),CHAINS[(CHAINS.indexOf(chain)+1)%CHAINS.length].approved],
   ].map(([l,v])=>`<button type="button" class="chip" data-v="${esc(v)}">${esc(l)}</button>`).join("");
   for(const b of $("#fills").querySelectorAll(".chip"))
     b.addEventListener("click",()=>{$("#to").value=b.dataset.v;$("#to").focus()});
@@ -453,9 +461,11 @@ function drawChain(){
 $("#go").addEventListener("click",()=>{
   if(amountOf($("#amt"))===null){ $("#amt").focus(); return; }
   const to=$("#to").value.trim(), v=decide(to,$("#amt").value);
-  verdict(row(v.decision,v.decision==="allow"?"the wallet would be asked to sign":"no transaction exists","simulated")+
-    `<div class="call mono">${esc(short(to))} <span class="dim">on ${esc(chain.name)}</span></div>`+
-    (v.reasons.length?why(v.reasons):`<p class="hint ok-line">Every field matches what you approved, so there is nothing to refuse.</p>`));
+  verdict(row(v.decision,v.decision==="allow"?L("the wallet would be asked to sign","سيُطلب من المحفظة التوقيع")
+      :L("no transaction exists","لا توجد معاملة"),L("simulated","محاكاة"))+
+    `<div class="call mono">${esc(short(to))} <span class="dim">${esc(CHAIN_LABEL(CHAINS.indexOf(chain)))}</span></div>`+
+    (v.reasons.length?why(v.reasons):`<p class="hint ok-line">${L("Every field matches what you approved, so there is nothing to refuse.",
+      "كل حقل يطابق ما وافقت عليه، فلا شيء يُرفض.")}</p>`));
 });
 
 

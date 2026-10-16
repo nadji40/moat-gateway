@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { L } from '../../i18n'
 
 type SocialLink = {
   label: string
@@ -48,11 +49,16 @@ export default function Footer() {
               </g>
             </svg>
             <p>
-              Moat helps AI agents make authorized payments by verifying every action
-              against the user&apos;s intent.
+              {L(
+                <>
+                  Moat helps AI agents make authorized payments by verifying every action
+                  against the user&apos;s intent
+                </>,
+                <>يساعد Moat وكلاء الذكاء الاصطناعي على إجراء دفعات موافَق عليها، بمطابقة كل إجراء مع نية المستخدم</>,
+              )}
             </p>
             {socialLinks.length > 0 && (
-              <div className="footer-social" aria-label="Moat links">
+              <div className="footer-social" aria-label={L('Moat links', 'روابط Moat')}>
                 {socialLinks.map(({ label, href, Icon }) => (
                   <a key={label} className="social-link" href={href} aria-label={label} target="_blank" rel="noreferrer noopener">
                     <Icon />
@@ -63,32 +69,31 @@ export default function Footer() {
           </div>
 
           <div className="footer-group" role="group" aria-labelledby="footer-product">
-            <h4 id="footer-product">Product</h4>
-            <a href="/#how">How it works</a>
-            <a href="/#checks">What it checks</a>
-            <a href="/docs">Documentation</a>
-            <a href="/docs#quickstart">API quickstart</a>
+            <h4 id="footer-product">{L('Product', 'المنتج')}</h4>
+            <a href="/#how">{L('How it works', 'كيف يعمل')}</a>
+            <a href="/#checks">{L('What it checks', 'ما الذي يتحقق منه')}</a>
+            <a href="/docs">{L('Documentation', 'التوثيق')}</a>
+            <a href="/docs#quickstart">{L('API quickstart', 'البدء السريع مع API')}</a>
           </div>
 
           <div className="footer-group" role="group" aria-labelledby="footer-proof">
-            <h4 id="footer-proof">Proof</h4>
-            <a href="/#numbers">Results</a>
-            <a href="/compare">Compared</a>
-            <a href="/tests">The tests</a>
-            <a href="/status">Status</a>
+            <h4 id="footer-proof">{L('Proof', 'الإثبات')}</h4>
+            <a href="/compare">{L('Compared', 'المقارنة')}</a>
+            <a href="/tests">{L('The tests', 'الاختبارات')}</a>
+            <a href="/status">{L('Status', 'الحالة')}</a>
           </div>
 
           <div className="footer-group footer-workspace" role="group" aria-labelledby="footer-workspace">
-            <h4 id="footer-workspace">Company</h4>
-            <a href="/team">Who we are</a>
-            <a href="/dashboard">Open a workspace</a>
-            <a href="/dashboard#pane-playground">Playground</a>
+            <h4 id="footer-workspace">{L('Company', 'الشركة')}</h4>
+            <a href="/team">{L('Who we are', 'من نحن')}</a>
+            <a href="/dashboard">{L('Open a workspace', 'افتح مساحة عمل')}</a>
+            <a href="/dashboard#pane-playground">{L('Playground', 'ساحة التجربة')}</a>
           </div>
         </div>
 
         <div className="fbase">
           <span>© 2026 Moat</span>
-          <span>The sandbox uses a mock provider. No real money moves.</span>
+          <span>{L('The sandbox uses a mock provider. No real money moves.', 'بيئة التجربة تستخدم مزوّد دفع وهميًا. لا تنتقل أي أموال حقيقية.')}</span>
         </div>
       </div>
     </footer>

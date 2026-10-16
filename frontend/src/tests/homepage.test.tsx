@@ -22,9 +22,13 @@ const original = parseHTML(originalPath);
 const visibleText = (element: Element): string => {
   const copy = element.cloneNode(true) as Element;
 
-  copy.querySelectorAll('style, script').forEach(node => node.remove());
+  // Decoration (icons, and the checks section's moving payment and progress
+  // bar) is aria-hidden and carries no copy of its own.
+  copy.querySelectorAll('style, script, [aria-hidden="true"]').forEach(node => node.remove());
 
-  return copy.textContent?.replace(/\s/g, '') ?? '';
+  // Full stops were dropped from single-phrase titles and lines on purpose,
+  // so they are not part of what has to match.
+  return copy.textContent?.replace(/[\s.]/g, '') ?? '';
 };
 
 describe('approved homepage integration', () => {
@@ -54,17 +58,41 @@ describe('approved homepage integration', () => {
 
     // The approved page had a sandbox section (#api). It now lives on the
     // documentation page, so the homepage is one section shorter.
-    const kept = approved.filter(node => node.id !== 'api');
-    expect(kept).toHaveLength(8);
-    expect(sections).toHaveLength(8);
+    // The sandbox section (#api) moved to the docs; the numbers section
+    // (#numbers) and the MCP section (#fit) were removed, and the numbers
+    // section's two links now sit under #checks.
+    const kept = approved.filter(node => !['api', 'numbers', 'fit'].includes(node.id)).map(node => {
+      // The hero's subtitle was removed on purpose; the rest of its copy stays.
+      const copy = node.cloneNode(true) as Element;
+      copy.querySelector('header.hero .lede, .lede')?.remove();
+      // So was the line above the headline.
+      copy.querySelector('header.hero .kicker')?.remove();
+      // And the How it works heading was reworded.
+      const how = copy.id === 'how' ? copy.querySelector('h2') : null;
+      if (how) how.textContent = 'Three answers: under a millisecond';
+      // And the Languages card says one word now, not the list.
+      if (copy.id === 'checks') copy.innerHTML = copy.innerHTML.replace('English, French and Arabic dialects', 'Multilingual');
+      // So was the row of payment-rail pills under the MCP section.
+      copy.querySelector('#fit .rails, .rails')?.remove();
+      return copy;
+    });
+    expect(kept).toHaveLength(6);
+    expect(sections).toHaveLength(6);
 
     expect(sections.map(node => node.id)).toEqual(
       kept.map(node => node.id)
     );
 
     sections.forEach((node, index) => {
-      if (node.tagName !== 'FOOTER') {
-        expect(visibleText(node)).toBe(
+      if (node.id === 'problem') {
+        // Redesigned as a trace of the attack; its heading is what must hold.
+        expect(node.querySelector('h2')?.textContent).toBe(kept[index].querySelector('h2')?.textContent);
+      } else if (node.tagName !== 'FOOTER') {
+        // The two links moved from #numbers into #checks; where they sit on the
+        // page is checked with the other links below.
+        const rendered = node.cloneNode(true) as Element;
+        rendered.querySelector('.chk-more')?.remove();
+        expect(visibleText(rendered)).toBe(
           visibleText(kept[index])
         );
       }
@@ -88,7 +116,7 @@ describe('approved homepage integration', () => {
 
     expect(
       screen.getByText(
-        "Moat helps AI agents make authorized payments by verifying every action against the user's intent."
+        "Moat helps AI agents make authorized payments by verifying every action against the user's intent"
       )
     ).toBeInTheDocument();
 

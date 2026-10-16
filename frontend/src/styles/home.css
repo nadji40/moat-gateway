@@ -10,67 +10,147 @@
 /* Section descriptions */
 .head p { font-size: 1.0625rem; line-height: 1.6; }
 
-/* ── Worked example (#problem) ──────────────────────────────────────── */
-.case {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  text-align: left;
-  position: relative;
-  align-items: stretch;
-}
-@media (max-width: 980px) { .case { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 560px) { .case { grid-template-columns: 1fr; } }
+/* ── Worked example (#problem): one attack, traced ──────────────────── */
+.trace { position: relative; text-align: start; }
+.tr-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; position: relative; }
+/* the line the four steps sit on, filling as they light up */
+/* From the first badge's centre to the last one's: four equal columns with
+   16px gaps put the last badge's centre 25% - 28px from the far edge. */
+.tr-line { position: absolute; top: 15px; inset-inline-start: 16px; inset-inline-end: calc(25% - 28px); height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
+.tr-line > span { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left;
+  background: linear-gradient(90deg, var(--orange) 0%, var(--orange) 70%, var(--red-l) 100%);
+  transition: transform 1.6s var(--ease) .1s; }
+html[dir="rtl"] .tr-line > span { transform-origin: right; background: linear-gradient(270deg, var(--orange) 0%, var(--orange) 70%, var(--red-l) 100%); }
+.trace.on .tr-line > span { transform: scaleX(1); }
 
-.step {
-  border-radius: 16px;
-  padding: 18px 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
+.tr-step { display: flex; flex-direction: column; gap: 14px; min-width: 0;
+  opacity: .25; transform: translateY(10px); transition: opacity .6s var(--ease), transform .6s var(--ease);
+  transition-delay: calc(var(--i) * .38s); }
+.trace.on .tr-step { opacity: 1; transform: none; }
+.tr-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; font-size: .82rem; font-weight: 700; color: var(--ink-2); }
+.tr-n { position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  font: 800 .82rem var(--font); color: var(--ink); background: #111114; border: 1px solid var(--line-2); box-shadow: 0 0 0 5px var(--bg); }
+.trace.on .tr-step .tr-n { border-color: rgba(255,138,76,.55); color: var(--orange-l); }
+.tr-n.moat { color: var(--red-l); }
+.tr-n.moat svg { width: 18px; height: 18px; }
+.trace.on .tr-step:last-child .tr-n { border-color: rgba(255,77,94,.6); background: #2A0C10; }
+
+.tr-card { border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.tr-note { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: var(--ink-3); margin-top: auto; }
+.tr-note svg { width: 14px; height: 14px; flex: none; }
+.tr-note.bad { color: var(--red-l); }
+mark { background: none; color: inherit; }
+
+/* 1: a chat message */
+.tr-chat { display: flex; gap: 10px; align-items: flex-start; }
+.tr-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; color: var(--ink-2); background: rgba(255,255,255,.07); }
+.tr-avatar svg { width: 16px; height: 16px; }
+.tr-bubble { padding: 10px 13px; border-radius: 14px; border-start-start-radius: 4px; background: rgba(255,95,0,.12); border: 1px solid rgba(255,95,0,.25);
+  color: var(--ink); font-size: .95rem; font-weight: 600; line-height: 1.5; }
+.tr-bubble mark { color: var(--orange-l); font-weight: 800; }
+
+/* 2: a page in a browser, one line of it planted */
+.tr-browser { border-radius: 11px; border: 1px solid var(--line); overflow: hidden; background: rgba(255,255,255,.025); }
+.tr-bar { display: flex; align-items: center; gap: 5px; padding: 7px 9px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.035); direction: ltr; }
+.tr-bar i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.18); }
+.tr-bar span { margin-left: 6px; font: 600 .68rem var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-page { padding: 10px; display: flex; flex-direction: column; gap: 7px; }
+.tr-sk { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); }
+.tr-sk.short { width: 60%; }
+.tr-inj { margin: 2px 0 0; padding: 8px 10px; border-radius: 8px; font-size: .84rem; font-weight: 600; line-height: 1.45; color: var(--ink);
+  background: rgba(235,0,27,.1); border: 1px dashed rgba(255,77,94,.55); }
+.tr-inj mark { color: var(--red-l); font-weight: 800; }
+
+/* 3: the payment, as a slip */
+.tr-slip { margin: 0; display: grid; gap: 0; border-radius: 11px; border: 1px solid var(--line); overflow: hidden; }
+.tr-slip > div { display: flex; justify-content: space-between; gap: 10px; padding: 9px 11px; font-size: .84rem; }
+.tr-slip > div + div { border-top: 1px solid var(--line); }
+.tr-slip dt { color: var(--ink-3); font-weight: 600; }
+.tr-slip dd { margin: 0; color: var(--ink); font-weight: 700; text-align: end; }
+.tr-slip dd.bad { color: var(--red-l); }
+.tr-slip dd.mono { font-family: var(--mono); }
+
+/* 4: the verdict */
+.tr-verdict { border-color: rgba(255,77,94,.4); background: radial-gradient(120% 90% at 50% 0%, rgba(235,0,27,.14), rgba(255,255,255,.02)); }
+.tr-stamp { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px;
+  font-weight: 800; font-size: 1.05rem; color: var(--red-l); background: rgba(235,0,27,.14); border: 1.5px solid rgba(255,77,94,.6);
+  transform: scale(.6) rotate(-6deg); opacity: 0; transition: transform .5s cubic-bezier(.3,1.6,.5,1) 1.45s, opacity .3s 1.45s; }
+.tr-stamp svg { width: 16px; height: 16px; }
+.trace.on .tr-stamp { transform: rotate(-2deg); opacity: 1; }
+.tr-why { color: var(--ink); font-weight: 700; font-size: .95rem; line-height: 1.45; }
+
+@media (max-width: 980px) {
+  .tr-steps { grid-template-columns: 1fr 1fr; }
+  .tr-line { display: none; }
 }
-.step .who {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+@media (max-width: 560px) { .tr-steps { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) {
+  .tr-step, .tr-stamp, .tr-line > span { transition: none; }
 }
-.step .who svg { width: 16px; height: 16px; flex: none; }
-.step .said { font-size: 0.98rem; line-height: 1.5; color: var(--ink); font-weight: 500; }
-.step .said mark { background: none; color: var(--orange-l); font-weight: 700; }
-.step .said.bad mark,
-.step .said mark.x { color: var(--red-l); }
-.step.inj { border-color: rgba(255, 77, 94, 0.28); }
-.step.inj .who { color: var(--red-l); }
-.step.out { border-color: rgba(255, 77, 94, 0.35); background: rgba(235, 0, 27, 0.06); }
-.step.out .pill { font-size: 1rem; padding: 7px 16px; }
-.step .pill { align-self: flex-start; }
 
 /* ── Verdict cards (#how) ───────────────────────────────────────────── */
 .verdict3 {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  grid-template-columns: 1fr;
+  justify-items: center;
   text-align: left;
   margin-top: 8px;
 }
-@media (max-width: 860px) { .verdict3 { grid-template-columns: 1fr; } }
+/* The three cards share one spot and take turns. */
+.verdict3 > .vcard { grid-area: 1 / 1; width: min(440px, 100%); }
 
 .vcard {
-  border-radius: 16px;
-  padding: 22px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
+  --v: var(--ink-2); --vt: rgba(255,255,255,.06); --vb: rgba(255,255,255,.14);
+  position: relative; overflow: hidden;
+  border-radius: 18px; padding: 22px 20px 20px;
+  display: flex; flex-direction: column; gap: 14px; text-align: start;
+  transition: border-color .5s, box-shadow .5s, transform .5s var(--ease);
 }
-.vcard p { color: var(--ink-2); font-size: 0.95rem; line-height: 1.55; }
+.vcard.v-allow { --v: var(--green-l); --vt: rgba(46,209,122,.12); --vb: rgba(46,209,122,.45); --vg: rgba(46,209,122,.35); animation: vc-allow 18s infinite; }
+.vcard.v-hold { --v: var(--yellow-l); --vt: rgba(255,184,77,.12); --vb: rgba(255,184,77,.45); --vg: rgba(247,158,27,.32); animation: vc-hold 18s infinite; }
+.vcard.v-deny { --v: var(--red-l); --vt: rgba(255,77,94,.12); --vb: rgba(255,77,94,.45); --vg: rgba(235,0,27,.32); animation: vc-deny 18s infinite; }
+/* a thin line of the verdict's colour along the top */
+.vcard::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--v); opacity: .55; }
+.vc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.vc-ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; flex: none;
+  color: var(--v); background: var(--vt); border: 1px solid var(--vb); }
+.vc-ic svg { width: 22px; height: 22px; }
+.vcard .vc-rule { color: var(--ink); font-size: 1.02rem; font-weight: 700; line-height: 1.45; }
+.vc-case { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: auto;
+  padding: 10px 12px; border-radius: 12px; font-size: .84rem;
+  background: rgba(255,255,255,.035); border: 1px solid var(--line); }
+.vc-who { font-weight: 700; color: var(--ink); }
+.vc-amt { font-family: var(--mono); color: var(--ink-2); direction: ltr; }
+.vc-out { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--v); }
+.vc-out svg { width: 14px; height: 14px; flex: none; }
+
+.vcard.v-allow, .vcard.v-hold, .vcard.v-deny { border-color: var(--vb); box-shadow: 0 22px 50px -26px var(--vg); }
+
+/* In step with the diagram above, which plays the three cases on one 18 s
+   loop: allowed first, then refused, then held and approved. Each card is
+   on screen only for its own case, and they cross-fade at the hand-overs. */
+@keyframes vc-allow {
+  0%, 27% { opacity: 1; transform: none; }
+  30%, 96% { opacity: 0; transform: translateY(10px) scale(.97); }
+  99%, 100% { opacity: 1; transform: none; }
+}
+@keyframes vc-deny {
+  0%, 26% { opacity: 0; transform: translateY(10px) scale(.97); }
+  29%, 44% { opacity: 1; transform: none; }
+  47%, 100% { opacity: 0; transform: translateY(10px) scale(.97); }
+}
+@keyframes vc-hold {
+  0%, 45% { opacity: 0; transform: translateY(10px) scale(.97); }
+  48%, 95% { opacity: 1; transform: none; }
+  98%, 100% { opacity: 0; transform: translateY(10px) scale(.97); }
+}
+/* Less motion asked for: all three, side by side, still. */
+@media (prefers-reduced-motion: reduce) {
+  .vcard { animation: none !important; }
+  .verdict3 { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .verdict3 > .vcard { grid-area: auto; width: auto; }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 860px) { .verdict3 { grid-template-columns: 1fr; } }
 
 .flowart { width: min(560px, 100%); margin: 0 auto 30px; }
 .flowart svg { display: block; width: 100%; height: auto; }
@@ -191,3 +271,85 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ── Right to left (Arabic) ─────────────────────────────────────────── */
+html[dir="rtl"] .verdict3,
+html[dir="rtl"] .stats4,
+html[dir="rtl"] .feats { text-align: right; }
+/* Arabic letters must stay joined: no tracking on the small caps labels. */
+html[dir="rtl"] .flowart .a-lbl { letter-spacing: 0; }
+/* "0 / 380" and "0.22 ms" read as numbers, left to right, on the right edge. */
+html[dir="rtl"] .stat .n { direction: ltr; text-align: right; }
+html[dir="rtl"] .more + .more { margin-left: 0; margin-right: 22px; }
+html[dir="rtl"] .more svg { transform: scaleX(-1); }
+
+/* ── What it checks: one payment passing six checks ─────────────────── */
+.chk { display: grid; gap: 22px; justify-items: center; }
+.chk-pay {
+  display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+  padding: 9px 16px 9px 10px; border-radius: 999px; font-weight: 700; font-size: .92rem;
+  border: 1px solid var(--line-2); background: rgba(255,255,255,.04);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  transition: border-color .6s, box-shadow .6s;
+}
+.chk-pay-ic { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--ink); background: rgba(255,255,255,.07); }
+.chk-pay-ic svg { width: 18px; height: 18px; }
+.chk-pay-who { color: var(--ink); }
+.chk-pay-amt { font-family: var(--mono); color: var(--ink-2); direction: ltr; }
+.chk-pay-st { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; color: var(--orange-l); min-width: 9.5em; }
+.chk-pay-st svg { width: 14px; height: 14px; }
+.chk-pay.ok { border-color: rgba(46,209,122,.55); box-shadow: 0 0 0 6px rgba(46,209,122,.08), inset 0 1px 0 rgba(255,255,255,.08); }
+.chk-pay.ok .chk-pay-st { color: var(--green-l); }
+@keyframes chk-blink { 50% { opacity: .25; } }
+
+.chk-view {
+  position: relative; width: 100%; overflow: hidden; padding: 26px 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent);
+}
+.chk-track { display: flex; gap: 18px; width: max-content; transition: transform .9s var(--ease); }
+.chk-card {
+  position: relative; flex: none; width: min(300px, 72vw); border-radius: 18px; padding: 22px 20px;
+  display: flex; flex-direction: column; gap: 10px; text-align: start;
+  opacity: .4; transform: scale(.84);
+  transition: transform .75s var(--ease), opacity .75s, border-color .5s, box-shadow .5s;
+}
+.chk-card[data-d="1"] { opacity: .62; transform: scale(.88); }
+.chk-card p { color: var(--ink-2); font-size: .95rem; line-height: 1.55; }
+.chk-card .ic {
+  width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: var(--orange);
+  background: rgba(255,95,0,.1); border: 1px solid rgba(255,95,0,.22); transition: color .5s, background .5s, border-color .5s;
+}
+.chk-card .ic svg { width: 19px; height: 19px; }
+.chk-card.is-active { opacity: 1; transform: scale(1.06); border-color: rgba(255,138,76,.55);
+  box-shadow: 0 0 0 1px rgba(255,138,76,.22), 0 26px 60px -26px rgba(255,95,0,.6); }
+.chk-card.is-active .ic { animation: chk-pulse 1s ease-in-out infinite; }
+.chk-card.is-passed .ic { color: var(--green-l); background: rgba(46,209,122,.1); border-color: rgba(46,209,122,.28); animation: none; }
+.chk-card.is-active.is-passed { border-color: rgba(46,209,122,.6);
+  box-shadow: 0 0 0 1px rgba(46,209,122,.22), 0 26px 60px -26px rgba(46,209,122,.5); }
+@keyframes chk-pulse { 50% { box-shadow: 0 0 0 7px rgba(255,95,0,.12); } }
+.chk-badge {
+  position: absolute; top: 14px; inset-inline-end: 14px; width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center; color: #000; background: var(--green-l);
+  transform: scale(0); transition: transform .45s cubic-bezier(.3,1.6,.5,1);
+}
+.chk-badge svg { width: 15px; height: 15px; }
+.chk-card.is-passed .chk-badge { transform: scale(1); }
+.chk-track.all-ok .chk-card { opacity: .9; transform: scale(.9); border-color: rgba(46,209,122,.35); }
+
+.chk-steps { display: flex; gap: 6px; }
+.chk-steps span { width: 34px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); transition: background .45s; }
+.chk-steps span.on { background: var(--orange); }
+.chk-steps span.ok { background: var(--green-l); }
+
+/* Less motion asked for: the six checks, all passed, laid out still. */
+.chk-still .chk-view { -webkit-mask-image: none; mask-image: none; padding: 0; }
+.chk-still .chk-track { width: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; transform: none !important; transition: none; }
+.chk-still .chk-card { width: auto; opacity: 1; transform: none; transition: none; }
+@media (max-width: 980px) { .chk-still .chk-track { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 620px) { .chk-still .chk-track { grid-template-columns: 1fr; } }
+
+.chk-more { display: flex; justify-content: center; gap: 26px; margin-top: 30px; }
+.chk-more .more { margin-top: 0; }
+.chk-more .more + .more { margin-left: 0; margin-right: 0; }
+html[dir="rtl"] .chk-more .more + .more { margin-right: 0; }

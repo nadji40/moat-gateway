@@ -5,6 +5,10 @@
 // `busy` for the set of tests in flight. One copy cannot drift from itself.
 
 const $ = (s) => document.querySelector(s);
+/* English or Arabic, from i18n.js when the page loads it; English otherwise. */
+// Named so it cannot collide with a page's own helpers: these scripts share
+// one global scope, and a page that declares the same name stops loading.
+const navText = (en, ar) => (window.MOAT_I18N ? window.MOAT_I18N.L(en, ar) : en);
 const NL = String.fromCharCode(10);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
@@ -66,7 +70,7 @@ function idle(btn) {
  * execCommand is the fallback because the async clipboard API needs a
  * secure context, and this page is reachable over plain http on a LAN.
  */
-async function copyText(text, btn, done = "Copied", selectOnFail) {
+async function copyText(text, btn, done = navText("Copied", "تم النسخ"), selectOnFail) {
   let ok = false;
   // The async API is refused in more places than the docs suggest: an
   // embedded browser, a denied permission, a page without focus. A throw
@@ -100,7 +104,7 @@ async function copyText(text, btn, done = "Copied", selectOnFail) {
   if (!btn) return ok;
   const was = btn.dataset.said ?? btn.innerHTML;
   btn.dataset.said = was;
-  btn.innerHTML = ok ? done : "Press ctrl C";
+  btn.innerHTML = ok ? done : navText("Press ctrl C", "اضغط Ctrl+C");
   clearTimeout(btn._t);
   btn._t = setTimeout(() => { btn.innerHTML = was; delete btn.dataset.said; }, 1600);
   return ok;
@@ -134,11 +138,11 @@ function signedIn() {
  * a URL should not name the file format it happens to be stored in.
  */
 const NAV = [
-  { href: "/docs", label: "Docs", page: "docs" },
-  { href: "/compare", label: "Compare", page: "compare" },
-  { href: "/tests", label: "The tests", page: "tests" },
-  { href: "/status", label: "Status", page: "status" },
-  { href: "/team", label: "Team", page: "team" },
+  { href: "/", label: "Home", ar: "الرئيسية", page: "index" },
+  { href: "/team", label: "Team", ar: "الفريق", page: "team" },
+  { href: "/compare", label: "Compare", ar: "المقارنة", page: "compare" },
+  { href: "/status", label: "Status", ar: "الحالة", page: "status" },
+  { href: "/docs", label: "Docs", ar: "التوثيق", page: "docs" },
 ];
 
 /** Which page is open, from the path, with or without an extension. */
@@ -175,15 +179,16 @@ function mountNav() {
   const here = currentPage();
   const links = NAV.map((l) => {
     const on = l.page === here && !(here === "index" && l.href.includes("#")) ? ' aria-current="page"' : "";
-    return `<a href="${l.href}"${on}>${l.label}</a>`;
+    return `<a href="${l.href}"${on}>${navText(l.label, l.ar)}</a>`;
   }).join("");
   host.innerHTML =
     '<div class="wrap"><div class="navbar glass">' +
-    `<a class="navmark" href="/" aria-label="moat, home">${NAV_MARK}</a>` +
+    `<a class="navmark" href="/" aria-label="${navText("moat, home", "moat، الرئيسية")}">${NAV_MARK}</a>` +
     `<div class="navlinks" id="navlinks">${links}</div>` +
     '<button class="navtoggle" type="button" id="navtoggle" aria-controls="navlinks"' +
-    ` aria-expanded="false" aria-label="Pages">${NAV_TOGGLE}</button>` +
+    ` aria-expanded="false" aria-label="${navText("Pages", "الصفحات")}">${NAV_TOGGLE}</button>` +
     "</div></div>";
+  mountLangButton();
   mountAuthButton();
   mountNavToggle(host);
 }
@@ -237,6 +242,27 @@ function mountNavToggle(host) {
   wide.addEventListener("change", (e) => { if (e.matches) open(false); });
 }
 
+/* The language switch: it names the language it switches to, in that
+   language, so a reader who cannot read the current one can still find it. */
+function mountLangButton() {
+  const bar = document.querySelector(".navbar");
+  if (!bar || !window.MOAT_I18N || document.getElementById("langbtn")) return;
+  const ar = window.MOAT_I18N.ar;
+  const b = document.createElement("button");
+  b.type = "button";
+  b.id = "langbtn";
+  b.className = "langbtn";
+  b.lang = ar ? "en" : "ar";
+  b.setAttribute("aria-label", ar ? "Switch to English" : "التبديل إلى العربية");
+  // Flags from flagcdn: the United States for English, Algeria for Arabic.
+  b.title = ar ? "English" : "العربية";
+  b.innerHTML = ar
+    ? '<img src="https://flagcdn.com/us.svg" width="22" height="16" alt="">'
+    : '<img src="https://flagcdn.com/dz.svg" width="22" height="16" alt="">';
+  b.addEventListener("click", () => window.MOAT_I18N.setLang(ar ? "en" : "ar"));
+  bar.appendChild(b);
+}
+
 function mountAuthButton() {
   const bar = document.querySelector(".navbar");
   if (!bar) return;
@@ -254,7 +280,7 @@ function mountAuthButton() {
   // Primary, and it stays on a phone: it is the only way in, so hiding it with
   // .navlinks at 760px would leave a visitor on a phone with no route at all.
   a.className = "btn tiny";
-  a.textContent = signedIn() ? "Dashboard" : "Log in";
+  a.textContent = signedIn() ? navText("Dashboard", "لوحة التحكم") : navText("Log in", "تسجيل الدخول");
   if (currentPage() === "dashboard") a.setAttribute("aria-current", "page");
 }
 
@@ -299,6 +325,14 @@ function mountSwiper(barSel, deckSel) {
   });
   addEventListener("resize", size);
   show(0);
+  // The tabs can change width after this first placement: a page in Arabic
+  // gets its words at DOMContentLoaded and its font a moment later. Put the
+  // thumb back under the selected tab whenever the bar changes size.
+  // i18n.js puts the words in on its own DOMContentLoaded listener, which
+  // was added first and so runs first; measure again straight after it.
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => show(active));
+  if (document.fonts) document.fonts.ready.then(() => show(active));
+  if (typeof ResizeObserver === "function") new ResizeObserver(() => show(active)).observe(bar);
   return { show, size };
 }
 

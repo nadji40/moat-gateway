@@ -4,12 +4,32 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>moat, API status</title>
+<meta name="ar-title" content="moat، حالة الواجهة البرمجية">
 <meta name="description" content="Live status and round-trip latency for every endpoint the public sandbox exposes.">
 <meta name="color-scheme" content="dark">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,400;1,500&family=Ubuntu+Mono:wght@400;700&display=swap">
 <link rel="stylesheet" href="app.css?v=cbb4282">
+<link rel="stylesheet" href="i18n.css">
+<script src="i18n.js"></script>
+<style>
+/* Right to left. The strip is a timeline and stays one: oldest on the left,
+   today on the right, with its two captions under the matching ends. */
+html[dir="rtl"] .strip,html[dir="rtl"] .strip-ends{direction:ltr}
+html[dir="rtl"] .summary .bar{left:auto;right:0}
+html[dir="rtl"] .rows .row{text-align:right}
+html[dir="rtl"] .row-e{margin-left:0;margin-right:9px}
+html[dir="rtl"] .row-r{text-align:left}
+html[dir="rtl"] .check{text-align:right}
+html[dir="rtl"] .check .code{text-align:left}
+@media(max-width:700px){
+  html[dir="rtl"] .rows .row,html[dir="rtl"] .row-r{text-align:center}
+}
+@media(max-width:560px){
+  html[dir="rtl"] .check .code{text-align:right}
+}
+</style>
 </head>
 <body>
 
@@ -17,14 +37,13 @@
 
 <div class="wrap">
 
-
 <section class="tight">
-  <div class="headrow"><h2>Thirty days</h2></div>
+  <div class="headrow"><h2 data-ar="ثلاثون يومًا">Thirty days</h2></div>
   <div class="panel glass">
-    <div class="ph"><h3 id="uptime-h">Availability</h3></div>
+    <div class="ph"><h3 id="uptime-h" data-ar="التوفّر">Availability</h3></div>
     <div class="pb">
       <div class="strip" id="strip"></div>
-      <div class="strip-ends"><span id="strip-from"></span><span id="strip-to">today</span></div>
+      <div class="strip-ends"><span id="strip-from"></span><span id="strip-to" data-ar="اليوم">today</span></div>
     </div>
   </div>
 
@@ -37,11 +56,13 @@
 
 <section class="tight">
   <div class="headrow">
-    <h2>Right now</h2>
+    <h2 data-ar="الآن">Right now</h2>
+    <!-- Labelled from script, not data-ar: the first run starts before the
+         page's Arabic is applied, and would put the English back when idle. -->
     <button class="btn" id="recheck">Run the checks</button>
   </div>
   <div class="summary glass" id="summary" hidden><span class="bar"></span></div>
-  <div class="panel glass"><div class="ph">Endpoints</div><div class="pb">
+  <div class="panel glass"><div class="ph" data-ar="نقاط الاتصال">Endpoints</div><div class="pb">
     <div class="checks" id="checks"></div>
     <p class="hint foot-note" id="origin"></p>
   </div></div>
@@ -49,22 +70,14 @@
 
 </div>
 
-<footer class="foot"><div class="wrap">
-  <p class="rails-lead">One authorization core, four rails.</p>
-  <div class="rails" aria-label="Rails">
-    <span class="rail" style="--c:var(--red-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="5" width="18.8" height="14" rx="3"/><path d="M2.6 9.6h18.8"/><path d="M6 14.5h3.5"/></svg>Cards</span>
-    <span class="rail" style="--c:var(--orange-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.6 12 4.2l9 5.4"/><path d="M5.8 11.4v6.2M10 11.4v6.2M14 11.4v6.2M18.2 11.4v6.2"/><path d="M3.6 20h16.8"/></svg>Bank transfers</span>
-    <span class="rail" style="--c:var(--yellow-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 2 5.2 12.1 12 15.9l6.8-3.8z" opacity=".55"/><path d="M12 17.2 5.2 13.4 12 22l6.8-8.6z"/></svg>Ethereum</span>
-    <span class="rail" style="--c:var(--green-l)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.8 5.6H20.5L17.2 8.9H3.5z"/><path d="M3.5 10.4h13.7l3.3 3.3H6.8z" opacity=".65"/><path d="M6.8 15.1H20.5L17.2 18.4H3.5z"/></svg>Solana</span>
-  </div>
-</div></footer>
-
 <script src="app.js"></script>
 <script>
 /* The strip. One column a day, coloured by how much of that day the gateway
    answered. Today is drawn faintly because it is still being counted, and a
    day with no samples at all is drawn as a gap rather than as green. */
 const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidden = !text; };
+/* Arabic counts its days: one, two, three to ten, eleven and up. */
+const daysAr = (n) => n === 1 ? "يوم واحد" : n === 2 ? "يومين" : n >= 3 && n <= 10 ? `${n} أيام` : `${n} يومًا`;
 
 (async () => {
   try {
@@ -75,9 +88,9 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
         : pct >= 99.5 ? "var(--green-l)"
         : pct >= 95 ? "var(--yellow-l)"
         : "var(--red-l)";
-      const title = pct === null ? `${d.date}: not measured`
-        : d.declared ? `${d.date}: up, stated rather than measured`
-        : `${d.date}: ${pct}%${d.partial ? " so far today" : ""}`;
+      const title = pct === null ? `${d.date}: ${L("not measured", "لم يُقَس")}`
+        : d.declared ? `${d.date}: ${L("up, stated rather than measured", "يعمل، مُصرَّح به لا مَقيس")}`
+        : `${d.date}: ${pct}%${d.partial ? L(" so far today", " حتى الآن اليوم") : ""}`;
       const cls = d.declared ? " declared" : d.partial ? " partial" : "";
       return `<span class="day${cls}" style="background:${colour}" title="${esc(title)}"></span>`;
     });
@@ -89,8 +102,9 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
     const ok = whole.reduce((a, d) => a + d.ok, 0);
     const exp = whole.reduce((a, d) => a + d.expected, 0);
     $("#uptime-h").textContent = exp
-      ? `Availability, ${(100 * ok / exp).toFixed(2)}% over ${whole.length} day${whole.length === 1 ? "" : "s"}`
-      : "Availability";
+      ? L(`Availability, ${(100 * ok / exp).toFixed(2)}% over ${whole.length} day${whole.length === 1 ? "" : "s"}`,
+          `التوفّر: ${(100 * ok / exp).toFixed(2)}% على مدى ${daysAr(whole.length)}`)
+      : L("Availability", "التوفّر");
 
     /* The strip answers "was it up"; the list answers "what happened on the
        ninth". Days nobody measured are left out rather than listed as zero. */
@@ -109,16 +123,16 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
     const dayRow = (d) => {
       const pct = Math.round(d.ratio * 1000) / 10;
       const colour = pct >= 99.5 ? "var(--green-l)" : pct >= 95 ? "var(--yellow-l)" : "var(--red-l)";
-      const when = new Date(d.date + "T00:00:00Z").toLocaleDateString(undefined,
+      const when = new Date(d.date + "T00:00:00Z").toLocaleDateString(L(undefined, "ar-DZ"),
         { weekday: "short", day: "numeric", month: "short" });
       return `<article class="row">
         <span class="row-i" style="color:${colour}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/></svg>
         </span>
         <div class="row-t">
-          <h3>${esc(when)}${d.partial ? ' <span class="row-e">so far today</span>'
-            : d.declared ? ' <span class="row-e">declared</span>' : ""}</h3>
-          <p class="row-s mono">${esc(d.date)}${d.declared ? " · stated, not sampled" : ""}</p>
+          <h3>${esc(when)}${d.partial ? ` <span class="row-e">${L("so far today", "حتى الآن اليوم")}</span>`
+            : d.declared ? ` <span class="row-e">${L("declared", "مُصرَّح به")}</span>` : ""}</h3>
+          <p class="row-s mono">${esc(d.date)}${d.declared ? ` · <bdi>${L("stated, not sampled", "مُصرَّح به، بلا عيّنات")}</bdi>` : ""}</p>
         </div>
         <span class="row-r" style="color:${colour};font-size:1.1rem">${pct}%</span>
       </article>`;
@@ -129,12 +143,12 @@ const note = (sel, text) => { const el = $(sel); el.textContent = text; el.hidde
       const left = measured.length - shown;
       const more = $("#more");
       more.hidden = left <= 0;
-      more.textContent = `Show ${Math.min(left, PAGE)} more of ${left}`;
+      more.textContent = L(`Show ${Math.min(left, PAGE)} more of ${left}`, `اعرض ${Math.min(left, PAGE)} أخرى من ${left}`);
     };
     $("#more").addEventListener("click", () => { shown += PAGE; draw(); });
     draw();
   } catch (e) {
-    note("#days-note", "Could not read the record: " + String(e.message || e));
+    note("#days-note", L("Could not read the record: ", "تعذّرت قراءة السجل: ") + String(e.message || e));
   }
 })();
 </script>
@@ -147,9 +161,9 @@ const FLOW=[
   {m:"GET",    p:()=>"/v1/limits",                     init:()=>({})},
   {m:"GET",    p:()=>"/v1/tests",                      init:()=>({})},
   {m:"POST",   p:()=>"/v1/sandbox",                    init:()=>({method:"POST"}), keep:j=>({id:j.id})},
-  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/intent`,      init:()=>body({text:"Pay the Aseer Cloud Co invoice INV-4471 for 480 USD."})},
-  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/authorization`,init:()=>body({payee:"Aseer Cloud Co",amount:"480",currency:"USD"}), keep:j=>({auth:j.authorization_id})},
-  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/pay`,         init:s=>body({payee:"Aseer Cloud Co",amount:480,currency:"USD",authorization_id:s.auth})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/intent`,      init:()=>body({text:"Pay the Northwind Cloud Co invoice INV-4471 for 480 USD."})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/authorization`,init:()=>body({payee:"Northwind Cloud Co",amount:"480",currency:"USD"}), keep:j=>({auth:j.authorization_id})},
+  {m:"POST",   p:s=>`/v1/sandbox/${s.id}/pay`,         init:s=>body({payee:"Northwind Cloud Co",amount:480,currency:"USD",authorization_id:s.auth})},
   {m:"GET",    p:s=>`/v1/sandbox/${s.id}/evidence`,    init:()=>({})},
   {m:"DELETE", p:s=>`/v1/sandbox/${s.id}`,             init:()=>({method:"DELETE"})},
 ];
@@ -161,12 +175,14 @@ function label(p){
   return parts.join("/");
 }
 
+const codeText=c=>c==="skip"?L("skip","تخطٍّ"):c==="error"?L("error","خطأ"):String(c);
+
 function draw(rows,running){
   $("#checks").innerHTML=rows.map(r=>`<div class="check ${r.state||""}">
       <span class="verb ${esc(r.m.toLowerCase())}">${esc(r.m)}</span>
       <span class="path mono">${esc(r.path)}</span>
       <span class="ms mono">${r.ms==null?"":r.ms+" ms"}</span>
-      <span class="code mono">${r.code==null?(running?SPINNER:""):esc(String(r.code))}</span>
+      <span class="code mono">${r.code==null?(running?SPINNER:""):esc(codeText(r.code))}</span>
     </div>`).join("");
 }
 
@@ -180,21 +196,21 @@ function summarise(rows){
   const slowest=times.length?times[times.length-1]:0;
   $("#summary").hidden=false;
   $("#summary").innerHTML=`<span class="bar" style="--p:${Math.round(100*done.length/rows.length)}%"></span>
-    <div class="big mono ${ok===done.length?"through":"through bad"}">${ok} / ${done.length}<small>responding</small></div><span class="sep"></span>
-    <div class="big mono">${median} ms<small>median round trip</small></div><span class="sep"></span>
-    <div class="big mono">${slowest} ms<small>slowest</small></div>`;
+    <div class="big mono ${ok===done.length?"through":"through bad"}">${ok} / ${done.length}<small>${L("responding","تستجيب")}</small></div><span class="sep"></span>
+    <div class="big mono">${median} ms<small>${L("median round trip","وسيط زمن الذهاب والإياب")}</small></div><span class="sep"></span>
+    <div class="big mono">${slowest} ms<small>${L("slowest","الأبطأ")}</small></div>`;
 }
 
 async function run(){
   const btn=$("#recheck");
-  working(btn,"Checking");
+  working(btn,L("Checking","جارٍ الفحص"));
 
   const rows=FLOW.map(f=>({m:f.m,path:"",ms:null,code:null,state:null}));
   let state={};
   for(let i=0;i<FLOW.length;i++){
     const f=FLOW[i];
     let path;
-    try{ path=f.p(state); }catch{ path="(needs an earlier step)"; }
+    try{ path=f.p(state); }catch{ path=L("(needs an earlier step)","(تحتاج خطوة سابقة)"); }
     rows[i].path=label(path);
     draw(rows,true);
     // a step whose sandbox never got made cannot be called
@@ -220,7 +236,9 @@ async function run(){
   idle(btn);
 }
 
-$("#origin").textContent="Checked against "+location.origin+", from this browser, so the network between you and it is included.";
+$("#origin").innerHTML=L("Checked against "+esc(location.origin)+", from this browser, so the network between you and it is included.",
+  `فُحصت مقابل <bdi>${esc(location.origin)}</bdi> من هذا المتصفح، لذا فالشبكة بينك وبينه داخلة في الأزمنة.`);
+$("#recheck").textContent=L("Run the checks","شغّل الفحوص");
 $("#recheck").addEventListener("click",run);
 run();
 </script>

@@ -1,9 +1,7 @@
 import Hero from './components/Hero'
 import ProblemExample from './components/ProblemExample'
 import HowItWorks from './components/HowItWorks'
-import Results from './components/Results'
 import SecurityFeatures from './components/SecurityFeatures'
-import MCPIntegration from './components/MCPIntegration'
 import ClosingCTA from './components/ClosingCTA'
 import Footer from '../../components/layout/Footer'
 
@@ -14,9 +12,7 @@ export default function Home() {
         <Hero />
         <ProblemExample />
         <HowItWorks />
-        <Results />
         <SecurityFeatures />
-        <MCPIntegration />
         <ClosingCTA />
       </div>
       <Footer />

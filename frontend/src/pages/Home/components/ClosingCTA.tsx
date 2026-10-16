@@ -1,3 +1,5 @@
+import { L } from '../../../i18n'
+
 /**
  * ClosingCTA — the "Put Moat in front of your agent" band.
  *
@@ -8,9 +10,9 @@ export default function ClosingCTA() {
   return (
     <section className="tight">
       <div className="band glass">
-        <h2>Put Moat in front of your agent.</h2>
+        <h2>{L('Put Moat in front of your agent', 'ضع Moat أمام وكيلك')}</h2>
         <div className="row">
-          <a className="btn" href="/dashboard">Open a workspace</a>
+          <a className="btn" href="/dashboard">{L('Open a workspace', 'افتح مساحة عمل')}</a>
         </div>
       </div>
     </section>

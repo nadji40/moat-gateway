@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
+import { L, isAr, setLang } from '../../i18n'
 
 const links = [
-  { href: '/docs', label: 'Docs', page: 'docs' },
-  { href: '/compare', label: 'Compare', page: 'compare' },
-  { href: '/tests', label: 'The tests', page: 'tests' },
-  { href: '/status', label: 'Status', page: 'status' },
-  { href: '/team', label: 'Team', page: 'team' },
+  { href: '/', label: 'Home', ar: 'الرئيسية', page: 'index' },
+  { href: '/team', label: 'Team', ar: 'الفريق', page: 'team' },
+  { href: '/compare', label: 'Compare', ar: 'المقارنة', page: 'compare' },
+  { href: '/status', label: 'Status', ar: 'الحالة', page: 'status' },
+  { href: '/docs', label: 'Docs', ar: 'التوثيق', page: 'docs' },
 ]
 
 function Mark() {
@@ -45,11 +46,11 @@ export default function Navbar() {
     <nav aria-label="Main" data-open={open || undefined}>
       <div className="wrap">
         <div className="navbar glass">
-          <a className="navmark" href="/" aria-label="moat, home" onClick={() => setOpen(false)}><Mark /></a>
+          <a className="navmark" href="/" aria-label={L('moat, home', 'moat، الرئيسية')} onClick={() => setOpen(false)}><Mark /></a>
           <div className="navlinks" id="navlinks">
             {links.map((link) => (
               <a key={link.href} href={link.href} aria-current={link.page === current ? 'page' : undefined} onClick={() => setOpen(false)}>
-                {link.label}
+                {L(link.label, link.ar)}
               </a>
             ))}
           </div>
@@ -58,7 +59,7 @@ export default function Navbar() {
             type="button"
             aria-controls="navlinks"
             aria-expanded={open}
-            aria-label="Pages"
+            aria-label={L('Pages', 'الصفحات')}
             onClick={(event) => { event.stopPropagation(); setOpen((value) => !value) }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
@@ -66,8 +67,22 @@ export default function Navbar() {
               <path className="i-shut" d="M6 6l12 12M18 6L6 18" />
             </svg>
           </button>
+          <button
+            type="button"
+            id="langbtn"
+            className="langbtn"
+            lang={isAr() ? 'en' : 'ar'}
+            aria-label={isAr() ? 'Switch to English' : 'التبديل إلى العربية'}
+            title={isAr() ? 'English' : 'العربية'}
+            onClick={() => setLang(isAr() ? 'en' : 'ar')}
+          >
+            {/* Flags from flagcdn: the United States for English, Algeria for Arabic. */}
+            {isAr()
+              ? <img src="https://flagcdn.com/us.svg" width={22} height={16} alt="" />
+              : <img src="https://flagcdn.com/dz.svg" width={22} height={16} alt="" />}
+          </button>
           <a id="auth" className="btn tiny" href="/dashboard" aria-current={current === 'dashboard' ? 'page' : undefined}>
-            {signedIn ? 'Dashboard' : 'Log in'}
+            {signedIn ? L('Dashboard', 'لوحة التحكم') : L('Log in', 'تسجيل الدخول')}
           </a>
         </div>
       </div>

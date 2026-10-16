@@ -37,3 +37,10 @@
 .tbl tr:last-child td { border-bottom: 0; }
 .tbl td { color: var(--ink-2); line-height: 1.5; }
 .tbl td code { white-space: nowrap; }
+
+/* Right to left: the grid puts the section list on the right by itself; the
+ * sides set above are mirrored. Code blocks and their copy bar stay left to right. */
+html[dir="rtl"] .docs { text-align: right; }
+html[dir="rtl"] .docs-k { margin: 0 12px 10px 0; }
+html[dir="rtl"] .tbl th, html[dir="rtl"] .tbl td { text-align: right; }
+html[dir="rtl"] .docs-body .codebar { direction: ltr; }

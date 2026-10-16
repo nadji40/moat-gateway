@@ -1,3 +1,5 @@
+import { L } from '../../../i18n'
+
 /**
  * Hero section — the first thing a visitor sees.
  *
@@ -52,21 +54,25 @@ export default function Hero() {
           </svg>
         </div>
 
-        <p className="kicker">Payment authorization for AI agents</p>
 
         <h1>
-          Your agent pays only
-          <br />
-          what <span className="g">you asked for.</span>
+          {L(
+            <>
+              Your agent pays only
+              <br />
+              what <span className="g">you asked for</span>
+            </>,
+            <>
+              وكيلك لا يدفع
+              <br />
+              إلا <span className="g">ما طلبتَه</span>
+            </>,
+          )}
         </h1>
-
-        <p className="lede">
-          Every payment checked against the user's own words, before money moves.
-        </p>
 
         <div className="row">
           <a className="btn" href="/dashboard">
-            Open a workspace
+            {L('Open a workspace', 'افتح مساحة عمل')}
           </a>
           <a className="btn ghost" href="/tests?run=1">
             <svg
@@ -78,7 +84,7 @@ export default function Hero() {
             >
               <polygon points="6 3 20 12 6 21 6 3" />
             </svg>
-            Run the attacks live
+            {L('Run the attacks live', 'شغّل الهجمات مباشرة')}
           </a>
         </div>
       </div>

@@ -10,7 +10,11 @@ import '../styles/footer.css'
 import '../styles/compare.css'
 import '../styles/docs.css'
 import '../styles/team.css'
+import '../styles/i18n.css'
 import App from './App'
+import { applyDocumentLang } from '../i18n'
+
+applyDocumentLang()
 
 const root = document.getElementById('root')!
 createRoot(root).render(

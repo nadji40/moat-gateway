@@ -1,44 +1,51 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Footer from '../../components/layout/Footer'
+import { L } from '../../i18n'
 
 type Member = {
   name: string
   role: string
+  roleAr: string
   line: string
+  lineAr: string
   /** A photo, when there is one. Until then the node shows initials. */
   photo?: string
 }
 
-type Team = { name: string; members: Member[] }
+type Team = { name: string; nameAr: string; members: Member[] }
 
 const founder: Member = {
-  name: 'Nadji Sabri',
+  name: 'Khentit Nadji Sabri',
   role: 'Founder',
+  roleAr: 'المؤسس',
   line: 'Started Moat. Builds the gateway, the policy engine and the infrastructure it runs on.',
+  lineAr: 'أسّس Moat. يبني البوابة ومحرّك السياسات والبنية التحتية التي تعمل عليها.',
   photo: '/team/nadji.jpg',
 }
 
 /** Data has the most people, so it gets the right side of the molecule,
  *  where there is room for four branches. */
 const teams: Team[] = [
-  { name: 'Engineering', members: [
-    { name: 'Khawla Hammouda', role: 'Front-end engineer', line: 'The React site you are reading.', photo: '/team/khawla.jpg' },
-    { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', line: 'Design and front-end work across the site.', photo: '/team/rayan.jpg' },
+  { name: 'Engineering', nameAr: 'الهندسة', members: [
+    { name: 'Khawla Hammouda', role: 'Front-end engineer', roleAr: 'مهندسة واجهات أمامية', line: 'The React site you are reading', lineAr: 'موقع React الذي تقرؤه الآن', photo: '/team/khawla.jpg' },
+    { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', roleAr: 'التصميم والواجهات الأمامية', line: 'Design and front-end work across the site', lineAr: 'أعمال التصميم والواجهات الأمامية في الموقع كله', photo: '/team/rayan.jpg' },
   ] },
-  { name: 'Research', members: [
-    { name: 'Mounya Hasni', role: 'Research analyst', line: 'Regulation and market research: what the rules require, and who needs this.' },
+  { name: 'Research', nameAr: 'البحث', members: [
+    { name: 'Mounya Hasni', role: 'Research analyst', roleAr: 'محلّلة أبحاث', line: 'Regulation and market research: what the rules require, and who needs this', lineAr: 'أبحاث التنظيم والسوق: ما تشترطه القواعد، ومن يحتاج إلى هذا' },
   ] },
-  { name: 'Data', members: [
-    { name: 'Zahra Boucheta', role: 'Data and ML', line: 'The intent reader: which model, how accurate, how fast.', photo: '/team/zahra.jpg' },
-    { name: 'Redwan Ben', role: 'Adversarial data', line: 'The attack corpus: every way to get a payment past Moat, tried.', photo: '/team/redwan.jpg' },
-    { name: 'Dhoha Boumediene', role: 'Policy data', line: 'Honest payments, limits and currencies: making sure the right payments go through.' },
-    { name: 'Meriem Sara Aounallah', role: 'Language data', line: 'Arabic dialects, names and currencies: how Moat reads what people actually write.', photo: '/team/meriem.jpg' },
+  { name: 'Data', nameAr: 'البيانات', members: [
+    { name: 'Zahra Boucheta', role: 'Data and ML', roleAr: 'البيانات وتعلّم الآلة', line: 'The intent reader: which model, how accurate, how fast', lineAr: 'قارئ النية: أي نموذج، وبأي دقة، وبأي سرعة', photo: '/team/zahra.jpg' },
+    { name: 'Redwan Ben', role: 'Adversarial data', roleAr: 'بيانات الهجمات', line: 'The attack corpus: every way to get a payment past Moat, tried', lineAr: 'مجموعة الهجمات: جُرّبت كل طريقة لتمرير دفعة رغم Moat', photo: '/team/redwan.jpg' },
+    { name: 'Dhoha Boumediene', role: 'Policy data', roleAr: 'بيانات السياسات', line: 'Honest payments, limits and currencies: making sure the right payments go through', lineAr: 'الدفعات السليمة والحدود والعملات: لضمان مرور الدفعات الصحيحة', photo: '/team/dhoha.jpg' },
+    { name: 'Meriem Sara Aounallah', role: 'Language data', roleAr: 'بيانات اللغة', line: 'Arabic dialects, names and currencies: how Moat reads what people actually write', lineAr: 'اللهجات العربية والأسماء والعملات: كيف يقرأ Moat ما يكتبه الناس فعلًا', photo: '/team/meriem.jpg' },
   ] },
-  { name: 'Security', members: [
-    { name: 'Adam Belkadi', role: 'Security engineer', line: 'Keys, permissions, workspace isolation and the dashboard.' },
-    { name: 'Rofeida Imoussaine', role: 'Security engineer', line: 'Attacks on the payment checks, the reader and the evidence chain.' },
+  { name: 'Security', nameAr: 'الأمن', members: [
+    { name: 'Adam Belkadi', role: 'Security engineer', roleAr: 'مهندس أمن', line: 'Keys, permissions, workspace isolation and the dashboard', lineAr: 'المفاتيح والصلاحيات وعزل مساحات العمل ولوحة التحكم', photo: '/team/adam.jpg' },
+    { name: 'Rofeida Imoussaine', role: 'Security engineer', roleAr: 'مهندسة أمن', line: 'Attacks on the payment checks, the reader and the evidence chain', lineAr: 'الهجمات على فحوص الدفع وقارئ النية وسلسلة الأدلة' },
   ] },
 ]
+
+const teamNameAr = (name: string) => teams.find((t) => t.name === name)?.nameAr ?? name
 
 const TEAM_ANGLE: Record<string, number> = { Engineering: 180, Research: 270, Data: 0, Security: 90 }
 
@@ -52,6 +59,18 @@ const R_TEAM = 42
 const R_MEMBER = 31
 const TEAM_DIST = 190
 const MEMBER_DIST = 140
+
+/* The entrance, in order: the circles fade in (the centre, then the teams,
+   then the people one by one); only once the last is fully there do the
+   bonds draw in, the centre's first and the branches after; only then do
+   pulses start along them. In seconds. */
+const NODE_IN = 1.4
+const TEAM_DELAY = 0.5
+const MEMBER_DELAY = 1.1
+const MEMBER_STEP = 0.09
+const BOND_IN = 0.8
+const BRANCH_DELAY = 0.45
+const BRANCH_STEP = 0.06
 
 type Label = { x: number; y: number; anchor: 'start' | 'middle' | 'end'; lines: 'below' | 'above' | 'side' }
 type Node = {
@@ -110,6 +129,24 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
   const edgeRefs = useRef(new Map<string, SVGLineElement>())
   const pulseRefs = useRef(new Map<string, SVGCircleElement>())
 
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const members = nodes.filter((n) => n.kind === 'member').length
+  const branches = edges.filter((e) => e.from !== 'center').length
+  const nodesSettle = MEMBER_DELAY + (members - 1) * MEMBER_STEP + NODE_IN
+  const bondsSettle = BRANCH_DELAY + (branches - 1) * BRANCH_STEP + BOND_IN
+  // nodes: circles arriving, no bonds; bonds: bonds drawing in; live: pulses.
+  const [phase, setPhase] = useState<'nodes' | 'bonds' | 'live'>(reduce ? 'live' : 'nodes')
+  const pulseStart = useRef<number | null>(null)
+  useEffect(() => {
+    if (reduce) return
+    const a = setTimeout(() => setPhase('bonds'), nodesSettle * 1000)
+    const z = setTimeout(() => {
+      setPhase('live')
+      pulseStart.current = typeof performance !== 'undefined' ? performance.now() : 0
+    }, (nodesSettle + bondsSettle) * 1000)
+    return () => { clearTimeout(a); clearTimeout(z) }
+  }, [reduce, nodesSettle, bondsSettle])
+
   // The bonds that lead to the selected node, so its path from the centre lights.
   const lit = useMemo(() => {
     const on = new Set<string>([selected])
@@ -123,7 +160,6 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
      outward from the centre. Positions are written to the DOM each frame;
      React renders the molecule once and leaves the motion alone. */
   useEffect(() => {
-    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduce || typeof requestAnimationFrame !== 'function') return
     const seed = (id: string) => [...id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 9973, 7)
     const motion = new Map(nodes.map((n) => {
@@ -154,24 +190,28 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
           line.setAttribute('x2', b.x.toFixed(2)); line.setAttribute('y2', b.y.toFixed(2))
         }
         const dot = pulseRefs.current.get(e.id)
-        if (dot) {
-          // Bonds from the centre fire first, the branches after them.
+        const since = pulseStart.current === null ? -1 : t - pulseStart.current
+        if (dot && since < 0) dot.setAttribute('opacity', '0')
+        if (dot && since >= 0) {
+          // Bonds from the centre fire first, the branches after them, and
+          // the pulses fade in rather than appearing halfway along a bond.
           const offset = (e.from === 'center' ? 0 : 0.45) + i * 0.07
-          const p = (t / 6500 + offset) % 1
+          const p = (since / 6500 + offset) % 1
+          const arrive = Math.min(1, since / 1500)
           const ra = byId.get(e.from)!.r
           const rb = byId.get(e.to)!.r
           const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
           const s = (ra + (len - ra - rb) * p) / len
           dot.setAttribute('cx', (a.x + (b.x - a.x) * s).toFixed(2))
           dot.setAttribute('cy', (a.y + (b.y - a.y) * s).toFixed(2))
-          dot.setAttribute('opacity', (Math.sin(Math.PI * p) * 0.9).toFixed(3))
+          dot.setAttribute('opacity', (Math.sin(Math.PI * p) * 0.9 * arrive).toFixed(3))
         }
       })
       frame = requestAnimationFrame(tick)
     }
     frame = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frame)
-  }, [nodes, edges, byId])
+  }, [nodes, edges, byId, reduce])
 
   const handlers = (id: string) => ({
     onMouseEnter: () => onSelect(id),
@@ -182,7 +222,8 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
 
   let order = 0
   return (
-    <svg className="mol" viewBox="-110 0 1220 800" role="group" aria-label="The Moat team: Nadji Sabri at the centre, connected to four teams and their members">
+    <svg className="mol" viewBox="-110 0 1220 800" role="group" style={{ direction: 'ltr' }}
+      aria-label={L('The Moat team: Khentit Nadji Sabri at the centre, connected to four teams and their members', 'فريق Moat: Khentit Nadji Sabri في المركز، متصلًا بأربعة فرق وأعضائها')}>
       <defs>
         <radialGradient id="mol-core" cx="35%" cy="30%" r="80%">
           <stop offset="0%" stopColor="#FF8A4C" />
@@ -200,11 +241,16 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
 
       <circle className="mol-halo" cx={C.x} cy={C.y} r="330" fill="url(#mol-glow)" />
 
-      <g className="mol-edges">
-        {edges.map((e) => {
+      <g className={`mol-edges${phase === 'nodes' ? '' : ' in'}`}>
+        {edges.map((e, i) => {
           const a = byId.get(e.from)!
           const b = byId.get(e.to)!
-          return <line key={e.id} ref={(el) => { if (el) edgeRefs.current.set(e.id, el) }} className={`mol-edge${e.from === 'center' ? ' core' : ''}${lit.has(e.id) ? ' on' : ''}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+          const core = e.from === 'center'
+          const branch = edges.slice(0, i).filter((x) => x.from !== 'center').length
+          // The reveal's delays only apply while it runs, so a highlight on
+          // hover later is never held back by them.
+          const delay = phase === 'bonds' ? `${core ? i * 0.05 : BRANCH_DELAY + branch * BRANCH_STEP}s` : undefined
+          return <line key={e.id} ref={(el) => { if (el) edgeRefs.current.set(e.id, el) }} className={`mol-edge${core ? ' core' : ''}${lit.has(e.id) ? ' on' : ''}`} style={delay ? { transitionDelay: delay } : undefined} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
         })}
       </g>
       <g className="mol-pulses" aria-hidden="true">
@@ -212,14 +258,16 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
       </g>
 
       {nodes.map((n) => {
-        const delay = `${(n.kind === 'center' ? 0 : n.kind === 'team' ? 0.5 : 1.1) + (n.kind === 'member' ? order++ * 0.09 : 0)}s`
+        const delay = `${n.kind === 'center' ? 0 : n.kind === 'team' ? TEAM_DELAY : MEMBER_DELAY + order++ * MEMBER_STEP}s`
         const name = n.member?.name ?? n.team!
+        const shown = n.member ? name : L(name, teamNameAr(name))
+        const role = n.member ? L(n.member.role, n.member.roleAr) : ''
         const label = n.label
         const lines = label && (label.lines === 'below' ? [label.y + 4, label.y + 21] : label.lines === 'above' ? [label.y - 18, label.y - 1] : [label.y - 3, label.y + 14])
         return (
           <g key={n.id} ref={(el) => { if (el) nodeRefs.current.set(n.id, el) }} transform={`translate(${n.x} ${n.y})`}>
             <g className={`mol-node ${n.kind}${lit.has(n.id) ? ' on' : ''}${selected === n.id ? ' sel' : ''}`} style={{ animationDelay: delay }}
-               tabIndex={0} role="button" aria-label={n.member ? `${name}, ${n.member.role}` : `${name} team`} aria-pressed={selected === n.id} {...handlers(n.id)}>
+               tabIndex={0} role="button" aria-label={n.member ? L(`${name}, ${n.member.role}`, `${name}، ${role}`) : L(`${name} team`, `فريق ${shown}`)} aria-pressed={selected === n.id} {...handlers(n.id)}>
               <circle className="mol-dot" r={n.r} />
               {n.member?.photo
                 ? <>
@@ -227,18 +275,18 @@ function Molecule({ selected, onSelect }: { selected: string; onSelect: (id: str
                     <circle className="mol-rim" r={n.r - 1} />
                   </>
                 : n.kind === 'team'
-                  ? <text className="mol-team" textAnchor="middle" dy="5">{name}</text>
+                  ? <text className="mol-team" textAnchor="middle" dy="5">{shown}</text>
                   : <text className="mol-ini" textAnchor="middle" dy={n.kind === 'center' ? 9 : 6}>{initials(name)}</text>}
               {n.kind === 'center' && (
                 <>
                   <text className="mol-name" textAnchor="middle" y={n.r + 34}>{founder.name}</text>
-                  <text className="mol-role" textAnchor="middle" y={n.r + 52}>{founder.role}</text>
+                  <text className="mol-role" textAnchor="middle" y={n.r + 52}>{L(founder.role, founder.roleAr)}</text>
                 </>
               )}
               {label && lines && (
                 <>
                   <text className="mol-name" x={label.x - n.x} y={lines[0]! - n.y} textAnchor={label.anchor}>{name}</text>
-                  <text className="mol-role" x={label.x - n.x} y={lines[1]! - n.y} textAnchor={label.anchor}>{n.member!.role}</text>
+                  <text className="mol-role" x={label.x - n.x} y={lines[1]! - n.y} textAnchor={label.anchor}>{role}</text>
                 </>
               )}
             </g>
@@ -261,15 +309,15 @@ function Card({ member }: { member: Member }) {
     <article className="tm-card glass">
       <Avatar member={member} />
       <h3>{member.name}</h3>
-      <p className="tm-role">{member.role}</p>
-      <p className="tm-line">{member.line}</p>
+      <p className="tm-role">{L(member.role, member.roleAr)}</p>
+      <p className="tm-line">{L(member.line, member.lineAr)}</p>
     </article>
   )
 }
 
 export default function TeamPage() {
   const [selected, setSelected] = useState('center')
-  useEffect(() => { document.title = 'moat, who we are' }, [])
+  useEffect(() => { document.title = L('moat, who we are', 'moat، من نحن') }, [])
 
   const team = selected.startsWith('team:') ? teams.find((t) => `team:${t.name}` === selected) : undefined
   const owner = teams.find((t) => t.members.some((m) => `m:${m.name}` === selected))
@@ -280,30 +328,32 @@ export default function TeamPage() {
       <main className="team">
         <div className="wrap">
           <header className="hero">
-            <p className="kicker">Who we are</p>
-            <h1>Ten people who want agents<br />to <span className="g">pay only what was asked.</span></h1>
-            <p className="lede">Moat started in 2026 as one question: when an AI agent pays the wrong company, who could have stopped it? The answer was a gateway that checks every payment against the user's own words. We build it, and we spend most of our time trying to break it.</p>
+            <p className="kicker">{L('Who we are', 'من نحن')}</p>
+            <h1>{L(
+              <>Ten people who want agents<br />to <span className="g">pay only what was asked</span></>,
+              <>عشرة أشخاص يريدون للوكلاء<br />أن <span className="g">لا يدفعوا إلا ما طُلب</span></>,
+            )}</h1>
           </header>
 
-          <section className="tight mol-wrap" aria-label="Team structure">
+          <section className="tight mol-wrap" aria-label={L('Team structure', 'هيكل الفريق')}>
             <Molecule selected={selected} onSelect={setSelected} />
             <div className="mol-card glass" aria-live="polite">
               {person && (
                 <>
                   <Avatar member={person} />
                   <div>
-                    <p className="tm-role">{owner ? `${owner.name} team` : 'Founder'}</p>
+                    <p className="tm-role">{owner ? L(`${owner.name} team`, `فريق ${owner.nameAr}`) : L('Founder', 'المؤسس')}</p>
                     <h3>{person.name}</h3>
-                    <p className="tm-sub">{person.role}</p>
-                    <p className="tm-line">{person.line}</p>
+                    <p className="tm-sub">{L(person.role, person.roleAr)}</p>
+                    <p className="tm-line">{L(person.line, person.lineAr)}</p>
                   </div>
                 </>
               )}
               {team && (
                 <div>
-                  <p className="tm-role">Team</p>
-                  <h3>{team.name}</h3>
-                  <p className="tm-line">{team.members.map((m) => m.name).join(', ')}</p>
+                  <p className="tm-role">{L('Team', 'الفريق')}</p>
+                  <h3>{L(team.name, team.nameAr)}</h3>
+                  <p className="tm-line">{team.members.map((m) => m.name).join(L(', ', '، '))}</p>
                 </div>
               )}
             </div>
@@ -313,12 +363,12 @@ export default function TeamPage() {
               structure is shown as a list instead. */}
           <section className="tight tm-groups">
             <div className="tm-group">
-              <h2 className="tm-h">Founder</h2>
+              <h2 className="tm-h">{L('Founder', 'المؤسس')}</h2>
               <div className="tm-grid"><Card member={founder} /></div>
             </div>
             {teams.map((t) => (
               <div className="tm-group" key={t.name}>
-                <h2 className="tm-h">{t.name}</h2>
+                <h2 className="tm-h">{L(t.name, t.nameAr)}</h2>
                 <div className="tm-grid">{t.members.map((m) => <Card key={m.name} member={m} />)}</div>
               </div>
             ))}
@@ -326,9 +376,9 @@ export default function TeamPage() {
 
           <section className="tight">
             <div className="tm-how">
-              <div className="tm-fact glass"><b>Built in Algeria</b><span>Part of the Thirduni programme, 2026.</span></div>
-              <div className="tm-fact glass"><b>Tested by its own team</b><span>Every week, half of us attack what the other half built.</span></div>
-              <div className="tm-fact glass"><b>Measured, not promised</b><span>Every number on this site comes from a run you can read the record of.</span></div>
+              <div className="tm-fact glass"><b>{L('Built in Algeria', 'صُنع في الجزائر')}</b><span>{L('Part of the Thirduni programme, 2026', 'ضمن برنامج Thirduni، 2026')}</span></div>
+              <div className="tm-fact glass"><b>{L('Tested by its own team', 'يختبره فريقه نفسه')}</b><span>{L('Every week, half of us attack what the other half built', 'كل أسبوع، يهاجم نصفنا ما بناه النصف الآخر')}</span></div>
+              <div className="tm-fact glass"><b>{L('Measured, not promised', 'أرقام مقيسة، لا وعود')}</b><span>{L('Every number on this site comes from a run you can read the record of', 'كل رقم في هذا الموقع مصدره تشغيل يمكنك قراءة سجله')}</span></div>
             </div>
           </section>
         </div>
