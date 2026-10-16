@@ -41,7 +41,7 @@ const teams: Team[] = [
   ] },
   { name: 'Security', nameAr: 'الأمن', members: [
     { name: 'Adam Belkadi', role: 'Security engineer', roleAr: 'مهندس أمن', line: 'Keys, permissions, workspace isolation and the dashboard', lineAr: 'المفاتيح والصلاحيات وعزل مساحات العمل ولوحة التحكم', photo: '/team/adam.jpg' },
-    { name: 'Rofeida Imoussaine', role: 'Security engineer', roleAr: 'مهندسة أمن', line: 'Attacks on the payment checks, the reader and the evidence chain', lineAr: 'الهجمات على فحوص الدفع وقارئ النية وسلسلة الأدلة' },
+    { name: 'Rofeida Imoussaine', role: 'Security engineer', roleAr: 'مهندسة أمن', line: 'Attacks on the payment checks, the reader and the evidence chain', lineAr: 'الهجمات على فحوص الدفع وقارئ النية وسلسلة الأدلة', photo: '/team/rofeida.jpg' },
   ] },
 ]
 
