@@ -1239,6 +1239,7 @@ mod ledger_tests {
     ///   is the reason the tables exist at all, and it is exactly the bug that
     ///   a single-process test would never see.
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     /// Run one statement against the test database.
@@ -1251,7 +1252,32 @@ mod ledger_tests {
         client
             .execute(sql, params)
             .await
-            .unwrap_or_else(|e| panic!("{sql}: {e}"));
+            .unwrap_or_else(|e| panic!("{sql}: {}", db_error(&e)));
+    }
+
+    /// What PostgreSQL actually said.
+    ///
+    /// `tokio_postgres::Error` displays as "db error" and nothing else, which
+    /// is how a failed deploy on 2026-10-16 reported a cleanup DELETE without
+    /// saying whether it was a foreign key, a deadlock or a timeout. The
+    /// SQLSTATE is the part that answers that.
+    fn db_error(e: &tokio_postgres::Error) -> String {
+        let Some(db) = e.as_db_error() else {
+            return format!("{e:?}");
+        };
+        let mut text = format!("{} {}: {}", db.severity(), db.code().code(), db.message());
+        for (label, value) in [
+            ("detail", db.detail()),
+            ("hint", db.hint()),
+            ("table", db.table()),
+            ("constraint", db.constraint()),
+            ("where", db.where_()),
+        ] {
+            if let Some(value) = value {
+                text.push_str(&format!("; {label}: {value}"));
+            }
+        }
+        text
     }
 
     use ::moat_core::money::Minor;
@@ -1283,12 +1309,25 @@ mod ledger_tests {
         };
     }
 
+    /// An id no other test, in this run or a concurrent one, will be handed.
+    ///
+    /// The clock alone is not enough. The tests run in parallel, and two of
+    /// them reading the clock in the same tick get the same tenant; one's
+    /// cleanup then deletes the other's mandate while its reservations still
+    /// point at it, and fails on a foreign key (23503) or a deadlock (40P01)
+    /// in a test that has nothing wrong with it -- the shape of the deploy
+    /// failure on 2026-10-16, and exactly what forcing a shared tenant
+    /// reproduces. Session ids have the same problem through the global
+    /// unique index on `moat.sessions (id)`. The counter makes ids distinct
+    /// within the process and the pid across processes.
     fn unique(prefix: &str) -> String {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let n = NEXT.fetch_add(1, Ordering::Relaxed);
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        format!("{prefix}-{nanos}")
+        format!("{prefix}-{}-{nanos}-{n}", std::process::id())
     }
 
     fn now_ms() -> u64 {
@@ -1313,17 +1352,26 @@ mod ledger_tests {
     }
 
     /// A tenant of our own, so a test never touches another's rows.
+    ///
+    /// A plain insert, not `ON CONFLICT DO NOTHING`: if the id were ever
+    /// taken, two tests would be sharing a tenant without knowing it, and
+    /// that should fail here, by name, rather than as a confusing error in
+    /// somebody else's cleanup.
     async fn tenant(store: &DurableStore, id: &str) {
         exec(
             store,
-            "INSERT INTO moat.tenants (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO moat.tenants (id, name) VALUES ($1, $2)",
             &[&id, &"ledger test"],
         )
         .await;
     }
 
-    /// Remove everything this test wrote, in foreign-key order.
+    /// Remove everything this test wrote, children before parents, in one
+    /// transaction, so a failure leaves the tenant whole for the deploy
+    /// script's sweep rather than half deleted.
     async fn cleanup(store: &DurableStore, id: &str) {
+        let mut client = store.pool.get().await.expect("test connection");
+        let tx = client.transaction().await.expect("cleanup transaction");
         for sql in [
             "DELETE FROM moat.payment_reservations WHERE tenant_id = $1",
             "DELETE FROM moat.payment_outcomes WHERE tenant_id = $1",
@@ -1331,8 +1379,13 @@ mod ledger_tests {
             "DELETE FROM moat.sessions WHERE tenant_id = $1",
             "DELETE FROM moat.tenants WHERE id = $1",
         ] {
-            exec(store, sql, &[&id]).await;
+            tx.execute(sql, &[&id])
+                .await
+                .unwrap_or_else(|e| panic!("{sql}: {}", db_error(&e)));
         }
+        tx.commit()
+            .await
+            .unwrap_or_else(|e| panic!("committing cleanup: {}", db_error(&e)));
     }
 
     fn authorization(id: &str, amount: u128, aggregate: Option<u128>) -> PaymentAuthorization {
@@ -1619,8 +1672,11 @@ mod ledger_tests {
             &[&id],
         )
         .await;
-        let reaped = store.expire_reservations().await.expect("reaping");
-        assert!(reaped >= 1, "ours was among the reaped");
+        // Not `reaped >= 1`: the sweep covers every tenant, and another one
+        // sharing the database can get there first -- a concurrent test run,
+        // or on the pilot the live gateway's own reaper, which ticks every
+        // minute. That our reservation is gone is the part that is ours.
+        store.expire_reservations().await.expect("reaping");
         let aggregate = store
             .aggregate_for(&id, "auth-age")
             .await
