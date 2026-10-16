@@ -36,6 +36,14 @@ import {
 
 const HERE = dirname(dirname(fileURLToPath(import.meta.url)));
 const PUBLIC = join(HERE, "public");
+/** This process's start, as the version on every local script and stylesheet. */
+const ASSET_STAMP = Date.now().toString(36);
+function stampAssets(html: string): string {
+  return html.replace(
+    /((?:src|href)=")(\/?(?:shared\/)?[a-z0-9_-]+\.(?:js|css))(?:\?v=[^"]*)?(")/g,
+    (_, pre, path, post) => `${pre}${path}?v=${ASSET_STAMP}${post}`,
+  );
+}
 /** Where `npm run build` in frontend/ puts the React pages. Optional. */
 const FRONTEND = join(HERE, "..", "frontend", "dist");
 
@@ -272,6 +280,11 @@ const server = createServer(async (req, res) => {
       "content-type": TYPES[extname(file)] ?? "application/octet-stream",
       "cache-control": "no-cache",
     });
+    // Cloudflare keeps scripts and stylesheets for hours whatever this
+    // header says, so a page would run the old script after a deploy. Every
+    // page goes out with its local scripts and stylesheets stamped with this
+    // process's start, and a restart is a deploy: new address, fresh fetch.
+    if (extname(file) === ".html") return res.end(stampAssets(readFileSync(file, "utf8")));
     return res.end(readFileSync(file));
   } catch (error) {
     if (error instanceof SandboxError) return json(res, error.status, { error: error.message });
