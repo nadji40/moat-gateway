@@ -93,7 +93,6 @@ export default function Footer() {
 
         <div className="fbase">
           <span>© 2026 Moat</span>
-          <span>{L('The sandbox uses a mock provider. No real money moves.', 'بيئة التجربة تستخدم مزوّد دفع وهميًا. لا تنتقل أي أموال حقيقية.')}</span>
         </div>
       </div>
     </footer>
