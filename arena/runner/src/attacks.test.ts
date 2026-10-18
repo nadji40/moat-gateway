@@ -19,7 +19,7 @@ const attackOnCard = (id: string): Attack => {
 describe("attack corpus authorizations", () => {
   it("carries trusted payment authority for every attack", () => {
     const sources = loadAttacks(ARENA_ROOT);
-    expect(sources).toHaveLength(21);
+    expect(sources).toHaveLength(24);
     for (const source of sources) {
       const scenario = scenarioForRail(ARENA_ROOT, source, source.rails[0]!) as Attack;
       expect(Number(scenario.authorization.amount), source.id).toBeGreaterThan(0);

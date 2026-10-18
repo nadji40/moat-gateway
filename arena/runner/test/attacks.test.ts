@@ -21,8 +21,8 @@ describe("attack corpus", () => {
   const sources = loadAttacks(ARENA_ROOT);
 
   it("has twenty-one attacks with unique ids and every class represented", () => {
-    expect(sources).toHaveLength(21);
-    expect(new Set(sources.map((s) => s.id)).size).toBe(21);
+    expect(sources).toHaveLength(24);
+    expect(new Set(sources.map((s) => s.id)).size).toBe(24);
     const classes = sources.map(
       (s) => (scenarioForRail(ARENA_ROOT, s, s.rails[0]!) as Attack).class,
     );
@@ -37,13 +37,13 @@ describe("attack corpus", () => {
   it("runs one corpus across every rail, and says where it cannot", () => {
     // Card is short the lost-reply attack (a card retry is safe) and the
     // three that are about chains.
-    expect(sourcesForRail(sources, "card")).toHaveLength(17);
+    expect(sourcesForRail(sources, "card")).toHaveLength(20);
     // Bank takes the lost-reply attack and none of the chain ones.
-    expect(sourcesForRail(sources, "bank")).toHaveLength(18);
+    expect(sourcesForRail(sources, "bank")).toHaveLength(21);
     // EVM takes everything, because it is the only family with allowances.
-    expect(sourcesForRail(sources, "evm")).toHaveLength(21);
+    expect(sourcesForRail(sources, "evm")).toHaveLength(24);
     // Solana takes everything except the allowance attack.
-    expect(sourcesForRail(sources, "solana")).toHaveLength(20);
+    expect(sourcesForRail(sources, "solana")).toHaveLength(23);
   });
 
   // Every scenario has to survive expansion onto every rail it declares.
