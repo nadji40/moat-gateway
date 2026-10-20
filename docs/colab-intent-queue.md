@@ -43,8 +43,12 @@ The four systemd units in `deploy/` are:
   waits for a Redis job result.
 - `moat-colab-queue-worker.service`: processes one model job at a time. Its
   only network target is the loopback tunnel; it never calls the gateway.
-- `moat-intent-colab.service`: starts Moat's grounded reader with the queue
-  proxy as its model endpoint and the gateway's intent API for registration.
+- `moat-intent.service`: starts Moat's grounded reader with the gateway's
+  intent API for registration. Its model is chosen in
+  `/etc/moat/moat-intent.env`; with no file, or with
+  `MOAT_INTENT_PROVIDER=llama`, it reads through this queue. With
+  `MOAT_INTENT_PROVIDER=anthropic` it reads with Claude instead, and the
+  queue and tunnel sit idle. See `deploy/moat-intent.env.example`.
 
 Redis already runs on SkyLight with authentication, AOF, and a loopback bind.
 The dedicated `moat_colab` ACL account is limited to `moat:colab:*` keys;

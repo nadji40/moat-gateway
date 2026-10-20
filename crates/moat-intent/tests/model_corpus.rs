@@ -1,10 +1,16 @@
 //! The reader against a real model, on 36 messages in 12 languages.
 //!
-//! Skipped unless `MOAT_INTENT_LLM_URL` names a running `llama-server`, so
-//! `cargo test` stays green on a machine without one. To run it:
+//! Skipped unless `MOAT_INTENT_LLM_URL` names a running `llama-server`, or
+//! `MOAT_INTENT_PROVIDER` names a hosted one, so `cargo test` stays green on
+//! a machine without either. To run it:
 //!
 //!   llama-server -hf unsloth/gemma-4-E4B-it-GGUF:Q4_K_M --jinja -c 4096 --port 8092
 //!   MOAT_INTENT_LLM_URL=http://127.0.0.1:8092 cargo test -p moat-intent --test model_corpus -- --nocapture
+//!
+//! or, against Claude, with the key in the environment and never on the
+//! command line:
+//!
+//!   MOAT_INTENT_PROVIDER=anthropic cargo test -p moat-intent --test model_corpus -- --nocapture
 //!
 //! The assertion that matters is that nothing fails open: no message yields
 //! a payee the user refused or never named. That is checked on what survives
@@ -16,7 +22,7 @@
 use std::time::{Duration, Instant};
 
 use moat_core::normalize::spelling_key;
-use moat_intent::reader::{Reader, Status};
+use moat_intent::reader::{Backend, Provider, Reader, Status};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -40,13 +46,31 @@ fn same(a: &str, b: &str) -> bool {
 
 #[tokio::test]
 async fn the_reader_never_asks_for_a_payee_the_user_did_not() {
-    let Ok(url) = std::env::var("MOAT_INTENT_LLM_URL") else {
-        eprintln!("skipped: set MOAT_INTENT_LLM_URL to a running llama-server");
-        return;
+    let env = |name: &str| std::env::var(name).ok();
+    let provider: Provider = match (env("MOAT_INTENT_PROVIDER"), env("MOAT_INTENT_LLM_URL")) {
+        (Some(name), _) => name.parse().unwrap(),
+        (None, Some(_)) => Provider::Llama,
+        (None, None) => {
+            eprintln!("skipped: set MOAT_INTENT_LLM_URL to a running llama-server, or MOAT_INTENT_PROVIDER");
+            return;
+        }
     };
-    let model =
-        std::env::var("MOAT_INTENT_MODEL").unwrap_or_else(|_| "gemma-4-E4B-it-Q4_K_M".into());
-    let reader = Reader::new(&url, &model, Duration::from_secs(120)).unwrap();
+    let reader = Reader::with_backend(
+        Backend {
+            provider,
+            url: env("MOAT_INTENT_LLM_URL")
+                .or(provider.default_url().map(Into::into))
+                .expect("MOAT_INTENT_LLM_URL"),
+            model: env("MOAT_INTENT_MODEL")
+                .or(provider.default_model().map(Into::into))
+                .expect("MOAT_INTENT_MODEL"),
+            api_key: env("MOAT_INTENT_API_KEY"),
+            effort: (provider == Provider::Anthropic)
+                .then(|| env("MOAT_INTENT_EFFORT").unwrap_or_else(|| "low".into())),
+        },
+        Duration::from_secs(120),
+    )
+    .unwrap();
     let corpus = match std::env::var("MOAT_INTENT_CORPUS") {
         Ok(path) => std::fs::read_to_string(path).unwrap(),
         Err(_) => include_str!("corpus.json").to_owned(),
@@ -146,8 +170,9 @@ async fn the_reader_never_asks_for_a_payee_the_user_did_not() {
     times.sort();
     let n = cases.len();
     println!(
-        "\n{model}: fail-open {fail_open}  payee {payee_ok}/{n}  refused {refused_ok}/{n}  \
+        "\n{}: fail-open {fail_open}  payee {payee_ok}/{n}  refused {refused_ok}/{n}  \
          amount {amount_ok}/{n}  currency {currency_ok}/{n}  cancel {cancel_ok}/{n}  references {references_ok}/{n}  complete {all_fields_ok}/{n}  median {:.1}s",
+        reader.label(),
         times[n / 2].as_secs_f32()
     );
     assert_eq!(

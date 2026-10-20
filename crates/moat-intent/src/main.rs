@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use moat_intent::reader::Reader;
+use moat_intent::reader::{Backend, Provider, Reader};
 use moat_intent::server::{router, AppState};
 
 /// Command line.
@@ -20,17 +20,30 @@ struct Cli {
     /// Where to listen.
     #[arg(long, default_value = "127.0.0.1:7083")]
     listen: String,
-    /// The llama-server serving the model.
-    #[arg(long, default_value = "http://127.0.0.1:8092")]
-    llm_url: String,
-    /// The model's name, as it goes in the record.
-    #[arg(long, default_value = "gemma-4-E4B-it-Q4_K_M")]
-    model: String,
+    /// Which kind of server reads: `llama` (llama-server, local or
+    /// tunnelled), `anthropic` (Claude), or `openai` (any OpenAI-compatible
+    /// chat completions API). A hosted one takes its key from the
+    /// environment variable MOAT_INTENT_API_KEY, never from a flag.
+    #[arg(long, env = "MOAT_INTENT_PROVIDER", default_value = "llama")]
+    provider: Provider,
+    /// The server's base URL. Defaults to http://127.0.0.1:8092 for llama
+    /// and https://api.anthropic.com for anthropic; openai needs one.
+    #[arg(long, env = "MOAT_INTENT_LLM_URL")]
+    llm_url: Option<String>,
+    /// The model to ask for, as it goes in the record. Defaults to
+    /// gemma-4-E4B-it-Q4_K_M for llama and claude-opus-5-5 for anthropic;
+    /// openai needs one.
+    #[arg(long, env = "MOAT_INTENT_MODEL")]
+    model: Option<String>,
+    /// How hard a Claude model thinks before answering: low, medium, high,
+    /// xhigh or max, or `default` for the model's own. Anthropic only.
+    #[arg(long, env = "MOAT_INTENT_EFFORT", default_value = "low")]
+    effort: String,
     /// The gateway's intent API. Without it only `/v1/read` works.
-    #[arg(long)]
+    #[arg(long, env = "MOAT_INTENT_GATEWAY")]
     gateway: Option<String>,
     /// How long to wait for the model, in seconds.
-    #[arg(long, default_value_t = 60)]
+    #[arg(long, env = "MOAT_INTENT_TIMEOUT_SECS", default_value_t = 60)]
     timeout_secs: u64,
     /// Listen on an address other than loopback. The service holds no
     /// credential, but what users type passes through it.
@@ -48,9 +61,27 @@ fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    let reader = Reader::new(
-        &cli.llm_url,
-        &cli.model,
+    let provider = cli.provider;
+    let llm_url = cli
+        .llm_url
+        .clone()
+        .or_else(|| provider.default_url().map(str::to_owned))
+        .with_context(|| format!("the {} provider needs --llm-url", provider.name()))?;
+    let model = cli
+        .model
+        .clone()
+        .or_else(|| provider.default_model().map(str::to_owned))
+        .with_context(|| format!("the {} provider needs --model", provider.name()))?;
+    let effort =
+        (provider == Provider::Anthropic && cli.effort != "default").then(|| cli.effort.clone());
+    let reader = Reader::with_backend(
+        Backend {
+            provider,
+            url: llm_url.clone(),
+            model: model.clone(),
+            api_key: std::env::var("MOAT_INTENT_API_KEY").ok(),
+            effort,
+        },
         Duration::from_secs(cli.timeout_secs),
     )?;
     let http = reqwest::Client::builder()
@@ -77,7 +108,7 @@ fn main() -> Result<()> {
                 "{local} is not loopback; pass --allow-remote if that is intended"
             );
             tracing::info!(
-                %local, llm = %cli.llm_url, model = %cli.model,
+                %local, provider = provider.name(), llm = %llm_url, %model,
                 gateway = cli.gateway.as_deref().unwrap_or("none"),
                 prompt = %&moat_intent::reader::prompt_sha256()[..16],
                 "moat-intent listening"

@@ -785,8 +785,8 @@ blank names, amounts that are not positive numbers, currencies the gateway
 does not know, more than 16 entries.
 
 **2. Words, read by `moat-intent`.** A client that has only what the user
-typed sends it to the `moat-intent` service instead of the gateway. A small
-model running beside it reads the message in any language, and every value it
+typed sends it to the `moat-intent` service instead of the gateway. A model
+reads the message in any language, and every value it
 returns is checked against the message before the fields go to the gateway:
 a payee must be written there character for character, an amount must be a
 number the message contains, read with its own decimal conventions, a payee
@@ -796,10 +796,25 @@ from what the model sees and from what is kept. What fails a check is dropped
 and reported, so a misreading costs a confirmation, never a payment. If the
 model cannot be reached, the message is registered with empty fields.
 
+Which model reads is configuration. The default is a small local model
+served by llama.cpp; Claude, or any OpenAI-compatible API, is one setting
+away, with its key taken from the environment and never from a flag. The
+checks above are the same for every model.
+
 ```bash
+# local: Gemma on llama-server, no key
 llama-server -hf unsloth/gemma-4-E4B-it-GGUF:Q4_K_M --jinja -c 4096 --port 8092
 moat-intent --llm-url http://127.0.0.1:8092 --gateway http://127.0.0.1:7082
+
+# hosted: Claude, or --provider openai --llm-url … --model … for any other API
+MOAT_INTENT_API_KEY=… moat-intent --provider anthropic --gateway http://127.0.0.1:7082
 ```
+
+Every flag can also come from the environment (`MOAT_INTENT_PROVIDER`,
+`MOAT_INTENT_LLM_URL`, `MOAT_INTENT_MODEL`, `MOAT_INTENT_EFFORT`,
+`MOAT_INTENT_TIMEOUT_SECS`); `deploy/moat-intent.env.example` is a complete
+file. The record names the model that read each message, so a reading can be
+traced to its provider, model and prompt.
 
 ```
 POST /v1/session/{id}/intent   { "text": "..." }   read, check, and register with the gateway
@@ -811,9 +826,10 @@ gateway, which checks it as if the host had called directly. The strongest way
 to use it is `/v1/read`: show the user what was understood, in their language,
 and send the fields they confirm to the gateway yourself.
 
-On SkyLight, both routes send model requests through the single-consumer Redis
-queue to Gemma on a Colab T4. The reader is connected to the gateway intent
-API for the registration route. See [Colab intent queue](docs/colab-intent-queue.md)
+On SkyLight the reader runs as `moat-intent.service`, connected to the
+gateway intent API for the registration route, and reads with Claude
+(`claude-opus-5-5`). The local option there is Gemma through a single-consumer
+Redis queue to Colab; see [Colab intent queue](docs/colab-intent-queue.md)
 for its service layout and outage behavior.
 
 Measured on 36 messages in 12 languages with Gemma 4 E4B quantised to four

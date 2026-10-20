@@ -14,7 +14,7 @@ use axum::extract::State;
 use axum::http::HeaderMap;
 use axum::routing::post;
 use axum::{Json, Router};
-use moat_intent::reader::Reader;
+use moat_intent::reader::{Backend, Provider, Reader};
 use moat_intent::server::{router, AppState};
 use serde_json::{json, Value};
 
@@ -228,4 +228,105 @@ async fn read_only_returns_the_fields_for_the_host_to_confirm() {
     assert_eq!(body["fields"]["pay"], json!(["Vega Cloud Srl"]));
     assert_eq!(body["fields"]["refused"], json!(["Orbit Labs Srl"]));
     assert!(seen.lock().unwrap().gateway.is_empty());
+}
+
+/// A stand-in for Anthropic's Messages API that checks how it is asked and
+/// answers the way Claude does: thinking first, then the JSON as text.
+async fn claude(seen: Arc<Mutex<Seen>>, answer: Value) -> String {
+    let app = Router::new()
+        .route(
+            "/v1/messages",
+            post(
+                |State((seen, answer)): State<(Arc<Mutex<Seen>>, Value)>,
+                 headers: HeaderMap,
+                 raw: String| async move {
+                    assert_eq!(headers["x-api-key"], "test-key");
+                    assert_eq!(headers["anthropic-version"], "2023-06-01");
+                    assert!(headers.get("authorization").is_none());
+                    let body: Value = serde_json::from_str(&raw).unwrap();
+                    assert_eq!(body["model"], "claude-opus-5-5");
+                    assert_eq!(body["output_config"]["effort"], "low");
+                    let format = &body["output_config"]["format"];
+                    assert_eq!(format["type"], "json_schema");
+                    assert_eq!(format["schema"]["additionalProperties"], false);
+                    assert!(body.get("temperature").is_none());
+                    // The schema reaches Claude in its own order, too.
+                    let properties = raw.split_once("\"properties\":").unwrap().1;
+                    assert!(properties.find("\"pay\"") < properties.find("\"amount\""));
+                    assert!(
+                        properties.find("\"amount\"") < properties.find("\"cancels_previous\"")
+                    );
+                    let mut seen = seen.lock().unwrap();
+                    seen.model
+                        .push(body["messages"][0]["content"].as_str().unwrap().to_owned());
+                    seen.model_requests.push(raw);
+                    Json(json!({
+                        "model": "claude-opus-5-5",
+                        "stop_reason": "end_turn",
+                        "content": [
+                            {"type": "thinking", "thinking": "", "signature": "sig"},
+                            {"type": "text", "text": answer.to_string()},
+                        ],
+                    }))
+                },
+            ),
+        )
+        .with_state((seen, answer));
+    serve(app).await
+}
+
+#[tokio::test]
+async fn claude_reads_through_the_same_checks_and_is_named_in_the_record() {
+    let seen = Arc::new(Mutex::new(Seen::default()));
+    let llm = claude(
+        Arc::clone(&seen),
+        json!({
+            "pay": ["Vega Cloud Srl", "Vega Holdings"], "refused": [], "amount": "480",
+            "currency": "EUR", "destinations": ["DEST_1"], "references": [],
+            "cancels_previous": false
+        }),
+    )
+    .await;
+    let reader = Reader::with_backend(
+        Backend {
+            provider: Provider::Anthropic,
+            url: llm,
+            model: "claude-opus-5-5".into(),
+            api_key: Some("test-key".into()),
+            effort: Some("low".into()),
+        },
+        Duration::from_secs(5),
+    )
+    .unwrap();
+    let state = Arc::new(AppState {
+        reader,
+        gateway: None,
+        http: reqwest::Client::new(),
+    });
+    let service = serve(router(state)).await;
+    let raw = reqwest::Client::new()
+        .post(format!("{service}/v1/read"))
+        .json(&json!({ "text": "Paga 480 euro a Vega Cloud Srl su DE89 3704 0044 0532 0130 00" }))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    let body: Value = serde_json::from_str(&raw).unwrap();
+    assert_eq!(body["status"], "read", "{body}");
+    // The invented payee is dropped exactly as it is for the local model.
+    assert_eq!(body["fields"]["pay"], json!(["Vega Cloud Srl"]));
+    assert_eq!(body["dropped"].as_array().unwrap().len(), 1, "{body}");
+    let label = body["fields"]["reader"].as_str().unwrap();
+    assert!(
+        label.contains("model=anthropic/claude-opus-5-5 "),
+        "{label}"
+    );
+    // The key went to the API and nowhere else.
+    assert!(!raw.contains("test-key"));
+    // Claude, too, never saw the account.
+    let seen = seen.lock().unwrap();
+    assert!(!seen.model[0].contains("DE89"));
+    assert!(seen.model[0].contains("DEST_1"));
 }

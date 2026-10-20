@@ -196,7 +196,7 @@ after service recovery instead of treating the failed read as authorization.
 | `moat-colab-tunnel.service` | Copies the bootstrap to Colab and maintains the SSH forward |
 | `moat-colab-queue-api.service` | Runs the loopback completion API |
 | `moat-colab-queue-worker.service` | Runs the single Redis consumer |
-| `moat-intent-colab.service` | Runs the grounded reader connected to the queue and gateway |
+| `moat-intent.service` | Runs the grounded reader connected to the queue and gateway |
 
 The Colab bootstrap checks model health every 15 seconds and attempts to start
 the model when unavailable. The tunnel unit restarts after a lost connection
@@ -211,7 +211,7 @@ from `/etc/moat/colab-queue.env`, outside Git. The queue and reader bind to
 loopback; a trusted host application supplies the client-facing integration.
 
 ```sh
-systemctl is-active moat-intent-colab moat-colab-queue-api \
+systemctl is-active moat-intent moat-colab-queue-api \
   moat-colab-queue-worker moat-colab-tunnel
 curl -sS http://127.0.0.1:8093/health
 curl -sS http://127.0.0.1:8092/health

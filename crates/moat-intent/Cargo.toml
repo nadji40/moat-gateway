@@ -19,7 +19,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.104"
 axum = "0.8.9"
-clap = { version = "4.5.61", features = ["derive"] }
+clap = { version = "4.5.61", features = ["derive", "env"] }
 moat-core = { version = "0.1.0", path = "../moat-core" }
 reqwest = { version = "0.13.3", default-features = false, features = ["rustls", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
