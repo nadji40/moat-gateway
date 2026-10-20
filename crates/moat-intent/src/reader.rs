@@ -215,7 +215,12 @@ impl Reader {
 
     /// A reader for any backend.
     pub fn with_backend(backend: Backend, timeout: Duration) -> Result<Reader> {
-        let api_key = backend.api_key.filter(|key| !key.trim().is_empty());
+        // Trimmed: a key pasted into a file often carries a line ending,
+        // which no HTTP header may contain.
+        let api_key = backend
+            .api_key
+            .map(|key| key.trim().to_owned())
+            .filter(|key| !key.is_empty());
         if backend.provider.needs_key() && api_key.is_none() {
             return Err(anyhow!(
                 "the {} provider needs an API key, and none was given",
