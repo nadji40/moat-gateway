@@ -45,8 +45,8 @@ The four systemd units in `deploy/` are:
   only network target is the loopback tunnel; it never calls the gateway.
 - `moat-intent.service`: starts Moat's grounded reader with the gateway's
   intent API for registration. Its model is chosen in
-  `/etc/moat/moat-intent.env`; with no file, or with
-  `MOAT_INTENT_PROVIDER=llama`, it reads through this queue. With
+  `/etc/moat/moat-intent.env`; with `MOAT_INTENT_PROVIDER=llama` and
+  `MOAT_INTENT_LLM_URL=http://127.0.0.1:8093` it reads through this queue. With
   `MOAT_INTENT_PROVIDER=anthropic` it reads with Claude instead, and the
   queue and tunnel sit idle. See `deploy/moat-intent.env.example`.
 

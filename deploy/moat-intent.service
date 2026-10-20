@@ -8,14 +8,10 @@ Type=simple
 User=moat
 Group=moat
 WorkingDirectory=/var/lib/moat
-# Which model reads is chosen in /etc/moat/moat-intent.env (root-only: it
-# can hold an API key). Without it, the reader uses the local Gemma through
-# the Colab queue, as below. See deploy/moat-intent.env.example.
-Environment=MOAT_INTENT_PROVIDER=llama
-Environment=MOAT_INTENT_LLM_URL=http://127.0.0.1:8093
-Environment=MOAT_INTENT_MODEL=gemma-4-E4B-it-qat-UD-Q4_K_XL
-Environment=MOAT_INTENT_TIMEOUT_SECS=130
-EnvironmentFile=-/etc/moat/moat-intent.env
+# Which model reads is chosen in /etc/moat/moat-intent.env and nowhere else,
+# so no default here can mix with it. The file is root-only: it can hold an
+# API key. See deploy/moat-intent.env.example.
+EnvironmentFile=/etc/moat/moat-intent.env
 ExecStart=/usr/local/bin/moat-intent --listen 127.0.0.1:7083 --gateway http://127.0.0.1:7082
 Restart=always
 RestartSec=5
