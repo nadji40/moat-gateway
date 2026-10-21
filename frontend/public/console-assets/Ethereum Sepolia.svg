@@ -1,0 +1,11 @@
+<!-- Moat console asset: Ethereum Sepolia.svg — network brand mark - Ethereum Sepolia (8 facets, §5.17) -->
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 3V9.651L17.625 12.167L12 3Z" fill="#8FFCF3"/>
+<path d="M12 3L6.375 12.166L12 9.653V3Z" fill="#CABCF8"/>
+<path d="M12 16.4781V21.0001L17.625 13.2161L12 16.4781Z" fill="#CBA7F5"/>
+<path d="M12 21.0001V16.4781L6.375 13.2161L12 21.0001Z" fill="#74A0F3"/>
+<path d="M12 15.4301L17.625 12.1671L12 9.6521V15.4301Z" fill="#CBA7F5"/>
+<path d="M6.375 12.1671L12 15.4301V9.6521L6.375 12.1671Z" fill="#74A0F3"/>
+<path d="M12 15.43L6.375 12.167L12 3L17.624 12.166L12 15.43ZM6.748 11.902L11.909 3.492V9.606L6.748 11.902ZM6.671 12.131L11.909 9.804V15.168L6.671 12.131ZM12.089 9.804V15.168L17.323 12.131L12.089 9.804ZM12.089 9.606L17.25 11.902L12.089 3.492V9.606Z" fill-rule="evenodd" clip-rule="evenodd" fill="#202699"/>
+<path d="M12 16.406L6.375 13.211L12 21L17.624 13.21L12 16.406ZM7.005 13.773L11.909 16.563V20.568L7.005 13.773ZM12.089 16.563V20.568L16.994 13.773L12.089 16.563Z" fill-rule="evenodd" clip-rule="evenodd" fill="#202699"/>
+</svg>

@@ -1,0 +1,1359 @@
+/* ============================================================
+   Moat gateway console — shared styles  (single stylesheet for all pages)
+   Built from the pen.dev design (node IDs HyTAB, XQ2bh, h803uR,
+   sJFYK, O7JXtJ, C3aPk, WH8Tk, IKAdu, rRk9f, F5gC53, Bx2kO, bUo6E)
+   and DESIGN.md. All values are the design's exact px values.
+
+   SECTION MAP (in file order)
+   ├─ :root ................ design tokens: surfaces, text ranks, brand
+   │                         colors, badge fills, chart series, bezel
+   │                         presets, motion curves, chart-compat aliases
+   ├─ resets/global ........ box-sizing, scrollbar craft, body app frame,
+   │                         skip-link, buttons/inputs normalize, .mono
+   ├─ scaffold ............. .shell (app frame) .topbar .brand .app
+   ├─ sidebar .............. width 170 rail, "LAYER" heading, .nav links,
+   │                         .signin-card (sign-in-with-key card)
+   ├─ main surface ......... .surface (the scroller) .page-head titles
+   ├─ menubar .............. tabs shell (§5.3) + sliding .thumb graft
+   ├─ floating calendar .... .cal-* (JS-injected .cal-pop + grid tokens)
+   ├─ pagination ........... .pages (menubar shell reused, centered)
+   ├─ panels ............... #252525 r15 shells + panel titles,
+   │                         .rowlist (Usage row items + cell widths)
+   ├─ badge ................ Paid/Held/Refused pill (§5.11)
+   ├─ stat rail ............ Usage right column cards
+   ├─ buttons .............. .btn family: primary/destructive/danger-
+   │                         outline/run/create-key + press physics
+   ├─ tables ............... .table-shell/.table-grid/.rt rows,
+   │                         .kgrid/.vgrid column plans, row actions,
+   │                         .switch (API-keys rows)
+   ├─ fields & menus ....... .field (§5.8) .trigger (§5.9) .menu body,
+   │                         option rows w/ check + icons, stagger,
+   │                         .checkbox (§5.5) with draw-in tick
+   ├─ dialog ............... .modal-overlay/.dialog Create-API-Key (§5.19)
+   ├─ playground ........... pg-columns, memo blocks (§5.7 headers),
+   │                         fields-in-panel overrides, currency chips
+   │                         (§5.16), asset chip (§5.17), readout,
+   │                         verdict banner, dividers
+   ├─ code block ........... .code-block (§5.10) syntax classes + copy btn
+   ├─ verdicts page ........ .search-row/.search-field, table column plans
+   ├─ usage page layout .... .usage-body/.usage-main/.usage-lists
+   ├─ responsive ........... 1180 / 900 / 620 breakpoints
+   ├─ focus ring ........... #878282 double ring (§6)
+   └─ reduced motion ....... global kill list for every transition+keyframe
+   ============================================================ */
+.shell {
+  /* page + surfaces */
+  --page: #100D08;          /* page background  */
+  --s1: #171717;            /* surface-1  (main shell, fields, menus)  */
+  --s2: #252525;            /* surface-2  (tables, dialog, chips)      */
+  --s3: #111111;            /* surface-deep (dark buttons)           */
+  --inset: #100D08;         /* dialog inner panel                    */
+  --line-strong: #363636;
+  --line-muted: #252525;
+
+  /* text */
+  --t1: #FFFFFF;
+  --t2: #A0A0A0;
+  --t3: #878787;
+  --t-cap: #8D8D8D;         /* page caption  */
+  --t-panel: #F7F7F8;       /* panel titles  */
+  --t-label: #DDDDDD;       /* section labels (USER SAID …) */
+  --t-mini: #B8B8B8;        /* form mini labels            */
+  --t-body: #F4F4F6;
+  --t-ph: #94A3B8;          /* textarea placeholder        */
+
+  /* brand */
+  --orange: #FF5F00;
+  --orange-hover: #F2772F;
+  --red: #EB001B;
+  --yellow: #F79E1B;
+  --green: #2ED17A;
+  --red-hover: #FF6166;
+  --red-line: #E5484D;
+
+  /* chart series (from the source chart components: Bar dataKey desktop → --chart-1, mobile → --chart-3) */
+  --chart-1: #FF5F00;
+  --chart-3: #F79E1B;
+
+  /* app.css compatibility tokens used by assets/charts/*.js + components.css */
+  --bg: #100D08;
+  --bg-2: #171717;
+  --ink: #F4F4F6;
+  --line: rgba(255, 255, 255, .09);
+  --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font: "Ubuntu", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  /* signature bezels (inset shadow pairs, §4 DESIGN.md) */
+  --bezel-orange: inset 0 2px 3.5px #ffffff66, inset 0 -2px 3.5px #a33d00;
+  --bezel-neutral: inset 0 2px 3.5px #00000040, inset 0 -2px 3.5px #00000040;
+  --bezel-dark: inset 0 2px 3.5px #252525, inset 0 -2px 3.5px #252525;
+  --slide-ease: cubic-bezier(0.2, 0.7, 0.2, 1);  /* menubar thumb (components/sliding-tabs) */
+  --slide-dur: 0.42s;
+  --bezel-side: inset 0 2px 3.5px #2b2b2b;
+}
+.shell * { box-sizing: border-box; scrollbar-width: none; }
+/* hide scrollbars, scrolling still works */
+.shell *::-webkit-scrollbar { display: none; }
+/* app frame: body never scrolls; the .surface is the single scroller.
+   100dvh (with the vh fallback) keeps the frame correct on mobile URL bars. */
+/* minimalist scrollbars: 4px dark thumb, invisible rail */
+.shell *::-webkit-scrollbar { width: 10px; height: 10px; }
+.shell *::-webkit-scrollbar { background: transparent; }
+.shell *::-webkit-scrollbar {
+  background: #363636;
+  border: 3px solid transparent;
+  border-radius: 50px;
+  background-clip: content-box;
+}
+.shell *::-webkit-scrollbar { background: #878787; }
+.shell *::-webkit-scrollbar { background-clip: content-box; }
+/* skip link — hidden until keyboard-focused (§1 skip-links) */
+.shell img { display: block; }
+.shell svg { display: block; }
+.shell button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; touch-action: manipulation; }
+.shell input,
+.shell textarea {
+  font-family: inherit;
+  background: none;
+  border: 0;
+  outline: 0;
+  color: var(--t1);
+}
+.shell input::placeholder,
+.shell textarea::placeholder { color: var(--t2); }
+.shell .mono { font-family: var(--mono); font-weight: 500; }
+/* ------------------------------------------------------------
+   Page scaffolding:  top bar / app row (sidebar + main)
+   ------------------------------------------------------------ */
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+  height: 100vh;
+  height: 100dvh;
+}
+/* the workspace div itself uses the hidden attribute to swap panes; the
+   UA display:none would be beaten by the flex rule above */
+.shell[hidden] { display: none; }
+.shell .topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+}
+.shell .brand { display: flex; align-items: center; gap: 10px; }
+/* 50px logo mark + "Moat" wordmark */
+.shell .brand img { width: 50px; height: 50px; }
+.shell .brand span { font-size: 23px; font-weight: 700; color: #A0A0A0; }
+/* wordmark reads secondary, not white — brand is quiet */
+.shell .app {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-height: 0;
+}
+/* ------------------------------------------------------------
+   Sidebar navigation
+   ------------------------------------------------------------ */
+.shell .sidebar {
+  width: 170px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px 10px;
+  border-radius: 20px;
+}
+.shell .sidebar-heading {
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 500;
+  color: var(--t3);
+}
+.shell .nav { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.shell .nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 16px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--t1);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.shell .nav-btn img { width: 20px; height: 20px; }
+.shell .nav-btn.active {
+  background: var(--s2);
+  border-color: var(--line-strong);
+  box-shadow: var(--bezel-side);
+}
+.shell .nav-btn:not(.active):hover { background: rgba(37, 37, 37, .55); }
+/* sidebar sign-in card — small control shell on the app background
+   (#252525 fill + #363636 stroke, r10; mono data, secondary caption) */
+.shell .signin-card {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+}
+.shell .signin-label { font-size: 11px; font-weight: 500; color: var(--t2); }
+.shell .signin-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--t1);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.shell .signin-key img { width: 14px; height: 14px; flex: none; opacity: .85; }
+.shell .signin-mask { font-family: var(--mono); font-size: 10.5px; font-weight: 500; color: var(--t3); white-space: nowrap; }
+/* ------------------------------------------------------------
+   Main surface
+   ------------------------------------------------------------ */
+.shell .surface {
+  flex: 1;
+  min-width: 0;
+  background: var(--s1);
+  border: 1px solid var(--s1);
+  border-radius: 20px;
+  box-shadow: inset 0 1px 3.5px #FFFFFF40;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+.shell .page-head { display: flex; align-items: center; justify-content: space-between; gap: 30px; flex-wrap: wrap; padding: 20px 0; }
+.shell .page-head .titles { display: flex; flex-direction: column; gap: 13px; min-width: 0; }
+/* .surface scrolls, so its children must keep natural height (a scroll-container
+   child like .table-scroll otherwise loses min-height and gets flex-crushed) */
+.shell .surface > * { flex-shrink: 0; }
+.shell h1.page-title { margin: 0; font-size: 32px; font-weight: 700; color: var(--t1); }
+.shell .page-caption { font-family: var(--mono); font-size: 14px; line-height: 21px; font-weight: 500; color: var(--t-cap); }
+/* ------------------------------------------------------------
+   Menubar (tabs) — DESIGN §5.2–5.3: shell #252525 r14 p6, items
+   Roboto Mono 14/500 pad 6/12 r10; selected = #FF5F00 + orange bezel
+   ------------------------------------------------------------ */
+.shell .menubar {
+  display: inline-flex;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 6px;
+  flex-shrink: 0;
+}
+.shell .menubar button {
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 500;
+  color: var(--t1);
+  background: transparent;
+  white-space: nowrap;
+  transition: background .18s ease-out, box-shadow .18s ease-out, color .15s ease-out, transform .1s ease-out;
+}
+.shell .menubar button:active { transform: scale(.96); }
+.shell .menubar button:not(.active):hover { background: rgba(255, 255, 255, .05); }
+.shell .menubar button.active {
+  background: var(--orange);
+  box-shadow: var(--bezel-orange);
+}
+/* sliding thumb — grafted from components/sliding-tabs.js, mounted by
+   assets/menubar-slide.js on every .menubar; state stays with .active */
+.shell .menubar button { position: relative; z-index: 1; }
+.shell .menubar.sliding { position: relative; }
+.shell .menubar.sliding .thumb {
+  position: absolute;
+  top: 6px; left: 6px;
+  width: 0; height: calc(100% - 12px);
+  border-radius: 10px;
+  background: var(--orange);
+  box-shadow: var(--bezel-orange);
+  pointer-events: none;
+  will-change: transform, width;
+  transition: transform var(--slide-dur) var(--slide-ease), width var(--slide-dur) var(--slide-ease);
+}
+.shell .menubar.sliding button.active { background: transparent; box-shadow: none; }
+/* floating calendar (usage CUSTUME range / dialog Custom expiry) — menu-body tokens */
+.cal-pop {
+  position: fixed; z-index: 110;
+  background: var(--s1);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 12px;
+  filter: drop-shadow(2px 2px 3.5px rgba(0, 0, 0, .25));
+  font-family: var(--mono);
+  color: var(--t1);
+  animation: cal-in .22s cubic-bezier(.3, 1.4, .5, 1);
+}
+@keyframes cal-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: none; }
+}
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.cal-title { font-family: var(--font); font-size: 15px; line-height: 22px; font-weight: 500; }
+.cal-nav { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 8px; }
+.cal-nav:hover { background: rgba(255, 255, 255, .05); }
+.cal-nav svg { width: 14px; height: 14px; display: block; }
+.cal-week,
+.cal-grid { display: grid; grid-template-columns: repeat(7, 30px); gap: 2px; }
+.cal-week { margin-bottom: 4px; }
+.cal-week span { text-align: center; font-size: 11px; line-height: 16px; color: var(--t2); }
+.cal-day {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  font-size: 12px; font-weight: 500;
+  background: transparent;
+}
+.cal-day:not(.sel):hover { background: rgba(255, 255, 255, .05); }
+.cal-day.out { color: rgba(255, 255, 255, .28); }
+.cal-day.today { box-shadow: inset 0 0 0 1px #878282; }
+.cal-day.inr { background: rgba(255, 95, 0, .18); border-radius: 0; }
+.cal-day.sel { background: var(--orange); color: #fff; box-shadow: var(--bezel-orange); }
+.cal-foot { margin-top: 8px; min-height: 18px; text-align: center; font-size: 12px; line-height: 18px; color: var(--t2); }
+/* The button reset (shared.css:146) is scoped to .shell here, but openCalendar
+   mounts .cal-pop on <body> — outside .shell — so UA button chrome (border,
+   background, padding) painted boxes around every .cal-day/.cal-nav. Restore
+   the design reset inside the pop. */
+.cal-pop button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; touch-action: manipulation; }
+/* pagination bar (verdicts) — menubar shell reused, centered under the table */
+/* ------------------------------------------------------------
+   Panels — #252525 r15 border #363636 pad 21/22
+   ------------------------------------------------------------ */
+.shell .panel {
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  padding: 21px 22px;
+  min-width: 0;
+}
+.shell .panel-title { margin: 0 0 18px; font-size: 23px; font-weight: 700; color: var(--t-panel); }
+/* list rows inside panels (Usage lists / verdict badges lists) */
+.shell .rowlist { display: flex; flex-direction: column; gap: 15px; min-width: 0; flex: 1; min-height: 0; width: 100%; }
+.shell .rowlist-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.shell .cell { font-family: var(--mono); font-size: 12px; line-height: 20px; font-weight: 500; flex-shrink: 0; }
+.shell .cell-payee { color: var(--t-body); width: 180px; min-width: 110px; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shell .cell-amount { color: var(--t-body); width: 60px; }
+.shell .cell-when { color: var(--t2); width: 80px; text-align: right; margin-left: auto; }
+/* ------------------------------------------------------------
+   Verdict badge — DESIGN §5.11: pill r999 mono 12/500, inner dark
+   bezel pair; fills/strokes are the brand ramp's success/warning/danger
+   ------------------------------------------------------------ */
+.shell .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 22px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: var(--bezel-neutral);
+  flex-shrink: 0;
+}
+.shell .badge.paid { background: var(--green);  border: 1px solid #269459; color: #252525; }
+.shell .badge.held { background: var(--yellow); border: 1px solid #C07B14; color: #252525; }
+.shell .badge.refused { background: var(--red);    border: 1px solid #BF091E; color: #FFFFFF; padding: 2px 10px; }
+/* ------------------------------------------------------------
+   Stat rail (Usage page right column)
+   ------------------------------------------------------------ */
+.shell .stat-rail { display: flex; flex-direction: column; gap: 10px; width: 156px; flex-shrink: 0; }
+.shell .stat-card {
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  padding: 15px;
+  display: flex;
+  gap: 5px;
+}
+.shell .stat-card.big { flex-direction: column; }
+.shell .stat-card.big .num { font-size: 32px; font-weight: 700; line-height: normal; }
+.shell .stat-card.big .lbl { font-family: var(--mono); font-size: 14px; line-height: 21px; }
+.shell .stat-card.big .sub { font-family: var(--mono); font-size: 12px; line-height: 20px; color: var(--t3); }
+.shell .stat-card.mini {
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+}
+.shell .stat-card.mini .num { font-size: 32px; font-weight: 700; line-height: normal; }
+/* ------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------ */
+.shell .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 10px;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--t1);
+  white-space: nowrap;
+  text-decoration: none;
+  /* smooth-button press: quiet scale on hold, settles on release */
+  transition: transform .14s var(--slide-ease);
+}
+.shell .btn:active { transform: scale(.96); }
+.shell .btn-primary {
+  background: var(--orange);
+  box-shadow: var(--bezel-orange);
+  padding: 10px 12px;
+}
+.shell .btn-primary:hover { background: var(--orange-hover); }
+/* CREATE KEY button (extracted component from mod front end preview v2/test.html) */
+.shell .btn-create-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--orange);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font: 700 14px/1 var(--font);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: var(--bezel-orange);
+  transition: background .15s ease, transform .08s ease;
+  user-select: none;
+}
+.shell .btn-create-key:hover { background: var(--orange-hover); }
+.shell .btn-dark {
+  background: var(--s3);
+  border: 1px solid var(--line-muted);
+  box-shadow: var(--bezel-dark);
+  padding: 10px 16px;
+}
+.shell .btn-dark:hover { background: var(--red-hover); border-color: var(--red-line); }
+/* sign-out icon: arrow nudges left on hover — "exiting" the door */
+.shell .sign-out img { transition: transform .22s ease; }
+.shell .sign-out:hover img,
+.shell .sign-out:focus-visible img { transform: translateX(-3px); }
+.shell .btn-danger-outline {
+  background: var(--red-hover);
+  border: 1px solid var(--red-line);
+  box-shadow: inset 0 2px 3.5px var(--red-line), inset 0 -2px 3.5px #00000040;
+  padding: 10px 16px;
+}
+.shell .btn-danger-outline:hover { background: var(--red); }
+.shell .btn-danger-outline img { width: 24px; height: 24px; }
+/* full-width run button with play glyph (Playground) */
+.shell .btn-run {
+  width: 100%;
+  background: var(--orange);
+  box-shadow: var(--bezel-orange);
+  padding: 10px 12px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.15px;
+}
+.shell .btn-run:hover { background: var(--orange-hover); }
+.shell .btn-run .play { width: 24px; height: 24px; }
+.shell .btn-run .play path { fill: #fff; }
+/* ------------------------------------------------------------
+   Tables — DESIGN §5.12–5.13: #252525 shell, headers Ubuntu 18/500
+   white, rows Roboto Mono 12/500 (#F4F4F6 primary / #A0A0A0 muted),
+   divider 1px #878787, 14px row gap
+   ------------------------------------------------------------ */
+.shell .table-shell { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.shell .table-grid { display: grid; align-items: center; gap: 14px; min-width: 0; }
+.shell .table-grid th,
+.shell .table-grid .th-cell { text-align: left; font-weight: 500; font-size: 18px; color: var(--t1); }
+.shell .table-grid .th-cell.right { text-align: right; color: #D9D9D9; }
+.shell .table-grid .rt { font-family: var(--mono); font-size: 12px; line-height: 20px; font-weight: 500; }
+.shell .rt.primary { color: var(--t-body); }
+.shell .rt.muted { color: var(--t2); }
+.shell .table-div { height: 1px; background: var(--t3); width: 100%; }
+.shell .row-actions { display: flex; align-items: center; gap: 16px; }
+/* switch — DESIGN §5.4: track 40x22 r50 (#E2E8F0 off / #FF5F00 on),
+   knob 18px white + #E9E9E9 stroke; both carry the neutral bezel.
+   knob glides with a spring (JS per API-keys rows: role="switch") */
+/* ------------------------------------------------------------
+   Fields (§5.8) and dropdown menus (§5.9) — popup + playground.
+   .field  = dark text input, 40px, r10, #171717/#363636 in-panel
+   .trigger = dropdown button (chevron-down/up pair swapped by .open)
+   .menu-body = floating panel body (#171717 r10 pad-4); items are
+   rows of [check?][icon?][tag]; selected+hover = #252525 chip
+   ------------------------------------------------------------ */
+.shell .field {
+  height: 40px;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 8px 12px;
+  width: 100%;
+}
+.shell .field input {
+  width: 100%; height: 100%;
+  font-family: var(--mono);
+  font-size: 14px; line-height: 21px; font-weight: 500;
+}
+.shell .field .typed { font-family: var(--mono); font-size: 14px; line-height: 21px; font-weight: 500; color: var(--t2); }
+.shell .trigger {
+  height: 36px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 16px;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  font-family: Inter, "Ubuntu", sans-serif;
+  font-size: 14px; line-height: 20px; font-weight: 500;
+  color: var(--t1);
+  white-space: nowrap;
+  /* smooth-button press: quiet scale on hold */
+  transition: transform .14s var(--slide-ease);
+}
+.shell .trigger:active { transform: scale(.96); }
+.shell .trigger.chev-active { background: var(--line-strong); }
+/* dropdown body */
+.shell .menu-body {
+  background: var(--s1);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.shell .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+}
+.shell .menu-item .check {
+  width: 11px; height: 9px; flex-shrink: 0; font-size: 0;
+  opacity: 0; transform: scale(.5); transition: opacity .15s ease-out, transform .18s ease-out;
+}
+.shell .menu-item.selected .check { opacity: 1; transform: none; }
+.shell .menu-item .check svg { width: 11px; height: 9px; }
+.shell .menu-item .opt-icon { width: 20px; height: 20px; flex-shrink: 0; }
+.shell .menu-item .opt-icon img { width: 20px; height: 20px; }
+.shell .menu-item .tag { flex: 1; min-width: 0; font-size: 14px; line-height: 21px; font-weight: 500; font-family: var(--mono); color: var(--t1); }
+.shell .menu-item.ubold .tag { font-family: var(--font); font-size: 13px; line-height: normal; font-weight: 700; }
+.shell .menu-item:hover,
+.shell .menu-item.selected { background: #252525; }
+.shell .trigger .trg-icon { width: 20px; height: 20px; display: none; }
+.shell .trigger .trg-icon img { width: 20px; height: 20px; }
+/* floating dropdown wrapper */
+.shell .drop {
+  position: relative;
+}
+.shell .drop .drop-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  display: flex;
+  visibility: hidden;
+  opacity: 0;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 30;
+  pointer-events: none;
+  filter: drop-shadow(2px 2px 3.5px rgba(0, 0, 0, .25));
+  transform: translateY(-6px) scale(.98);
+  transform-origin: 50% 0;
+  transition: opacity .16s ease-out, transform .3s cubic-bezier(.3, 1.4, .5, 1);
+}
+.shell .drop.open .drop-panel { visibility: visible; opacity: 1; transform: none; pointer-events: auto; }
+/* staggered item rise on open (animation, so hover styling never gets delayed) */
+@keyframes drop-item {
+  from { opacity: 0; transform: translateY(-5px); }
+  70% { opacity: 1; transform: translateY(1.5px); }
+  to { opacity: 1; transform: none; }
+}
+.shell .drop.open .menu-item { animation: drop-item .24s cubic-bezier(.22, 1, .36, 1) backwards; }
+.shell .drop.open .menu-item:nth-child(2) { animation-delay: 30ms; }
+.shell .drop.open .menu-item:nth-child(3) { animation-delay: 55ms; }
+.shell .drop.open .menu-item:nth-child(4) { animation-delay: 75ms; }
+.shell .drop.open .menu-item:nth-child(5) { animation-delay: 90ms; }
+.shell .drop.open .menu-item:nth-child(6) { animation-delay: 105ms; }
+.shell .drop.open .menu-item:nth-child(7) { animation-delay: 120ms; }
+.shell .drop.open .menu-item:nth-child(8) { animation-delay: 135ms; }
+.shell .drop.open .trigger { background: var(--line-strong); }
+.shell .drop.open .chev-down { display: none; }
+.shell .drop:not(.open) .chev-up { display: none; }
+/* checkbox — DESIGN §5.5: 14x14 r4 box, #DDDDDD default + #E5E7EB
+   stroke, inset dark shadow pair; checked = #FF5F00 (orange bezel'd
+   via .box shadow below) with a white 6x4 check vector */
+.shell .checkbox { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; }
+.shell .checkbox .box {
+  width: 14px; height: 14px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #DDDDDD;
+  border: 1px solid #E5E7EB;
+  border-radius: 4px;
+  box-shadow: inset 0 -4px 3.5px #00000040, inset 0 4px 3.5px #00000040;
+}
+.shell .checkbox.on .box { background: var(--orange); }
+/* check draws in with a spring path animation (smoothui-style); reverses on uncheck */
+.shell .checkbox .tick {
+  width: 7px; height: 5px;
+  transform: translateX(-0.5px);
+}
+.shell .checkbox .tick path {
+  stroke-dasharray: 8;
+  stroke-dashoffset: 8;
+  transition: stroke-dashoffset .35s cubic-bezier(.34, 1.56, .64, 1);
+}
+.shell .checkbox.on .tick path { stroke-dashoffset: 0; }
+.shell .checkbox .txt {
+  font-family: var(--mono); font-size: 14px; line-height: 21px; font-weight: 500; color: var(--t1);
+}
+/* ------------------------------------------------------------
+   Create API key dialog — DESIGN §5.19 (`RXZAQ`/`NB920` states)
+   Field order: 1 key-name input (§5.8), 2 Expiration dropdown
+   (12 months/3 Months/7 Days/Never/Custom→calendar), 3 Staging Agent
+   role dropdown (Agent/Approver/Admin), 4 Permissions panel
+   (#252525 card, 4 toggle rows), footer Cancel(destructive)+Create
+   (primary). Overlay dims to rgba(25,25,25,.73).
+   ------------------------------------------------------------ */
+.shell .modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(25, 25, 25, .73);
+  display: flex;
+  visibility: hidden;
+  opacity: 0;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 24px;
+  transition: opacity .18s ease-out;
+}
+.shell .modal-overlay.open { visibility: visible; opacity: 1; }
+.shell .dialog {
+  width: 495px;
+  max-width: 100%;
+  background: var(--s2);
+  border-radius: 11px;
+  box-shadow: inset 0 4px 3.5px #33333340;
+  padding: 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transform: translateY(10px) scale(.94);
+  opacity: 0;
+  /* dialog primitive entrance: spring zoom-in (same curve as dropdowns/checkbox tick) */
+  transition: opacity .18s ease-out, transform .38s cubic-bezier(.3, 1.4, .5, 1);
+}
+.shell .modal-overlay.open .dialog { transform: none; opacity: 1; }
+.shell .dialog-title {
+  padding: 10px 5px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--t1);
+}
+.shell .dialog-body {
+  background: var(--inset);
+  border-radius: 10px;
+  box-shadow: inset 0 1px 2.625px #FFFFFF40, inset 0 -1px 1.75px #00000040;
+  padding: 20px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.shell .dialog-inner { width: 433px; max-width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 25px; }
+.shell .dialog-field { display: flex; flex-direction: column; gap: 6px; }
+.shell .dialog-label { font-size: 18px; font-weight: 500; color: var(--t1); }
+.shell .dialog-drop { display: flex; flex-direction: column; gap: 10px; border-radius: 10px; background: var(--s2); }
+.shell .dialog-drop .trigger { background: var(--s2); }
+.shell .permissions {
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: inset 0 2px 3.5px #00000040;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.shell .perm-row { display: flex; flex-direction: column; gap: 10px; }
+.shell .dialog-footer { display: flex; gap: 10px; }
+.shell .dialog-footer .btn-primary { flex: 1; }
+/* Playground — two-column transcript layout (§ pen screens): left
+   form column holds the scenario picker + USER SAID/AGENT TRIES/
+   INVOICE/APPROVED grouped blocks + run CTA; right column renders
+   the verdict cards. Frames on both columns are #252525 r15 panels. */
+.shell .pg-tabs-row { display: flex; flex-direction: column; gap: 25px; }
+.shell .pg-columns { display: flex; gap: 20px; align-items: flex-start; min-width: 0; }
+.shell .form-col {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 20px;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  padding: 18px;
+}
+.shell .result-col {
+  width: 400px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  padding: 18px;
+}
+.shell .pg-columns .panel-title { color: #FFFFFF; }
+.shell .pg-scenario { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; }
+.shell .pg-scenario .panel-title { margin-bottom: 0; }
+.shell .pg-scenario .drop { width: 384px; max-width: 60%; }
+.shell .pg-groups { display: flex; flex-direction: column; gap: 25px; }
+.shell .pg-group { display: flex; flex-direction: column; gap: 15px; }
+/* exported stacks: USER-SAID+AGENT-TRIES and INVOICE+APPROVED each live in a 25px stack;
+   off-chain agent→approved is 30px */
+.shell .pg-block { display: flex; flex-direction: column; gap: 25px; min-width: 0; }
+.shell .pg-block.g30 { gap: 30px; }
+.shell .pg-group.memo-fixed { height: 121px; }
+.shell .memo-fixed .memo { flex: 1; min-height: 0; }
+.shell .pg-group.approved-o { gap: 20px; height: 296px; }
+.shell .memo-head { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.shell .memo-head img { width: 24px; height: 24px; }
+.shell .memo-head .memo-label { font-size: 18px; font-weight: 500; color: var(--t-label); gap: 8px; }
+.shell .memo {
+  width: 100%;
+  background: var(--s1);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 15px;
+  line-height: 23px;
+  font-weight: 500;
+  color: var(--t-ph);
+  resize: none;
+  min-height: 100px;
+  text-align: center;
+}
+/* INVOICE THE AGENT READ memo: smaller italic voice (export 13.6/20) */
+.shell .memo.inv { font-size: 13.6px; line-height: 20px; font-style: italic; }
+.shell .pg-fields { display: flex; gap: 15px; width: 100%; }
+.shell .fgroup { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.shell .fgroup.grow { flex: 1; }
+.shell .fgroup-label { font-family: var(--mono); font-size: 12px; line-height: 20px; font-weight: 500; color: var(--t-mini); }
+.shell .fgroup-label.a0 { color: var(--t2); }
+.shell .fgroup.w127 { width: 127px; flex-shrink: 0; }
+/* playground chrome sits inside #252525 panels — fields/triggers drop to #171717,
+   values are Ubuntu 15 bold #a0a0a0, right pad 56 per export field component */
+.shell .pg-columns .field { background: var(--s1); padding: 8px 56px 8px 12px; }
+.shell .pg-columns .field input { font-family: var(--font); font-size: 15px; line-height: normal; font-weight: 700; color: var(--t2); }
+.shell .pg-columns .trigger { background: var(--s1); }
+/* currency chips row: 30x30 chips r10, selected orange */
+.shell .currency-row { display: flex; align-items: center; gap: 11px; width: 100%; height: 40px; }
+.shell .cur-chip {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  background: var(--s1);
+  border: 1px solid var(--t3);
+  box-shadow: var(--bezel-neutral);
+  flex-shrink: 0;
+  transition: transform .14s var(--slide-ease);
+}
+.shell .cur-chip:active { transform: scale(.96); }
+.shell .cur-chip img { width: 16px; height: 16px; }
+.shell .cur-chip.sel { background: var(--orange); box-shadow: var(--bezel-orange); }
+/* asset chip (ETH …) w-98 h-40 */
+.shell .asset-chip {
+  width: 98px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px 8px 10px;
+  background: var(--s1);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+}
+.shell .asset-chip img { width: 24px; height: 24px; }
+.shell .asset-chip .sym { font-family: Inter, "Ubuntu", sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--t1); }
+/* approved readout block (off-chain): head→rows 20, rows 15 apart, label→value 10 */
+.shell .readout { display: flex; flex-direction: column; gap: 15px; }
+.shell .readout-row { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.shell .readout-row .rt { font-family: var(--font); font-size: 18px; line-height: normal; font-weight: 500; color: #F4F4F6; }
+.shell .pg-divider { height: 1px; background: transparent; }
+.shell .pg-divider svg,
+.shell .divider-svg { width: 629px; max-width: 100%; height: 1px; }
+/* verdict banner (result column) */
+.shell .verdict-banner {
+  background: var(--s1);
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.shell .verdict-banner .banner-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; }
+.shell .verdict-banner .amount { font-size: 23px; font-weight: 700; color: var(--t1); text-align: right; white-space: nowrap; }
+.shell .verdict-banner .reason { font-family: var(--mono); font-size: 12px; line-height: 20px; font-weight: 500; color: var(--t1); }
+/* ------------------------------------------------------------
+   Code block — #252525 r15 + Pre shadow (drop + inner highlight)
+   ------------------------------------------------------------ */
+.shell .code-col { display: flex; flex-direction: column; gap: 15px; flex: 1; min-width: 0; }
+.shell .code-col h3 { margin: 0; font-size: 18px; font-weight: 500; color: var(--t1); }
+.shell .code-block {
+  position: relative;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  padding: 21px 22px 22px;
+  display: flex;
+  align-items: flex-start;
+}
+.shell .code-block::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .4), inset 0 1px 0 #FFFFFF1A;
+  pointer-events: none;
+}
+.shell .code-block pre {
+  flex: 1;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 500;
+  color: #E6E6EA;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  padding: 0 44px 0 0; /* clears the top-right copy button */
+}
+/* inline code coloring: scoped token classes inside .code-block */
+.shell .code-block .u { color: #FF8A3C; }
+.shell .code-block .f { color: #FFB37A; }
+.shell .code-block .s { color: #FFD9A0; }
+.shell .code-block .k { color: #E08A3C; font-weight: 700; }
+.shell .code-block .c { color: #878787; font-style: italic; }
+/* copy button — top-right; swaps to checkmark when copied (grid stacks both icons) */
+.shell .code-copy {
+  width: 24px; height: 24px;
+  position: absolute; top: 18px; right: 22px;
+  display: grid; place-items: center;
+  opacity: .8;
+  transition: opacity .15s ease-out, transform .14s var(--slide-ease);
+}
+.shell .code-copy:hover { opacity: 1; }
+.shell .code-copy:active { transform: scale(.88); }
+.shell .code-copy img,
+.shell .code-copy .ico-check {
+  grid-area: 1 / 1;
+  transition: opacity .18s ease-out, transform .18s ease-out;
+}
+.shell .code-copy .ico-check { opacity: 0; transform: scale(.4) rotate(-45deg); }
+.shell .code-copy .ico-check path { stroke: var(--green); }
+.shell .code-block.copied .code-copy img { opacity: 0; transform: scale(.4) rotate(45deg); }
+.shell .code-block.copied .code-copy .ico-check { opacity: 1; transform: none; }
+/* two code columns section (API keys page bottom) */
+.shell .connect-cols { display: flex; gap: 20px; }
+/* ------------------------------------------------------------
+   Verdicts page specifics
+   ------------------------------------------------------------ */
+.shell .search-row { display: flex; align-items: center; gap: 30px; flex-wrap: wrap; min-width: 0; }
+.shell .search-field {
+  width: 384px; max-width: 100%;
+  height: 40px;
+  padding: 8px 12px;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  display: flex; align-items: center;
+}
+.shell .search-field input { width: 100%; height: 100%; font-family: Inter, "Ubuntu", sans-serif; font-size: 16px; line-height: 24px; }
+.shell .search-field input::placeholder { color: var(--t2); font-weight: 400; }
+/* verdicts table column plan — badge | payee (110-180) | amount
+   (72-100) | rail (55-70) | why (200-534) | when 80px right-aligned;
+   fr values flex within the 1168px design width */
+.shell .vgrid { grid-template-columns: 96px minmax(110px, 180fr) minmax(72px, 100fr) minmax(55px, 70fr) minmax(200px, 534fr) 80px; }
+/* api keys table column plan — name 140 | key (90-150) | role (70-130)
+   | created (60-100) | expired (60-100) | last used (140-300) |
+   status-actions 179px (switch + delete btn) */
+.shell .kgrid { grid-template-columns: 140px minmax(90px, 150fr) minmax(70px, 130fr) minmax(60px, 100fr) minmax(60px, 100fr) minmax(140px, 300fr) 179px; }
+/* ------------------------------------------------------------
+   Usage page layout
+   ------------------------------------------------------------ */
+.shell .usage-body { display: flex; gap: 20px; align-items: flex-start; }
+.shell .usage-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.shell .usage-lists { display: flex; gap: 10px; }
+.shell .usage-lists .panel { flex: 1; min-width: 0; }
+.shell .usage-lists .rowlist { min-height: 0; }
+/* ------------------------------------------------------------
+   Playground pane graft — the port above carries the design's
+   .pg-* primitives; these cover what playground.js writes and the
+   preview needs on top: the chips it injects into the menu bodies,
+   the <dl> readout, rec verdict banners, and the tabs.
+   The #swiper can NOT take the .menubar class — menubar-slide.js
+   would fight playground.js's state (.active fallback resets to the
+   first tab) — so the same look rides a playground-owned selector.
+   ------------------------------------------------------------ */
+/* On chain / Off chain bar — same values as .menubar §5.2-5.3;
+   position:relative is the thumb's containing block */
+.shell #pane-playground [role=tablist] {
+  display: inline-flex;
+  position: relative;
+  background: var(--s2);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 6px;
+  flex-shrink: 0;
+}
+.shell #pane-playground [role=tablist] [role=tab] {
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 500;
+  color: var(--t1);
+  background: transparent;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  transition: background .18s ease-out, box-shadow .18s ease-out, color .15s ease-out, transform .1s ease-out;
+}
+.shell #pane-playground [role=tablist] [role=tab]:active { transform: scale(.96); }
+.shell #pane-playground [role=tablist] [role=tab]:hover { background: rgba(255, 255, 255, .05); }
+.shell #pane-playground [role=tablist] [role=tab][aria-selected=true] { background: var(--orange); box-shadow: var(--bezel-orange); }
+/* playground.js positions this thumb itself (offsetWidth + translateX);
+   the -2px base plus its own -4px step lands exactly on the 6px padding */
+.shell #pane-playground [role=tablist] .thumb {
+  position: absolute;
+  top: 6px; left: -2px;
+  width: 0; height: calc(100% - 12px);
+  border-radius: 10px;
+  background: var(--orange);
+  box-shadow: var(--bezel-orange);
+  pointer-events: none;
+  transition: transform var(--slide-dur) var(--slide-ease), width var(--slide-dur) var(--slide-ease);
+}
+/* app.css uppercases its labels; the design's fgroup labels read normal */
+.shell #pane-playground .fgroup-label { text-transform: none; letter-spacing: 0; }
+/* the scenario/network chips playground.js writes = the design's menu items
+   (§5.9); the check rides .selected or the aria-pressed the network
+   redraw sets */
+.shell .deck .menu-body .chip,
+.shell .deck .menu-body > button {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  padding: 8px 12px; border-radius: 8px;
+  background: transparent; border: 0; box-shadow: none;
+  font-family: var(--font); font-size: 13px; line-height: normal;
+  font-weight: 700; color: var(--t1);
+}
+.shell .deck .menu-body .chip::before,
+.shell .deck .menu-body > button::before {
+  content: ""; width: 11px; height: 9px; flex-shrink: 0; font-size: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11.5 9' fill='none'%3E%3Cpath d='M11.5 0l-7.75 9.00513-3.75-5' stroke='white' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;
+  opacity: 0; transform: scale(.5); transition: opacity .15s ease-out, transform .18s ease-out;
+}
+.shell .deck .menu-body .chip.selected::before,
+.shell .deck .menu-body .chip[aria-pressed=true]::before,
+.shell .deck .menu-body > button.selected::before,
+.shell .deck .menu-body > button[aria-pressed=true]::before { opacity: 1; transform: none; }
+.shell .deck .menu-body .chip:hover,
+.shell .deck .menu-body .chip.selected,
+.shell .deck .menu-body > button:hover,
+.shell .deck .menu-body > button[aria-pressed=true],
+.shell .deck .menu-body > button.selected { background: #252525; }
+/* the network menu reads at the plain menu-item voice (mono 14/500) */
+.shell .deck .menu-body:not(.ubold-group) .chip,
+.shell .deck .menu-body:not(.ubold-group) > button {
+  font-family: var(--mono); font-size: 14px; line-height: 21px; font-weight: 500;
+}
+/* currency chips: the pick() radios dressed as the design's cur-chip */
+.shell .pg-columns .currency-row button {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px;
+  background: var(--s1);
+  border: 1px solid var(--t3);
+  box-shadow: var(--bezel-neutral);
+  flex-shrink: 0; padding: 0;
+  transition: transform .14s var(--slide-ease);
+}
+.shell .pg-columns .currency-row button:active { transform: scale(.96); }
+.shell .pg-columns .currency-row button .sym { font-size: 14px; line-height: 1; font-weight: 700; color: var(--t2); }
+.shell .pg-columns .currency-row button[aria-checked=true] { background: var(--orange); box-shadow: var(--bezel-orange); }
+.shell .pg-columns .currency-row button[aria-checked=true] .sym { color: #252525; }
+/* the asset chip's mark is a raw svg from playground.js's simulator */
+.shell .asset-chip svg { width: 24px; height: 24px; fill: #fff; flex-shrink: 0; }
+.shell .asset-chip .dim { font-family: Inter, "Ubuntu", sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--t1); }
+/* approved readout is the <dl> playground.js (re)draws, so the
+   design's readout-row voice rides the dt/dd pair */
+.shell #mandate { margin: 0; display: flex; flex-direction: column; gap: 15px; }
+.shell #mandate dt { font-family: var(--mono); font-size: 12px; line-height: 20px; font-weight: 500; color: var(--t-mini); }
+.shell #mandate dd { margin: 0; font-size: 18px; line-height: normal; font-weight: 500; color: #F4F4F6; overflow-wrap: anywhere; }
+.shell #mandate dd .dim { font-size: 13px; color: var(--t3); }
+/* live verdicts render in the design's banner cards; the injected .rec
+   keeps playground.js's inner html, re-routed to banner layout */
+.shell #out { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.shell #out .rec {
+  background: var(--s1);
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.shell #out .rec > div:first-child { justify-content: flex-start !important; gap: 10px; }
+.shell #out .rec .call { text-align: left; }
+
+/* ------------------------------------------------------------
+   Responsive behaviour — verbatim design shared.css (≤1180 / ≤900 /
+   ≤620), .shell-scoped like the port above
+   ------------------------------------------------------------ */
+/* ≤1180px: two-column layouts stack; tables scroll horizontally
+   (kgrid/vgrid keep their min-width inside .table-scroll) */
+@media (max-width: 1180px) {
+  .shell .connect-cols, .shell .pg-columns { flex-direction: column; }
+  .shell .result-col { width: 100%; }
+  .shell .kgrid { min-width: 980px; }
+  .shell .vgrid { min-width: 860px; }
+  .shell .table-scroll { overflow-x: auto; }
+}
+
+/* ≤900px: sidebar collapses to a 62px icon rail (labels + signin
+   text hidden); usage body flips (stat rail on top), playground
+   fields wrap, fixed-height memo groups go auto; verdicts filter
+   menubar wraps to its own row */
+@media (max-width: 900px) {
+  .shell .sidebar { width: 62px; padding: 20px 8px; }
+  .shell .sidebar-heading, .shell .nav-btn .nav-label { display: none; }
+  .shell .nav-btn { justify-content: center; padding: 8px 0; }
+  /* collapsed rail: the sign-in card shrinks to the key glyph */
+  .shell .signin-label, .shell .signin-mask, .shell .signin-name { display: none; }
+  .shell .signin-card { align-items: center; padding: 10px 0; }
+  .shell .surface { padding: 14px; }
+  .shell .usage-body { flex-direction: column-reverse; }
+  .shell .stat-rail { width: 100%; flex-direction: row; flex-wrap: wrap; }
+  .shell .stat-rail .stat-card { flex: 1 1 120px; }
+  .shell .usage-lists { flex-direction: column; }
+  .shell .pg-fields { flex-wrap: wrap; }
+  .shell .pg-group.approved-o, .shell .pg-group.memo-fixed { height: auto; }
+  .shell .memo-fixed .memo { min-height: 44px; }
+  .shell .pg-scenario { flex-direction: column; align-items: stretch; }
+  .shell .pg-scenario .drop { width: 100%; max-width: none; }
+  .shell .search-row .menubar { margin-left: 0; }
+}
+
+/* ≤620px: small-phone trims — smaller wordmark, icon-only sign out,
+   tighter title, rowlists wrap their cells */
+@media (max-width: 620px) {
+  .shell .brand span { font-size: 18px; }
+  .shell .topbar .sign-out .signout-label { display: none; }
+  .shell .page-title { font-size: 26px; }
+  .shell .kgrid, .shell .vgrid { min-width: 760px; }
+  .shell .rowlist-row { flex-wrap: wrap; }
+  .shell .fgroup.w127 { width: 110px; }
+}
+
+/* keyboard focus per §6: outer double ring — applied on :focus-within
+   (fields with pointer focus too) and :focus-visible for buttons.
+   #878282 2px, never a glow. */
+.shell .field:focus-within, .shell .trigger:focus-visible, .shell .checkbox:focus-visible, .shell .btn:focus-visible {
+  outline: 2px solid #878282;
+  outline-offset: 1px;
+}
+
+/* reduced motion (§7): every transition of an animated element is
+   killed, and the three entrance keyframes are cancelled.
+   Static end-states still show (e.g. .open opacity is declared, not
+   transitioned). Add any NEW animation to this list when you build it. */
+@media (prefers-reduced-motion: reduce) {
+  .shell .drop.open .menu-item { animation: none; }
+  .shell .cal-pop { animation: none; }
+  .shell .bklit-bar-svg .bklit-bar-group { animation: none; }
+}
+
+/* ============================================================
+   Dashboard-port additions — interop with the preview app + rules
+   re-homed from dashboard.html's removed inline <style>.
+      shortcut: shared.css rules for classes that don't exist on
+      this page (console playground chrome, .cur-chip, .memo) are
+      carried along by the scoping transform; drop them when the
+      real frontend migrates.
+   ============================================================ */
+
+/* reduced-motion kill list, re-added minus the .skip-link / .switch /
+   .pages parts that were dropped by the scoping transform */
+@media (prefers-reduced-motion: reduce) {
+  .shell .modal-overlay, .shell .dialog, .shell .drop .drop-panel, .shell .menubar button,
+  .shell .menubar .thumb, .shell .code-copy img, .shell .code-copy .ico-check,
+  .shell .menu-item .check, .shell .checkbox .tick path, .shell .btn, .shell .trigger,
+  .shell .code-copy, .shell .sign-out img { transition: none; }
+}
+
+/* ---- app frame while the workspace is open ----
+   body-level state is outside .shell, so the few values it needs are
+   hardcoded here instead of reading the shell's token block. */
+body.in-ws {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #100D08;
+  color: #F4F4F6;
+  text-align: left;
+}
+body.in-ws nav,
+body.in-ws footer.foot { display: none; }
+body.in-ws .wrap { max-width: none; margin: 0; padding-inline: 0; }
+/* the console copy is English-only: keep the workspace LTR in RTL too */
+html[dir="rtl"] body.in-ws { direction: ltr; text-align: left; }
+
+/* hidden-state guards the preview's [hidden] toggling relies on */
+.shell[hidden] { display: none; }
+.shell .pane[hidden] { display: none; }
+.shell .pane { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.shell .tab-n[hidden] { display: none; }
+.shell .nav-btn .tab-n { margin-left: auto; }
+
+/* playground chrome that only exists on this page (not in the console) */
+.shell .headrow { justify-content: space-between; margin: 0 0 4px; }
+.shell .headrow h2 { font-size: 1.6rem; }
+.shell .panel:has(> .ph) { padding: 0; }
+
+/* get-started steps (console-skin re-home of the preview's .steps) */
+.shell .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.shell .steps li { display: grid; grid-template-columns: 26px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .03); }
+.shell .steps .ck { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, .16); display: grid; place-items: center; color: #000; }
+.shell .steps .ck svg { width: 13px; height: 13px; visibility: hidden; }
+.shell .steps li.done .ck { background: var(--green-l); border-color: var(--green-l); }
+.shell .steps li.done .ck svg { visibility: visible; }
+.shell .steps li.done .st { color: var(--ink-3); }
+.shell .steps .st { font-weight: 600; }
+.shell .steps .btn { padding: 8px 14px; font-size: .8rem; }
+.shell .vempty { padding: 24px 12px; text-align: center; color: var(--ink-3); font-size: .9rem; }
+.shell .tests-link { font-family: var(--mono); font-size: 14px; color: var(--t2); text-decoration: underline; text-underline-offset: 3px; }
+.shell .tests-link:hover { color: var(--t1); }
+
+/* table/overview rows rebuilt as buttons — strip the UA button shell */
+.shell button.vgrid { background: none; border: 0; padding: 0; width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.shell .rowlist-row { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.shell .vgrid > .rt:last-child { text-align: right; }
+
+/* feed + keys rows separated by the design's hairline dividers */
+.shell #feed, .shell #keys { display: flex; flex-direction: column; }
+.shell #feed > button, .shell #keys > .kgrid { padding: 7px 0; }
+.shell #feed > button + button, .shell #keys > .kgrid + .kgrid { border-top: 1px solid var(--t3); }
+
+/* stat-card labels: app.css .lbl is a form-label style — neutralize it */
+.shell .stat-card .lbl { display: block; margin: 0; font-weight: 500; }
+
+/* ---- drawer + scrim, re-homed verbatim from the removed inline <style> ----
+   these stay OUTSIDE .shell (body level) and keep the preview look;
+   their tokens (--line-2 / --v / --ease) still resolve from app.css */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55)}
+.drawer{position:fixed;top:12px;right:12px;bottom:12px;z-index:41;width:min(430px,calc(100vw - 24px));
+  border-radius:20px;padding:22px;overflow:auto;text-align:left;background:#0B0B0D;border:1px solid var(--line-2);
+  box-shadow:0 30px 80px -20px rgba(0,0,0,1);display:flex;flex-direction:column;gap:18px;
+  transform:translateX(calc(100% + 24px));transition:transform .28s var(--ease),visibility .28s;visibility:hidden}
+.drawer.on{transform:none;visibility:visible;transition:transform .28s var(--ease),visibility 0s}
+.dr-h{display:flex;align-items:center;justify-content:space-between}
+.dr-x{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink-2);display:grid;place-items:center;cursor:pointer;padding:0}
+.dr-x:hover{color:var(--ink)}
+.dr-x svg{width:16px;height:16px}
+.drawer h2{font-size:1.5rem;overflow-wrap:anywhere}
+.dr-amt{font-size:1.15rem;color:var(--ink-2);margin-top:6px}
+.dr-why{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.dr-why li{display:grid;grid-template-columns:10px 1fr;gap:10px;align-items:start;padding:12px;border-radius:12px;background:rgba(255,255,255,.035)}
+.dr-why li:before{content:"";width:8px;height:8px;border-radius:50%;margin-top:6px;background:var(--v)}
+.dr-why code{display:block;font-size:.75rem;color:var(--ink-3);margin-top:3px}
+.dr-kv{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;margin:0;font-size:.88rem}
+.dr-kv dt{color:var(--ink-3)}
+.dr-kv dd{margin:0;overflow-wrap:anywhere}
+.dr-kv dd.mono{font-family:var(--mono);font-size:.84rem}
+.drawer .row{display:flex;gap:10px}
+
+/* Right to left: the grid and flex rows mirror on their own; what is pinned to
+   a side here is mirrored by hand. The drawer comes in from the left edge. */
+html[dir="rtl"] .drawer{text-align:right}
+html[dir="rtl"] .drawer{right:auto;left:12px;transform:translateX(calc(-100% - 24px))}
+html[dir="rtl"] .drawer.on{transform:none}
+html[dir="rtl"] .dr-amt{direction:ltr;unicode-bidi:isolate}
+html[dir="rtl"] #new-id{direction:ltr;text-align:right}
+
+/* .switch was never in the preview's markup, so the port skipped it; the
+   keys rows need it (design §5.4: 40x22 pill, grey track, orange on) */
+.shell .switch { width: 40px; height: 22px; position: relative; border-radius: 50px; box-shadow: var(--bezel-neutral); }
+.shell .switch .track { position: absolute; inset: 0; background: #E2E8F0; border-radius: 50px; box-shadow: var(--bezel-neutral); transition: background-color .28s var(--slide-ease); }
+.shell .switch .knob {
+  position: absolute; left: 2px; top: 2px; width: 18px; height: 18px;
+  background: #FFFFFF; border: 1px solid #E9E9E9; border-radius: 999px;
+  transition: transform .32s cubic-bezier(.34, 1.56, .64, 1);
+}
+.shell .switch.on .track { background: var(--orange); }
+.shell .switch.on .knob { transform: translateX(18px); }
+
+
+/* ============================================================
+   appended: host-app interop fixes (dashboard.html preview)
+   app.css leaks into the shell: section padding-block (75px of
+   dead air above every pane), centered inputs, uppercase labels,
+   and .tab[aria-selected] orange over the bezel nav pill.
+   ============================================================ */
+.shell .pane { padding-block: 0; }
+.shell .field input,
+.shell .search-field input {
+  text-align: left; border: 0; background: transparent;
+  box-shadow: none; padding: 0;
+}
+.shell .stat-card .lbl { text-transform: none; font-weight: 500; color: var(--t1); }
+.shell .stat-card .sub { white-space: nowrap; }
+.shell .nav-btn[aria-selected="true"] {
+  background: var(--s2); border-color: var(--line-strong);
+  box-shadow: var(--bezel-side); color: var(--t1);
+}
+.shell .tab-n { display: none; }
+.shell .menu-item .check { width: 13px; height: 10px; flex: none; overflow: hidden; }
+.shell .menu-item .check svg { width: 11.5px; height: 9px; display: block; }
+.shell .vgrid .rt.primary { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ============================================================
+   APPENDED — second design pass (moat-console round 2)
+   ------------------------------------------------------------
+      1) body-level .cal-pop token re-home — openCalendar mounts the
+         floating calendar on <body>, below the .shell scope that owns
+         the design tokens on this page, so every var() call in the
+         .cal-* rules resolved to nothing (transparent panel, wrong
+         font). Re-home ONLY the tokens the calendar reads, with the
+         design :root values (shared.css 45-94).
+      2) verdicts pagination bar (.menubar.pages) — scoped port of
+         shared.css 377-381 (the scoping transform never carried it:
+         no .pages markup existed when it ran).
+      3) delete-confirm sub styles — scoped port of shared.css 787-788.
+   ============================================================ */
+
+/* 1) .cal-pop token re-home */
+.cal-pop {
+  --s1: #171717;
+  --line-strong: #363636;
+  --t1: #ffffff;
+  --t2: #a0a0a0;
+  --orange: #ff5f00;
+  --bezel-orange: inset 0 2px 3.5px #ffffff66, inset 0 -2px 3.5px #a33d00;
+  --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font: "Ubuntu", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* 2) pagination bar (verdicts) — menubar shell reused, centered under the table */
+.shell .pages { margin-left: auto; margin-right: auto; }
+.shell .pages button svg { width: 16px; height: 16px; display: block; }
+.shell .pages button.chev { padding: 6px 10px; }
+.shell .pages .dots { align-self: center; padding: 6px 4px; font-family: var(--mono); font-size: 14px; line-height: 21px; font-weight: 500; color: var(--t2); }
+.shell .pages button[aria-disabled="true"] { opacity: .35; pointer-events: none; }
+
+/* 3) delete-confirm copy styles */
+.shell .confirm-msg { font-size: 18px; font-weight: 500; line-height: 1.35; color: var(--t1); }
+.shell .confirm-sub { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--t2); }
+
+/* delete-confirm popup: center the two actions and open air between the
+   copy and the buttons (user request). Scoped to #del-confirm — the
+   Create dialog's footer stays design-verbatim (left pair, primary flex). */
+.shell #del-confirm .dialog-body { gap: 22px; }
+.shell #del-confirm .dialog-footer { justify-content: center; }
+.shell #del-confirm .dialog-inner { align-items: center; text-align: center; }
+
+/* app.css collision: the site's test-runner rows are also named .check
+   (`.check{display:grid;...}` — api tests page), and that card spec
+   (grid + padding + 1px border + 12px radius + white-3% bg) leaks onto
+   the .shell menu-item check glyph — dropdowns showed a stray blob
+   around the tick. Restore the design's bare glyph (§5.3 menu lists). */
+.shell .menu-item .check {
+  display: block;
+  grid-template-columns: none;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------
+   Playground pass 3 (user-reported states)
+   1) <=1180px the stacked columns collapsed: the deck is an absolute
+      slide stack with no content width, so align-items:flex-start
+      left it at min-content (~38px) and crushed the whole pane. The
+      design's column direction keeps full-width columns throughout.
+   2) Thumb geometry: playground.js writes translateX(offsetLeft-4),
+      made for app.css's left:4px base - the port's -2px hung the chip
+      6px left of its button.
+   3) Single orange (design rule .menubar.sliding button.active):
+      the travelling thumb is the only chip; the raised tab never
+      paints itself, so a switch shows one orange, not two.
+   ------------------------------------------------------------ */
+@media (max-width: 1180px) {
+  .shell .pg-columns .form-col { width: 100%; }
+}
+.shell #pane-playground [role=tablist] .thumb { left: 4px; }
+.shell #pane-playground [role=tablist] [role=tab][aria-selected=true] {
+  background: transparent;
+  box-shadow: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell #pane-playground [role=tablist] .thumb { transition: none; }
+}
+
+/* the design's coin icons ride the currency chips (§5.16, 16px) */
+.shell .pg-columns .currency-row button img { width: 16px; height: 16px; }
+
+/* column flex basis: <=1180 the main axis is vertical, so the deck's
+   flex:1 (meant for the row layout) reads as height-basis 0% and the
+   absolute-slide deck computes zero content - the frame collapsed to its
+   padding. basis auto keeps playground.js's inline deck height. */
+@media (max-width: 1180px) {
+  .shell .pg-columns .form-col { flex: 0 0 auto; }
+}
+
+/* the ::before check bodge (undressed chips) must not double the real
+   .check span the playground module adds to dressed network rows */
+.shell .deck .menu-body > button.menu-item::before { content: none; }
+
+/* slide inset onto themselves: the deck already caries 18px padding, but
+   the app.css slides are absolute and span the deck's PADDING box, so
+   their content pinned to the border rails (the sticky look). Padding
+   goes on the slides; playground.js sizeDeck writes deck height =
+   slide.offsetHeight, so the frame stays one breath in sync. */
+.shell #pane-playground .form-col > .slide { padding: 18px; }
+
+/* approved readout overflow fix: the ported dd boxes run ~12px deeper
+   than the design's, so the fixed 296px group overflowed and the bottom
+   row rode over the readout->CTA gap. auto height (what <=900 already
+   did) at every width; playground.js's deck sizing keys off the slide,
+   not this frame. */
+.shell .pg-group.approved-o { height: auto; }
+
+/* pg-fields vertical centering: the asset chip is 36px against the
+   ~44px field inputs, and pinned tops leave its bottom floating; the
+   fgroups now share a center line instead. */
+.shell #pane-playground .pg-fields { align-items: center; }

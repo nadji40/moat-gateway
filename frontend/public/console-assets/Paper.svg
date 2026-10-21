@@ -1,0 +1,7 @@
+<!-- Moat console asset: Paper.svg — INVOICE THE AGENT READ transcript header icon (paper, §5.7) -->
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M15 9L15 6.00001C15 4.34315 16.3431 3.00001 18 3.00001M18 3.00001C19.6569 3.00001 21 4.34315 21 6.00001L21 8.14286C21 8.47699 21 8.64405 20.9234 8.76602C20.8834 8.82962 20.8296 8.8834 20.766 8.92336C20.644 9 20.477 9 20.1429 9L15 9L15 21L12 20L9 21L6 20L3 21L3 7.00001C3 5.11439 3 4.17158 3.58579 3.58579C4.17157 3.00001 5.11438 3.00001 7 3.00001L18 3.00001Z" stroke-width="2" stroke="#DDDDDD"/>
+<path d="M7 7L11 7" stroke-width="2" stroke-linecap="round" stroke="#DDDDDD"/>
+<path d="M8 11H7" stroke-width="2" stroke-linecap="round" stroke="#DDDDDD"/>
+<path d="M7 15L10 15" stroke-width="2" stroke-linecap="round" stroke="#DDDDDD"/>
+</svg>

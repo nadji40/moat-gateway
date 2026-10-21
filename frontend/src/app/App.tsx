@@ -2,6 +2,7 @@ import Home from '../pages/Home/Home'
 import Compare from '../pages/Compare/Compare'
 import Docs from '../pages/Docs/Docs'
 import Team from '../pages/Team/Team'
+import Dashboard from '../pages/Dashboard/Dashboard'
 import Navbar from '../components/layout/Navbar'
 import type { ComponentType } from 'react'
 
@@ -9,6 +10,7 @@ const pages: Record<string, ComponentType> = {
   '/compare': Compare,
   '/docs': Docs,
   '/team': Team,
+  '/dashboard': Dashboard,
 }
 
 export default function App() {

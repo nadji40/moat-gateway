@@ -11,6 +11,8 @@ import '../styles/compare.css'
 import '../styles/docs.css'
 import '../styles/team.css'
 import '../styles/i18n.css'
+import '../styles/console.css'
+import '../styles/chart-components.css'
 import App from './App'
 import { applyDocumentLang } from '../i18n'
 

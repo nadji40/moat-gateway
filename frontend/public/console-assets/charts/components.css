@@ -1,0 +1,210 @@
+/* Moat time-series chart components (area + bar).
+   Any page loading app.css already has these; load this file when you use the
+   components on a page without app.css (still needs the :root design tokens).
+
+   ┌─ USED IN THIS BUILD ────────────────────────────────────────────
+   │ .bklit-bar-svg/.bklit-bar-group/.bklit-bar-col  stacked verdict
+   │   chart sits on usage.html via verdictBarChart() (usage-bar-chart.js)
+   │ .bklit-grid-line, .bklit-axis-text             same chart's grid + labels
+   │ .bklit-tooltip (+ title/row/dot)               the chart hover card,
+   │   restyled to the dark menu shell (#171717/r10/#363636, mono type)
+   └─ NOT used here (keep for the ports): .chart-row-2/.chart-panel/
+      .chart-controls chips (page chrome), the whole .bklit-area-* area
+      chart set, and .bklit-bar-wrap sizing. NOTE: area-chart rules
+      reference --paper/--signal/--ink-2/--ease/--radius-1 tokens that
+      are only defined in the older app.css theme — shared.css does not
+      carry them, so the area chart needs those vars added before use.
+   ------------------------------------------------------------- */
+
+/* -------------------------------------------------------------
+   Panel layout + range controls (page chrome for the charts)
+   ------------------------------------------------------------- */
+.chart-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+@media (max-width: 860px) {
+  .chart-row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.chart-controls .chip {
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.chart-controls .chip.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+/* Area Chart with Hairline Grid & Gradient */
+.bklit-area-wrap {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  margin-top: 10px;
+}
+
+.bklit-area-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.bklit-grid-line {
+  stroke: var(--line);
+  stroke-dasharray: 4 4;
+  stroke-width: 1;
+}
+
+.bklit-axis-text {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  fill: #FFFFFF;
+}
+
+.bklit-area-path {
+  fill: url(#bklit-area-grad);
+  transition: d 0.3s var(--ease);
+}
+
+.bklit-line-path {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: d 0.3s var(--ease);
+}
+
+.bklit-crosshair {
+  stroke: var(--ink-2);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+
+.bklit-dot {
+  fill: var(--paper);
+  stroke: var(--signal);
+  stroke-width: 2.5;
+  pointer-events: none;
+  transition: cx 0.05s ease, cy 0.05s ease;
+}
+
+/* Floating Tooltip Card — dark menu shell per the design system:
+   #171717 fill, r10, #363636 stroke, Roboto Mono type, muted divider */
+.bklit-tooltip {
+  position: absolute;
+  top: 14px;
+  pointer-events: none;
+  background: #171717;
+  border: 1px solid #363636;
+  border-radius: 10px;
+  padding: 9px 12px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .6);
+  z-index: 10;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.08s ease-out;
+  white-space: nowrap;
+}
+
+.bklit-tooltip.on {
+  opacity: 1;
+}
+
+.bklit-tooltip-title {
+  font-family: var(--mono);
+  font-weight: 500;
+  color: #FFFFFF;
+  font-size: 11px;
+  border-bottom: 1px solid #252525;
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+}
+
+.bklit-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-weight: 500;
+  color: #F4F4F6;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.bklit-tooltip-row b {
+  color: #FFFFFF;
+  font-weight: 500;
+}
+
+.bklit-tooltip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex: none;
+}
+
+/* Stacked Bar Chart */
+.bklit-bar-wrap {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  margin-top: 10px;
+}
+
+.bklit-bar-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.bklit-bar-col {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.bklit-bar-col:hover {
+  opacity: 0.82;
+}
+
+/* stacked verdict chart — smooth entrance: columns rise from the baseline,
+   staggered per column (delay set inline by the renderer) */
+@keyframes bklit-rise {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+.bklit-bar-svg .bklit-bar-group {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: bklit-rise .55s cubic-bezier(.22, 1, .36, 1) both;
+  transition: opacity .18s ease-out;
+}
+/* hover state: dim every other column, keep the hovered one full */
+.bklit-bar-svg.dim .bklit-bar-group { opacity: .35; }
+.bklit-bar-svg.dim .bklit-bar-group.hot { opacity: 1; }
