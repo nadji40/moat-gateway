@@ -1,0 +1,13 @@
+<!-- Moat console asset: Base Sepolia.svg — network brand mark - Base Sepolia (#1B56F0 circle, §5.17) -->
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_913_4794)">
+<path d="M19 12C19 8.13401 15.866 5 12 5C8.13401 5 5 8.13401 5 12C5 15.866 8.13401 19 12 19C15.866 19 19 15.866 19 12Z" fill="#1B56F0"/>
+<path d="M11.9927 16.1562C14.2923 16.1562 16.1562 14.2956 16.1562 12C16.1562 9.70442 14.2923 7.84375 11.9927 7.84375C9.81114 7.84375 8.02164 9.51889 7.84375 11.6505H13.347V12.3495H7.84375C8.02164 14.4811 9.81114 16.1562 11.9927 16.1562Z" fill="white"/>
+<path d="M12 5.21875C15.7452 5.21875 18.7812 8.25482 18.7812 12C18.7812 15.7452 15.7452 18.7812 12 18.7812C8.25482 18.7812 5.21875 15.7452 5.21875 12C5.21875 8.25482 8.25482 5.21875 12 5.21875Z" stroke-width="2" stroke="#1E1E1F" stroke-opacity="0.08"/>
+</g>
+<defs>
+<clipPath id="clip0_913_4794">
+<rect width="14" height="14" fill="white" transform="translate(5 5)"/>
+</clipPath>
+</defs>
+</svg>

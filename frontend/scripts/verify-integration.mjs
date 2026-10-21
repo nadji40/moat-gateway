@@ -41,15 +41,17 @@ try {
       assert.equal(response.status, 200)
       assert.equal(await response.text(), await readFile(new URL(`../public/${file}`, import.meta.url), 'utf8'))
     }
-    for (const route of ['/dashboard', '/dashboard.html', '/status', '/tests?run=1', '/app.css?v=cbb4282', '/app.js', '/footer.css', '/footer.js', '/playground.js']) {
+    for (const route of ['/status', '/tests?run=1', '/app.css?v=cbb4282', '/app.js', '/footer.css', '/footer.js']) {
       const response = await fetch(base + route)
       assert.equal(response.status, 200)
       assert.match(await response.text(), /Legacy integration fixture/)
       assert.equal(requests.at(-1).url, route)
     }
-    const compare = await fetch(`${base}/compare`)
-    assert.equal(compare.status, 200)
-    assert.match(await compare.text(), /id="root"/)
+    for (const page of ['/compare', '/dashboard']) {
+      const response = await fetch(base + page)
+      assert.equal(response.status, 200)
+      assert.match(await response.text(), /id="root"/)
+    }
     const body = JSON.stringify({ text: 'frontend integration fixture' })
     const api = await fetch(`${base}/v1/sandbox/fixture/intent`, {
       method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer test-fixture' }, body,

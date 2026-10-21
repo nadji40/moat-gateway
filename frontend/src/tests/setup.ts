@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
 // jsdom has neither; the Compare page's charts and glass effects use both.
@@ -20,6 +20,10 @@ window.matchMedia ??= ((query: string) => ({
   removeEventListener() {},
   dispatchEvent: () => false,
 })) as typeof window.matchMedia
+
+// Pages load lazily, and the Compare page's chunk is large: under a full,
+// parallel run it can take longer than the one-second default to arrive.
+configure({ asyncUtilTimeout: 5000 })
 
 afterEach(() => {
   cleanup()

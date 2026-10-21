@@ -65,8 +65,8 @@ Their source paths and SHA-256 values are in
 The application never imports files from `demo/` at build or runtime.
 
 The React `Navbar` owns navigation, the mobile menu and the `moat.admin`
-localStorage label on React routes. Dashboard authentication remains in the
-backend-owned legacy page. The pinned `public/shared/app.js` remains a tested
+localStorage label on React routes. The dashboard (`src/pages/Dashboard`) signs
+in with the same `moat.admin` slot, so the site and the workspace agree. The pinned `public/shared/app.js` remains a tested
 compatibility snapshot; it is not loaded by either React HTML entry. Legacy
 pages request `/app.js` from the backend through the proxy.
 
@@ -76,9 +76,9 @@ to the existing backend:
 | Paths | Owner |
 | --- | --- |
 | `/v1/*`, `/mcp` and `/mcp/*` | Existing backend APIs |
-| `/dashboard`, `/tests`, `/status` (also `.html`) | Existing demo pages during staged migration |
-| `/app.css`, `/app.js`, `/footer.css`, `/footer.js`, `/trail.js`, `/playground.js` | Assets used by those legacy pages |
-| `/`, `/index.html`, `/compare`, `/compare/`, `/shared/*`, `/assets/*`, favicon/cursor | This frontend |
+| `/tests`, `/status` (also `.html`) | Existing demo pages during staged migration |
+| `/app.css`, `/app.js`, `/footer.css`, `/footer.js`, `/trail.js` | Assets used by those legacy pages |
+| `/`, `/index.html`, `/compare`, `/docs`, `/team`, `/dashboard`, `/shared/*`, `/assets/*`, `/console-assets/*`, favicon/cursor | This frontend |
 
 Query strings such as `/tests?run=1` and fragments such as
 `/dashboard#pane-playground` are preserved. Proxying keeps legacy navigation and
@@ -92,13 +92,13 @@ on port 8787, port 5173, or `localhost` is **not** automatically available at
 | --- | --- | --- |
 | `/` and `/#api` | `frontend/` | Shared `src/components/layout/Footer.tsx` |
 | `/compare` | `frontend/src/pages/Compare/Compare.tsx` | Shared React Navbar/Footer |
+| `/dashboard` (and the old `/dashboard.html`) | `frontend/src/pages/Dashboard/Dashboard.tsx` | None: the workspace has its own header |
 | `/tests` | `demo/public/tests.html` | Shared legacy footer via `footer.js`/`footer.css` |
 | `/status` | `demo/public/status.html` | Shared legacy footer via `footer.js`/`footer.css` |
-| `/dashboard` | `demo/public/dashboard.html` | Shared legacy footer via `footer.js`/`footer.css` |
 
 The independent frontend does not replace remaining legacy documents with
 placeholders. Compare is now a native React entry and is no longer proxied to
-the legacy server. Tests, Status, and Dashboard remain staged legacy
+the legacy server, and so is the Dashboard. Tests and Status remain staged legacy
 dependencies until their page-specific API/authentication behavior is migrated.
 No Moat-owned LinkedIn, WhatsApp, or email account was present in the
 repository. The footer therefore links only to the verified official LinkedIn

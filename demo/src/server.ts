@@ -50,7 +50,10 @@ const FRONTEND = join(HERE, "..", "frontend", "dist");
 /** The built file for a path, or nothing: `/` and `/compare` are directories
  *  holding an index.html, assets are files, and anything else is not ours. */
 function builtFile(path: string): string | undefined {
-  const tries = extname(path) ? [path] : [`${path.replace(/\/$/, "")}/index.html`];
+  // A page's old address, /dashboard.html, still reaches the page now that
+  // it is built as /dashboard/index.html, so a link already sent out works.
+  const page = path.endsWith(".html") ? [`${path.slice(0, -".html".length)}/index.html`] : [];
+  const tries = extname(path) ? [path, ...page] : [`${path.replace(/\/$/, "")}/index.html`];
   for (const t of tries) {
     const file = resolve(FRONTEND, `.${t}`);
     if (file.startsWith(FRONTEND) && existsSync(file)) return file;

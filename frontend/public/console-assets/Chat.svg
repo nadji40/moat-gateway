@@ -1,0 +1,6 @@
+<!-- Moat console asset: Chat.svg — USER SAID transcript header icon (memory bubble, §5.7 header set) -->
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 20H17.0909C17.9375 20 18.3608 20 18.6989 19.8739C19.2425 19.6712 19.6712 19.2425 19.8739 18.6989C20 18.3608 20 17.9375 20 17.0909V12C20 7.58172 16.4183 4 12 4V4C7.58172 4 4 7.58172 4 12V12C4 16.4183 7.58172 20 12 20Z" stroke-width="2" stroke="#DDDDDD"/>
+<path d="M9 11L15 11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#DDDDDD"/>
+<path d="M12 15H15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke="#DDDDDD"/>
+</svg>

@@ -9,8 +9,8 @@ export default defineConfig(({ mode }) => {
   // shared navigation's localStorage auth state. No legacy page is rebuilt.
   const proxy = {
     '^/(v1|mcp)(/|$)': { target },
-    '^/(dashboard|tests|status)(\\.html)?(\\?|$)': { target },
-    '^/((app|footer)\\.(css|js)|playground\\.js|trail\\.js)(\\?|$)': { target },
+    '^/(tests|status)(\\.html)?(\\?|$)': { target },
+    '^/((app|footer)\\.(css|js)|trail\\.js)(\\?|$)': { target },
   }
 
   return {
@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
           compare: resolve(process.cwd(), 'compare/index.html'),
           docs: resolve(process.cwd(), 'docs/index.html'),
           team: resolve(process.cwd(), 'team/index.html'),
+          dashboard: resolve(process.cwd(), 'dashboard/index.html'),
         },
       },
     },
