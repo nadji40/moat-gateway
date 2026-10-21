@@ -932,6 +932,16 @@ fn minor_from_text(text: &str) -> Result<Minor> {
         .with_context(|| format!("reading {text:?} as a minor-unit amount"))
 }
 
+/// What a mandate allows, across every session: its value, and how many
+/// payments may be made under it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Room {
+    /// The most the mandate's payments may add up to.
+    pub amount: Minor,
+    /// How many payments it allows.
+    pub payments: u32,
+}
+
 /// What an authorization has spent and is holding, right now.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Aggregate {
@@ -1068,14 +1078,17 @@ impl DurableStore {
         })
     }
 
-    /// Take a reservation if, and only if, the mandate still has room.
+    /// Take a reservation if, and only if, the mandate still has room: in
+    /// value, and in the number of payments it allows.
     ///
     /// The whole point is that this is one statement under one row lock.
     /// Two sessions reading their own aggregates and then deciding
     /// separately will both decide yes; two sessions queueing on
     /// `SELECT ... FOR UPDATE` against the authorization row cannot. The
     /// check and the write have to happen inside that lock or the lock buys
-    /// nothing.
+    /// nothing. The count matters as much as the value: two payments of 25
+    /// fit in a mandate worth 50, and a mandate for one payment must still
+    /// stop the second, whichever session asks for it.
     ///
     /// Returns the aggregate as it stood *before* this reservation, so the
     /// caller can say what the limit was measured against, or `None` when
@@ -1087,7 +1100,7 @@ impl DurableStore {
         fingerprint: &str,
         session_id: &str,
         amount: Minor,
-        limit: Minor,
+        room: Room,
     ) -> Result<Option<Aggregate>> {
         let mut client = self
             .pool
@@ -1125,7 +1138,9 @@ impl DurableStore {
                      COALESCE((SELECT count(*) FROM moat.payment_outcomes
                                WHERE tenant_id = $1 AND authorization_id = $2 AND committed), 0),
                      COALESCE((SELECT sum(amount_minor) FROM moat.payment_reservations
-                               WHERE tenant_id = $1 AND authorization_id = $2), 0)::text",
+                               WHERE tenant_id = $1 AND authorization_id = $2), 0)::text,
+                     (SELECT count(*) FROM moat.payment_reservations
+                       WHERE tenant_id = $1 AND authorization_id = $2)",
                 &[&tenant_id, &authorization_id],
             )
             .await
@@ -1133,13 +1148,17 @@ impl DurableStore {
         let committed: String = row.get(0);
         let payments: i64 = row.get(1);
         let reserved: String = row.get(2);
+        let in_flight: i64 = row.get(3);
         let before = Aggregate {
             committed: minor_from_text(&committed)?,
             payments: u32::try_from(payments).unwrap_or(u32::MAX),
             reserved: minor_from_text(&reserved)?,
         };
-        if before.total().saturating_add(amount).0 > limit.0 {
-            // Rolled back by dropping the transaction: nothing was written.
+        // Rolled back by dropping the transaction: nothing was written.
+        if before.total().saturating_add(amount).0 > room.amount.0 {
+            return Ok(None);
+        }
+        if payments.saturating_add(in_flight) >= i64::from(room.payments) {
             return Ok(None);
         }
 
@@ -1758,7 +1777,14 @@ mod ledger_tests {
             let id = id.clone();
             tokio::spawn(async move {
                 store
-                    .reserve_if_within(&id, "auth-race", "fp-a", "session-a", amount, limit)
+                    .reserve_if_within(
+                        &id,
+                        "auth-race",
+                        "fp-a",
+                        "session-a",
+                        amount,
+                        room(limit, 10),
+                    )
                     .await
             })
         };
@@ -1767,7 +1793,14 @@ mod ledger_tests {
             let id = id.clone();
             tokio::spawn(async move {
                 store
-                    .reserve_if_within(&id, "auth-race", "fp-b", "session-b", amount, limit)
+                    .reserve_if_within(
+                        &id,
+                        "auth-race",
+                        "fp-b",
+                        "session-b",
+                        amount,
+                        room(limit, 10),
+                    )
                     .await
             })
         };
@@ -1815,7 +1848,7 @@ mod ledger_tests {
                 "fp-same",
                 "s1",
                 Minor(10_000),
-                Minor(100_000),
+                room(Minor(100_000), 10),
             )
             .await
             .expect("first");
@@ -1826,7 +1859,7 @@ mod ledger_tests {
                 "fp-same",
                 "s2",
                 Minor(10_000),
-                Minor(100_000),
+                room(Minor(100_000), 10),
             )
             .await
             .expect("second");
@@ -1861,6 +1894,72 @@ mod ledger_tests {
         cleanup(&store, &id).await;
     }
 
+    fn room(amount: Minor, payments: u32) -> Room {
+        Room { amount, payments }
+    }
+
+    /// A mandate for one payment grants one, even when a second would fit
+    /// in its value and is asked for from another session.
+    ///
+    /// Found by the arena's `max-payments-cross-session` attack: two
+    /// sessions each paid 25 under a mandate for one payment of up to 50,
+    /// because the ledger checked the value and not the count, and each
+    /// session counted only its own payments.
+    #[tokio::test]
+    async fn a_one_payment_mandate_grants_one_payment_across_sessions() {
+        let store = store_or_skip!();
+        let id = unique("t");
+        tenant(&store, &id).await;
+
+        let mut session = Session::new(unique("s"));
+        session
+            .register_payment_authorization(authorization("auth-once", 50_000, None))
+            .expect("registering");
+        store
+            .save_payment_ledger(&id, &session)
+            .await
+            .expect("saving");
+
+        let once = room(Minor(50_000), 1);
+        let first = store
+            .reserve_if_within(&id, "auth-once", "fp-a", "session-a", Minor(25_000), once)
+            .await
+            .expect("first");
+        let second = store
+            .reserve_if_within(&id, "auth-once", "fp-b", "session-b", Minor(25_000), once)
+            .await
+            .expect("second");
+        assert!(first.is_some(), "the first payment is granted");
+        assert!(second.is_none(), "the second payment is over the count");
+
+        // Once the first is settled rather than in flight, it still counts.
+        store
+            .release_reservation(&id, "fp-a")
+            .await
+            .expect("releasing");
+        let mut settled = Session::new(unique("s"));
+        settled
+            .register_payment_authorization(authorization("auth-once", 50_000, None))
+            .expect("registering");
+        settled.record_payment_outcome(outcome(
+            "ev-once",
+            "auth-once",
+            25_000,
+            OutcomeStatus::Succeeded,
+        ));
+        store
+            .save_payment_ledger(&id, &settled)
+            .await
+            .expect("saving");
+        let third = store
+            .reserve_if_within(&id, "auth-once", "fp-c", "session-c", Minor(25_000), once)
+            .await
+            .expect("third");
+        assert!(third.is_none(), "a settled payment uses up the mandate too");
+
+        cleanup(&store, &id).await;
+    }
+
     /// A cancelled mandate grants nothing, whatever room is left in it.
     #[tokio::test]
     async fn a_cancelled_mandate_reserves_nothing() {
@@ -1886,7 +1985,7 @@ mod ledger_tests {
                 "fp-x",
                 "s1",
                 Minor(10),
-                Minor(100_000),
+                room(Minor(100_000), 10),
             )
             .await
             .expect("query");

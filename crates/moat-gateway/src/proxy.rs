@@ -1019,15 +1019,18 @@ impl Gateway {
             .get("authorization_id")
             .and_then(Value::as_str)?
             .to_owned();
-        let limit = {
+        let room = {
             let s = moat_core::session::lock(session);
             let authorization = s.payment_authorization(&authorization_id)?;
-            authorization.aggregate_limit_minor.unwrap_or_else(|| {
-                authorization
-                    .amount_minor
-                    .saturating_add(authorization.tolerance_minor)
-                    .saturating_mul(u128::from(authorization.max_payments))
-            })
+            crate::storage::Room {
+                amount: authorization.aggregate_limit_minor.unwrap_or_else(|| {
+                    authorization
+                        .amount_minor
+                        .saturating_add(authorization.tolerance_minor)
+                        .saturating_mul(u128::from(authorization.max_payments))
+                }),
+                payments: authorization.max_payments,
+            }
         };
         match storage
             .reserve_if_within(
@@ -1036,7 +1039,7 @@ impl Gateway {
                 fingerprint,
                 &self.session_id,
                 amount,
-                limit,
+                room,
             )
             .await
         {
@@ -1044,10 +1047,10 @@ impl Gateway {
             Ok(None) => Some(format!(
                 concat!(
                     "this tenant's committed and in-flight payments under {} already ",
-                    "reach the mandate's limit of {}; another session may hold what ",
-                    "this one is asking for"
+                    "reach the mandate's limit of {} minor units or {} payment(s); ",
+                    "another session may hold what this one is asking for"
                 ),
-                authorization_id, limit.0
+                authorization_id, room.amount.0, room.payments
             )),
             Err(error) => {
                 // Fail closed. The ledger is the only thing that can see
