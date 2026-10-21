@@ -1,10 +1,32 @@
-import { Fragment, useEffect, type CSSProperties, type ReactNode } from 'react'
+import {
+  useEffect,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
 import Footer from '../../components/layout/Footer'
 import { L } from '../../i18n'
+import BenchmarkChart from './BenchmarkChart'
+import { LiquidGlassProvider } from '../../components/ui/liquid/liquid-glass-provider'
+import SecurityFlow from './SecurityFlow'
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '../../components/ui/glass/tabs'
 
-const Icon = ({ children }: { children: ReactNode }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
-)
+
+import {
+  FileCode2,
+  ShieldCheck,
+  ScanSearch,
+  CheckCircle2,
+  AlertTriangle,
+  Info,
+} from 'lucide-react'
+
+import { Card } from '../../components/ui/glass/card'
+
 
 function FlowArt() {
   return (
@@ -37,12 +59,6 @@ function FlowArt() {
   )
 }
 
-/* Each row holds its English and its Arabic; the language is picked at render. */
-const rows = [
-  ['Key-level policy', 'The transaction, not where the address came from', '370', 'bad', 'سياسة على مستوى المفتاح', 'المعاملة، لا مصدر العنوان'],
-  ['Payee allowlists', 'The name on the call, not the account behind it', '190', 'bad', 'قوائم المستفيدين المسموح بها', 'الاسم في الطلب، لا الحساب الذي وراءه'],
-  ['moat', 'Everything the agent reads, and the payment it then makes', '0', 'good', 'moat', 'كل ما يقرؤه الوكيل، والدفعة التي يجريها بعد ذلك'],
-] as const
 /** [term, value, tone, term in Arabic, value in Arabic] */
 type ProbeRow = [string, string, string, string, string]
 const x402Rows: ProbeRow[] = [
@@ -60,51 +76,319 @@ const injectionRows: ProbeRow[] = [
   ['attacks with nothing in them to object to', '12 of 21', 'bad', 'هجمات ليس فيها ما يُعترض عليه', '12 من 21'],
 ]
 
-function ComparisonRow({ title, description, result, resultLabel, tone, icon, badge, us = false }: { title: string; description: string; result: string; resultLabel: string; tone: string; icon: ReactNode; badge?: string; us?: boolean }) {
-  return <article className={`row ${us ? 'us' : ''}`}><span className="row-i">{icon}</span><div className="row-t"><h3>{title}{badge && <span className="row-e">{badge}</span>}</h3><p className="row-s">{description}</p></div><span className={`row-r ${tone}`}>{result}<i>{resultLabel}</i></span></article>
-}
 
 export default function Compare() {
+
+
   useEffect(() => {
     document.title = L('moat, compared', 'moat، المقارنة')
   }, [])
 
   return (
-    <>
-      <main className="compare-page">
+<LiquidGlassProvider
+  backdrop="/glass-backdrop.svg"
+  options={{
+    refraction: 16,
+    dispersion: 0.035,
+    frost: 8,
+    liquid: false,
+  }}
+>
+    <main id="main-content" tabIndex={-1} className="compare-page">
         <div className="wrap">
           <header className="hero"><p className="kicker">{L('Compared', 'المقارنة')}</p><h1>{L(<>It is not what<br /><span className="g">they check</span></>, <>ليست المسألة<br /><span className="g">ما يفحصونه</span></>)}</h1></header>
           <FlowArt />
           <section className="tight">
-            <p className="lbl">{L('Put through the same 380 payments', 'على الدفعات الـ380 نفسها')}</p>
-            <div className="rows">
-              {rows.map(([title, description, result, tone, titleAr, descriptionAr], index) => (
-                <ComparisonRow key={title} us={title === 'moat'} title={L<string>(title, titleAr)} description={L<string>(description, descriptionAr)} result={result} resultLabel={L('paid', 'دُفعت')} tone={tone} icon={index === 0 ? <Icon><circle cx="8" cy="12" r="4" /><path d="M12 12h9M18 12v3.5M15.5 12v2.5" /></Icon> : index === 1 ? <Icon><path d="M4 20h16M4 16c3-6 5 2 8-3s4 1 8-4" /></Icon> : <svg viewBox="69 43 144 144" aria-hidden="true"><g fill="none" stroke="currentColor" strokeWidth="13" strokeLinecap="round"><path d="M117 52.4A67 67 0 0 1 202.7 141.2M177.5 171.2A67 67 0 0 1 86.1 76.6" /></g><g fill="currentColor"><circle cx="99.7" cy="62.2" r="12" /><circle cx="192.3" cy="158.1" r="12" /></g></svg>} />
-              ))}
-            </div>
-            <p className="hint foot-note">{L(<>The 370 and the 190 are our own baseline arms. No vendor&apos;s product has been run.</>, <>الرقمان 370 و190 هما ذراعا خط الأساس لدينا. لم يُشغَّل منتج أي مورّد.</>)}</p>
-            <p className="lbl gap">{L('Asked their own question', 'أمام السؤال الذي تطرحه هي')}</p>
-            <div className="rows">
-              <ComparisonRow title={L('Mandate protocols', 'بروتوكولات التفويض')} badge="AP2, x402" description={L('That approval happened, not who wrote it', 'أن الموافقة حصلت، لا من كتبها')} result={L('run', 'جُرّبت')} resultLabel={L('below', 'أدناه')} tone="warn" icon={<Icon><path d="m12 3 8 4v5c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V7zM9 11h6M9 14h4" /></Icon>} />
-              <ComparisonRow title={L('Injection classifiers', 'مصنّفات الحقن')} description={L('An instruction, when the content carries one', 'التعليمات، حين يحملها المحتوى')} result="12" resultLabel={L('of 21 blind', 'من 21 دون رصد')} tone="warn" icon={<Icon><path d="M4 5h16l-6 7v6l-4 2v-8z" /></Icon>} />
-              <ComparisonRow title={L('MCP gateways', 'بوابات MCP')} description={L('Every call. It simply never decides a payment.', 'كل طلب. لكنها لا تبتّ في أي دفعة.')} result={L('no', 'لا')} resultLabel={L('verdict', 'حكم')} tone="warn" icon={<Icon><circle cx="12" cy="12" r="2.6" /><path d="M12 4v5M12 15v5M4 12h5M15 12h5" /></Icon>} />
-            </div>
+
+
+<div className="compare-benchmark-section">
+  <div className="compare-security-flow-heading">
+    <span
+      className="compare-security-flow-rule"
+      aria-hidden="true"
+    />
+
+    <h2>
+      {L(
+        'PUT THROUGH THE SAME 380 PAYMENTS',
+        'اختُبرت عبر محاولات الدفع الـ 380 نفسها'
+      )}
+    </h2>
+
+    <span
+      className="compare-security-flow-rule"
+      aria-hidden="true"
+    />
+  </div>
+
+  <BenchmarkChart />
+</div>
+
+            <SecurityFlow />
           </section>
-          <section id="tested" className="tight">
-            <div className="headrow"><h2>{L('Run against their own code', 'شُغّلت على شيفرتها نفسها')}</h2></div>
-            <div className="probes">
-              <Probe title="x402" version={L('@x402/core 2.26.0, balance and nonce stubbed', '@x402/core 2.26.0، مع محاكاة الرصيد والـ nonce')} rows={x402Rows} note={L(<><span className="mono">payTo</span> comes from the server being paid.</>, <>يأتي <span className="mono">payTo</span> من الخادم الذي يتلقّى الدفعة.</>)} />
-              <Probe title="AP2" version={L('google-agentic-commerce/AP2, unmodified', 'google-agentic-commerce/AP2، دون تعديل')} rows={ap2Rows} note={L('It checks the constraint, not who authored it', 'يتحقّق من القيد، لا ممّن كتبه')} />
-              <Probe title={L('Injection classifiers', 'مصنّفات الحقن')} version={L('a detector that never misses, counted generously', 'كاشف لا يُخطئ أبدًا، باحتساب متساهل')} rows={injectionRows} note={L('An invoice reading 499 is not lying about anything a reader could check', 'فاتورة تقول 499 لا تكذب في شيء يستطيع القارئ التحقق منه')} />
-            </div>
-          </section>
+
+
+
+
+
+<section id="tested" className="tight moat-evidence-section">
+  <div className="compare-security-flow-heading">
+    <span
+      className="compare-security-flow-rule"
+      aria-hidden="true"
+    />
+    <h2>
+      {L(
+        'RUN AGAINST THEIR OWN CODE',
+        'شُغّلت على شيفرتها نفسها'
+      )}
+    </h2>
+    <span
+      className="compare-security-flow-rule"
+      aria-hidden="true"
+    />
+  </div>
+
+  <Tabs defaultValue="x402" className="moat-evidence-tabs">
+
+<TabsList
+  variant="liquid"
+  material="clear"
+  glow={false}
+  hover="none"
+  className="moat-evidence-tabs-list"
+>
+  <TabsTrigger
+    value="x402"
+    className="moat-evidence-tab-trigger"
+  >
+    x402
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="ap2"
+    className="moat-evidence-tab-trigger"
+  >
+    AP2
+  </TabsTrigger>
+
+  <TabsTrigger
+    value="classifiers"
+    className="moat-evidence-tab-trigger"
+  >
+    {L('Injection classifiers', 'مصنّفات حقن التعليمات')}
+  </TabsTrigger>
+</TabsList>
+
+
+    <Card
+      material="clear"
+      tint="rgba(255, 135, 55, 0.18)"
+      className="moat-evidence-card"
+    >
+      <TabsContent
+        value="x402"
+        className="moat-evidence-tabs-content"
+      >
+        <Probe
+          title="x402"
+          version={L(
+            '@x402/core 2.26.0, balance and nonce stubbed',
+            '@x402/core 2.26.0، مع محاكاة الرصيد والـ nonce'
+          )}
+          rows={x402Rows}
+          note={L(
+            <>
+              <span className="mono">payTo</span> comes from
+              the server being paid.
+            </>,
+            <>
+              يأتي <span className="mono">payTo</span> من
+              الخادم الذي يتلقّى الدفعة.
+            </>
+          )}
+        />
+      </TabsContent>
+
+      <TabsContent
+        value="ap2"
+        className="moat-evidence-tabs-content"
+      >
+        <Probe
+          title="AP2"
+          version={L(
+            'google-agentic-commerce/AP2, unmodified',
+            'google-agentic-commerce/AP2، دون تعديل'
+          )}
+          rows={ap2Rows}
+          note={L(
+            'It checks the constraint, not who authored it',
+            'يتحقّق من القيد، لا ممّن كتبه'
+          )}
+        />
+      </TabsContent>
+
+      <TabsContent
+        value="classifiers"
+        className="moat-evidence-tabs-content"
+      >
+        <Probe
+          title={L(
+            'Injection classifiers',
+            'مصنّفات الحقن'
+          )}
+          version={L(
+            'a detector that never misses, counted generously',
+            'كاشف لا يُخطئ أبدًا، باحتساب متساهل'
+          )}
+          rows={injectionRows}
+          note={L(
+            'An invoice reading 499 is not lying about anything a reader could check',
+            'فاتورة تقول 499 لا تكذب في شيء يستطيع القارئ التحقق منه'
+          )}
+        />
+      </TabsContent>
+    </Card>
+  </Tabs>
+</section>
+
         </div>
-      </main>
+          </main>
       <Footer />
-    </>
+  </LiquidGlassProvider>
+
   )
 }
 
-function Probe({ title, version, rows, note }: { title: string; version: string; rows: ProbeRow[]; note: ReactNode }) {
-  return <div className="probe glass"><div className="probe-h"><h3>{title}</h3><span className="probe-v">{version}</span></div><dl className="probe-r">{rows.map(([term, value, tone, termAr, valueAr]) => <Fragment key={term}><dt>{L(term, termAr)}</dt><dd className={tone}>{L(value, valueAr)}</dd></Fragment>)}</dl><p className="probe-n">{note}</p></div>
+
+
+
+function Probe({
+  title,
+  version,
+  rows,
+  note,
+}: {
+  title: string
+  version: string
+  rows: ProbeRow[]
+  note: ReactNode
+}) {
+  const kind =
+    title === 'x402'
+      ? 'x402'
+      : title === 'AP2'
+        ? 'ap2'
+        : 'classifiers'
+
+  const EvidenceIcon =
+    kind === 'x402'
+      ? FileCode2
+      : kind === 'ap2'
+        ? ShieldCheck
+        : ScanSearch
+
+  const sectionTitle =
+    kind === 'x402'
+      ? L('PAYMENT DESTINATION TESTS', 'اختبارات وجهة الدفع')
+      : kind === 'ap2'
+        ? L('PAYMENT AUTHORIZATION TESTS', 'اختبارات تفويض الدفع')
+        : L('INJECTION DETECTION TESTS', 'اختبارات كشف حقن التعليمات')
+
+  const sectionMeta =
+    kind === 'x402'
+      ? 'x402 / CORE 2.26.0'
+      : kind === 'ap2'
+        ? 'AP2 / UNMODIFIED'
+        : L('DETECTION', 'الكشف')
+
+  return (
+    <div className={`moat-evidence-panel moat-evidence-${kind}`}>
+      <div className="moat-evidence-header">
+        <div className="moat-evidence-header-main">
+          <Card
+            material="clear"
+            tint="rgba(255, 135, 55, 0.18)"
+            className="moat-evidence-header-icon"
+            aria-hidden="true"
+          >
+            <EvidenceIcon size={28} strokeWidth={1.7} />
+          </Card>
+
+          <div className="moat-evidence-header-copy">
+            <h3>{title}</h3>
+            <p>{version}</p>
+          </div>
+        </div>
+
+        <span className="moat-evidence-chip">
+          <span
+            className="moat-evidence-chip-dot"
+            aria-hidden="true"
+          />
+          {L('TEST EVIDENCE', 'أدلة الاختبار')}
+        </span>
+      </div>
+
+      <div className="moat-evidence-inner">
+        <div className="moat-evidence-inner-heading">
+          <span>{sectionTitle}</span>
+          <span className="moat-evidence-inner-meta">
+            {sectionMeta}
+          </span>
+        </div>
+
+        <dl className="moat-evidence-test-list">
+          {rows.map(
+            ([term, value, tone, termAr, valueAr], index) => {
+              const isGood = tone === 'good'
+              const ResultIcon = isGood
+                ? CheckCircle2
+                : AlertTriangle
+
+              return (
+                <div
+                  className="moat-evidence-test"
+                  key={`${kind}-${index}`}
+                >
+                  <span
+                    className="moat-evidence-test-number"
+                    aria-hidden="true"
+                  >
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+
+                  <dt className="moat-evidence-test-description">
+                    {L(term, termAr)}
+                  </dt>
+
+                  <dd
+                    className={`moat-evidence-test-result ${
+                      isGood ? 'is-good' : 'is-risk'
+                    }`}
+                  >
+                    <ResultIcon
+                      size={16}
+                      strokeWidth={1.9}
+                      aria-hidden="true"
+                    />
+                    <span>{L(value, valueAr)}</span>
+                  </dd>
+                </div>
+              )
+            }
+          )}
+        </dl>
+
+        <div className="moat-evidence-footnote">
+          <Info
+            size={18}
+            strokeWidth={1.7}
+            aria-hidden="true"
+          />
+          <p>{note}</p>
+        </div>
+      </div>
+    </div>
+  )
 }

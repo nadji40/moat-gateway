@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-
+import tailwindcss from '@tailwindcss/vite'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'MOAT_')
   const target = env.MOAT_BACKEND_ORIGIN || 'http://127.0.0.1:8787'
@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
     appType: 'spa',
     build: {
       outDir: 'dist',

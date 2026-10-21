@@ -1,0 +1,255 @@
+/* Compare page only — three independent security approaches. */
+.compare-page .compare-security-flow {
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px 0 64px;
+  color: var(--ink, #f5f5f5);
+}
+
+/* Editorial heading with symmetrical divider lines */
+.compare-page .compare-security-flow-heading {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2vw, 28px);
+  margin-bottom: 24px;
+}
+.compare-page .compare-security-flow-heading h2 {
+  flex: 0 1 auto;
+  margin: 0;
+  text-align: center;
+  font-size: clamp(10px, 1.05vw, 14px);
+  letter-spacing: .22em;
+  line-height: 1.5;
+  font-weight: 800;
+  color: #a3a3ad;
+}
+.compare-page .compare-security-flow-rule {
+  display: block;
+  flex: 1 1 0;
+  min-width: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.24));
+}
+.compare-page .compare-security-flow-rule:last-child {
+  background: linear-gradient(90deg, rgba(255,255,255,.24), transparent);
+}
+
+/* Shared comparison marker: not an input/output process */
+.compare-page .compare-security-flow-intro {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  max-width: 500px;
+  margin: 0 auto 30px;
+  color: #dba16b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .17em;
+  text-align: center;
+}
+.compare-page .compare-security-flow-intro-rule {
+  flex: 1 1 0;
+  height: 1px;
+  min-width: 10px;
+  background: linear-gradient(90deg, transparent, rgba(227,159,96,.32));
+}
+.compare-page .compare-security-flow-intro-rule:last-child {
+  background: linear-gradient(90deg, rgba(227,159,96,.32), transparent);
+}
+
+/* Independent peer cards; no arrows or directional connectors */
+.compare-page .compare-security-flow-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 28px);
+  min-width: 0;
+  align-items: stretch;
+}
+.compare-page .compare-security-flow-card {
+  min-width: 0;
+  min-height: 345px;
+  height: 100%;
+  padding: clamp(18px, 2vw, 28px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border-radius: 21px;
+  border: 1px solid rgba(204,216,233,.24);
+  background: rgba(10,12,15,.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 14px 40px rgba(0,0,0,.28);
+}
+/* Glass UI paints live materials on its separate WebGL layer. */
+.compare-page .compare-security-flow-card[data-glass] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.compare-page .compare-security-flow-card[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Neutral dark-glass icon tiles. Do not register nested icon nodes as
+   WebGL surfaces: this avoids harsh white reflection and scroll jitter. */
+.compare-page .compare-security-flow-icon,
+.compare-page .moat-benchmark-label-icon {
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  background: rgba(9,10,13,.82);
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.17),
+              inset 0 -1px 0 rgba(255,255,255,.035),
+              0 8px 20px rgba(0,0,0,.23);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+/* Icon containers — real Glass UI */
+
+.compare-page .compare-security-flow-icon {
+  display: grid;
+  place-items: center;
+  width: 65px;
+  height: 65px;
+  min-width: 65px;
+  min-height: 65px;
+  padding: 0;
+  flex: 0 0 65px;
+  margin-bottom: 19px;
+
+  border-radius: 17px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  color: #d2d9e5;
+  box-sizing: border-box;
+}
+
+/* Let the WebGL glass show through */
+
+.compare-page .compare-security-flow-icon[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Keep SVG icons visible */
+
+.compare-page .compare-security-flow-icon svg {
+  width: 31px;
+  height: 31px;
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+/* Original icon colors */
+
+.compare-page
+.compare-security-flow-card-mandate
+.compare-security-flow-icon {
+  color: #efa85f;
+}
+.compare-page .compare-security-flow-card-mandate .compare-security-flow-icon {  color: #d2d9e5; }
+.compare-page .compare-security-flow-icon svg { width: 31px; height: 31px; }
+
+.compare-page .compare-security-flow-title-group {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+}
+.compare-page .compare-security-flow-title-group h3 {
+  margin: 0;
+  color: #f2f2f4;
+  font-size: clamp(17px, 1.6vw, 22px);
+  font-weight: 760;
+  line-height: 1.28;
+  letter-spacing: -.03em;
+}
+.compare-page .compare-security-flow-meta { font-size: 12px; color: #92929d; }
+.compare-page .compare-security-flow-description {
+  flex: 1 1 auto;
+  margin: 18px 0 20px;
+  padding-top: 17px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  color: #abaeb8;
+  font-size: clamp(12px, 1.1vw, 15px);
+  line-height: 1.6;
+}
+
+/* Each metric has its own subtle inner glass rectangle. */
+.compare-page .compare-security-flow-result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 15px 16px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 15px;
+  background: rgba(8,9,12,.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1);
+}
+.compare-page .compare-security-flow-result-icon {
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.035);
+  color: #c7ced8;
+  font-size: 18px;
+}
+.compare-page .compare-security-flow-card-mandate .compare-security-flow-result-icon { color: #ed9a46; }
+.compare-page .compare-security-flow-result-copy { display: grid; gap: 5px; min-width: 0; }
+.compare-page .compare-security-flow-result-copy strong {
+  color: #f1a955;
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+.compare-page .compare-security-flow-result-copy small {
+  color: #999aa5;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.4;
+  letter-spacing: .13em;
+}
+
+@media (max-width: 900px) {
+  .compare-page .compare-security-flow { padding-bottom: 44px; }
+  .compare-page .compare-security-flow-cards {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .compare-page .compare-security-flow-card {
+    min-height: 0;
+    padding: 22px;
+  }
+  .compare-page .compare-security-flow-description { margin: 16px 0; }
+}
+@media (max-width: 420px) {
+  .compare-page .compare-security-flow-heading { gap: 8px; }
+  .compare-page .compare-security-flow-heading h2 { letter-spacing: .12em; font-size: 10px; }
+  .compare-page .compare-security-flow-intro { gap: 8px; letter-spacing: .1em; font-size: 9px; }
+  .compare-page .compare-security-flow-card { padding: 19px; }
+  .compare-page .compare-security-flow-icon { width: 52px; height: 52px; margin-bottom: 14px; }
+  .compare-page .compare-security-flow-icon svg { width: 26px; height: 26px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compare-page .compare-security-flow *,
+  .compare-page .compare-security-flow *::before,
+  .compare-page .compare-security-flow *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
