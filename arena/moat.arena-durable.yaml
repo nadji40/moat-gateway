@@ -1,0 +1,17 @@
+# Database-backed bank gateway for scenarios that deliberately use more than
+# one session under the same authorization. The runner expects a migrated test
+# database and a `local` tenant in MOAT_TEST_DATABASE_URL.
+listen: { transport: stdio }
+upstreams:
+  - name: bank
+    rail: bank
+    transport: stdio
+    command: ["node", "--import", "tsx", "mock-bank/src/server.ts"]
+  - name: web
+    transport: http
+    url: "http://127.0.0.1:7100/mcp"
+policy: ../policies/rails/bank.yaml
+evidence: ./results/evidence-durable-bank.jsonl
+keys: ./keys
+intent_api: { addr: "127.0.0.1:7072" }
+storage: { database_url_env: MOAT_TEST_DATABASE_URL, max_connections: 4 }

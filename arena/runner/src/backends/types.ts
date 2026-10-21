@@ -67,6 +67,8 @@ export interface RunContext {
   readonly endpoints: Endpoints;
   /** Open the runner's own MCP clients and get the two tools. */
   connect(): Promise<Connected>;
+  /** Open another independent payment session for cross-session scenarios. */
+  connectSession(session: string): Promise<Connected>;
   /** Tell Moat what the human asked for. No-op in direct mode. */
   registerIntent(text: string): Promise<void>;
   /**

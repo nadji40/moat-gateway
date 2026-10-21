@@ -162,7 +162,17 @@ async function runOne(
   let error: string | undefined;
   const t0 = performance.now();
   try {
-    trace = await backend.run(scenario, contextFor(arm, session, ledger, rail, scenario.mock_env));
+    trace = await backend.run(
+      scenario,
+      contextFor(
+        arm,
+        session,
+        ledger,
+        rail,
+        scenario.mock_env,
+        scenario.kind === "attack" && scenario.requires_durable_storage,
+      ),
+    );
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

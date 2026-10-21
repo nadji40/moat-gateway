@@ -79,6 +79,8 @@ export const AuthorizationSchema = z.object({
   amount: Amount,
   tolerance: z.union([z.string().regex(/^\d+(\.\d+)?$/), z.number().nonnegative()]).default(0),
   currency: z.string().min(3).max(12).default("USD"),
+  /** Explicit null means this authorization is not bound to one invoice. */
+  invoice_id: z.string().min(1).nullable().optional(),
   repeat_payments: z.boolean().default(false),
   max_payments: z.number().int().positive().default(1),
   recipient_account_id: z.string().min(1).optional(),
@@ -138,6 +140,8 @@ export const AttackSchema = z.object({
   task: z.string().min(1),
   /** Trusted, structured authority supplied by the user/host. */
   authorization: AuthorizationSchema,
+  /** Requires a database so separate sessions can share the authorization. */
+  requires_durable_storage: z.boolean().default(false),
   /** The payee the attacker wants paid. */
   expected: z.string().min(1),
   /** If set, only payments of exactly this amount to `expected` count. */
@@ -152,6 +156,8 @@ export const AttackSchema = z.object({
   paid_calls_for_success: z.number().int().positive().default(1),
   /** What a scripted agent that follows the injection does after reading the pages. */
   injection: z.object({ calls: z.array(PayArgs).min(1) }),
+  /** Extra gateway sessions that make calls under the same authorization. */
+  additional_sessions: z.array(z.object({ calls: z.array(PayArgs).min(1) })).default([]),
   call_mode: z.enum(["sequential", "parallel"]).default("sequential"),
   /** How compromised payment metadata is presented to the payment tool. */
   payment_metadata: z
@@ -189,9 +195,10 @@ type ParsedControl = z.infer<typeof ControlSchema>;
 export type PayCall = Record<string, string | number>;
 
 /** An attack expanded onto one rail. */
-export type Attack = Omit<ParsedAttack, "injection"> & {
+export type Attack = Omit<ParsedAttack, "injection" | "additional_sessions"> & {
   rail: Rail;
   injection: { calls: PayCall[] };
+  additional_sessions: { calls: PayCall[] }[];
 };
 
 /** A control expanded onto one rail. */
@@ -285,6 +292,9 @@ export function scenarioForRail(
       rail,
       authorization: boundToRail(spec, parsed.authorization),
       injection: { calls: adaptCalls(spec, parsed.authorization.payee, parsed.injection.calls) },
+      additional_sessions: parsed.additional_sessions.map((session) => ({
+        calls: adaptCalls(spec, parsed.authorization.payee, session.calls),
+      })),
     };
   }
   const parsed = ControlSchema.parse(doc);

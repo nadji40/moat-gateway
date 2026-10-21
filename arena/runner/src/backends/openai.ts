@@ -88,6 +88,11 @@ export class OpenAIBackend implements AgentBackend {
   ) {}
 
   async run(scenario: ArenaScenario, ctx: RunContext): Promise<AgentTrace> {
+    if (scenario.kind === "attack" && scenario.additional_sessions.length > 0) {
+      throw new Error(
+        "cross-session attack scenarios require the scripted null backend so each session boundary is deterministic",
+      );
+    }
     const servers = buildServers(ctx);
     for (const s of servers) await s.connect();
     // The intent API only exists once the gateway process is up, which the

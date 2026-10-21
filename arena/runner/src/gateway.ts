@@ -83,7 +83,7 @@ export class IntentApi {
     session: string,
     body: {
       authorization_id: string;
-      invoice_id: string;
+      invoice_id?: string;
       payee: string;
       // Decimal strings as well as JSON numbers: a rail with more than two
       // decimal places cannot round-trip through a double.
