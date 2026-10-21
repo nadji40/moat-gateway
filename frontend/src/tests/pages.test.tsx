@@ -5,11 +5,11 @@ import App from '../app/App'
 describe('documentation and team pages', () => {
   afterEach(() => window.history.replaceState({}, '', '/'))
 
-  it('renders the documentation with every section reachable from its list', () => {
+  it('renders the documentation with every section reachable from its list', async () => {
     window.history.replaceState({}, '', '/docs')
     render(<App />)
 
-    expect(screen.getByRole('heading', { level: 1, name: /from first call to production/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /from first call to production/i })).toBeInTheDocument()
     const listed = [...document.querySelectorAll('.docs-nav a')].map((a) => a.getAttribute('href')!.slice(1))
     const present = [...document.querySelectorAll('.docs-body section')].map((s) => s.id)
     expect(listed).toEqual(present)
@@ -32,11 +32,11 @@ describe('documentation and team pages', () => {
     expect(writeText).toHaveBeenCalledWith(document.querySelector('#quickstart pre')!.textContent)
   })
 
-  it('draws the team as a molecule: founder at the centre, four teams, ten people', () => {
+  it('draws the team as a molecule: founder at the centre, four teams, ten people', async () => {
     window.history.replaceState({}, '', '/team')
     render(<App />)
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/pay only what was asked/i)
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(/pay only what was asked/i)
     expect(document.querySelectorAll('.mol-node.center')).toHaveLength(1)
     expect([...document.querySelectorAll('.mol-node.team')].map((n) => n.getAttribute('aria-label')))
       .toEqual(['Engineering team', 'Research team', 'Data team', 'Security team'])

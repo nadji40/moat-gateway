@@ -9,11 +9,11 @@ describe('documentation and compare pages in Arabic', () => {
     window.history.replaceState({}, '', '/')
   })
 
-  it('renders the documentation in Arabic, with code left as it is', () => {
+  it('renders the documentation in Arabic, with code left as it is', async () => {
     window.history.replaceState({}, '', '/docs')
     render(<App />)
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Moat، من أول طلب إلى الإنتاج' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Moat، من أول طلب إلى الإنتاج' })).toBeInTheDocument()
     expect(screen.queryByText(/from first call to production/i)).not.toBeInTheDocument()
     const labels = [...document.querySelectorAll('.docs-nav a')].map((a) => a.textContent)
     expect(labels).toContain('البدء السريع')
@@ -24,13 +24,12 @@ describe('documentation and compare pages in Arabic', () => {
     expect(document.querySelector('#rules .tbl td code')).toHaveTextContent('payee-provenance')
   })
 
-  it('renders the compare page in Arabic', () => {
+  it('renders the compare page in Arabic', async () => {
     window.history.replaceState({}, '', '/compare')
     render(<App />)
 
-    expect(screen.getByRole('heading', { level: 1, name: /ليست المسألة\s*ما يفحصونه/ })).toBeInTheDocument()
-    expect(screen.getByText('شُغّلت على شيفرتها نفسها')).toBeInTheDocument()
-    expect(screen.queryByText('Run against their own code')).not.toBeInTheDocument()
-    expect(document.querySelectorAll('.rows .row.us')).toHaveLength(1)
+    expect(await screen.findByRole('heading', { level: 1, name: /ليست المسألة\s*ما يفحصونه/ })).toBeInTheDocument()
+    expect(screen.getAllByText('مصنّفات حقن التعليمات').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Injection classifiers')).not.toBeInTheDocument()
   })
 })
