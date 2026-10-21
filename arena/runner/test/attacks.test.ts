@@ -20,9 +20,9 @@ const ARENA_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 describe("attack corpus", () => {
   const sources = loadAttacks(ARENA_ROOT);
 
-  it("has twenty-one attacks with unique ids and every class represented", () => {
-    expect(sources).toHaveLength(24);
-    expect(new Set(sources.map((s) => s.id)).size).toBe(24);
+  it("has twenty-five attacks with unique ids and every class represented", () => {
+    expect(sources).toHaveLength(25);
+    expect(new Set(sources.map((s) => s.id)).size).toBe(25);
     const classes = sources.map(
       (s) => (scenarioForRail(ARENA_ROOT, s, s.rails[0]!) as Attack).class,
     );
@@ -38,9 +38,11 @@ describe("attack corpus", () => {
     // Card is short the lost-reply attack (a card retry is safe) and the
     // three that are about chains.
     expect(sourcesForRail(sources, "card")).toHaveLength(20);
-    // Bank takes the lost-reply attack and none of the chain ones.
-    expect(sourcesForRail(sources, "bank")).toHaveLength(21);
-    // EVM takes everything, because it is the only family with allowances.
+    // Bank takes the lost-reply attack, the cross-session one (it needs the
+    // database-backed bank gateway), and none of the chain ones.
+    expect(sourcesForRail(sources, "bank")).toHaveLength(22);
+    // EVM takes everything but the bank-only cross-session attack, because
+    // it is the only family with allowances.
     expect(sourcesForRail(sources, "evm")).toHaveLength(24);
     // Solana takes everything except the allowance attack.
     expect(sourcesForRail(sources, "solana")).toHaveLength(23);
@@ -94,6 +96,28 @@ describe("attack corpus", () => {
     expect(call?.["tool"]).toBe("approve");
     expect(call?.["spender"]).toBe(railSpec("evm").fixtures.authorized.destination_display);
     expect(call?.["to_address"]).toBeUndefined();
+  });
+
+  it("models a single-payment approval reused from a separate session", () => {
+    const source = sources.find((candidate) => candidate.id === "max-payments-cross-session");
+    expect(source?.rails).toEqual(["bank"]);
+    const attack = scenarioForRail(ARENA_ROOT, source!, "bank") as Attack;
+    expect(attack.requires_durable_storage).toBe(true);
+    expect(attack.authorization).toMatchObject({ max_payments: 1, invoice_id: null });
+    expect(attack.injection.calls[0]).toMatchObject({
+      invoice_id: "INV-SESSION-A",
+      amount: 25,
+      currency: "EUR",
+    });
+    expect(attack.additional_sessions).toHaveLength(1);
+    expect(attack.additional_sessions[0]?.calls[0]).toMatchObject({
+      invoice_id: "INV-SESSION-B",
+      amount: 25,
+      currency: "EUR",
+    });
+    expect(attack.additional_sessions[0]?.calls[0]?.["beneficiary_iban"]).toBe(
+      railSpec("bank").fixtures.authorized.destination_display,
+    );
   });
 
   it("builds arena URLs with the rail in the path", () => {

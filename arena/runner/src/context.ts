@@ -78,6 +78,7 @@ export function endpointsFor(
   ledger: string,
   rail: Rail = DEFAULT_RAIL,
   mockEnv: Record<string, string> = {},
+  requiresDurableStorage = false,
 ): Endpoints {
   const arm = armOf(value);
   const spec = railSpec(rail);
@@ -116,7 +117,17 @@ export function endpointsFor(
   return {
     stdio: {
       command: gatewayBinary(ARENA_ROOT),
-      args: ["--config", join(ARENA_ROOT, configFor(arm, rail)), "--session-id", session],
+      args: [
+        "--config",
+        join(
+          ARENA_ROOT,
+          requiresDurableStorage && arm === "moat"
+            ? "moat.arena-durable.yaml"
+            : configFor(arm, rail),
+        ),
+        "--session-id",
+        session,
+      ],
       env: { ...env, RUST_LOG: process.env["RUST_LOG"] ?? "moat_gateway=warn" },
       cwd: ARENA_ROOT,
     },
@@ -134,10 +145,21 @@ export function contextFor(
   ledger: string,
   rail: Rail = DEFAULT_RAIL,
   mockEnv: Record<string, string> = {},
+  requiresDurableStorage = false,
 ): RunContext {
   const arm = armOf(value);
   const mode = modeForArm(arm);
-  const endpoints = endpointsFor(arm, session, ledger, rail, mockEnv);
+  if (requiresDurableStorage && arm === "moat") {
+    if (rail !== "bank") {
+      throw new Error("this durable cross-session scenario currently supports only the bank rail");
+    }
+    if (!process.env["MOAT_TEST_DATABASE_URL"]) {
+      throw new Error(
+        "this scenario needs a migrated local PostgreSQL database; set MOAT_TEST_DATABASE_URL and seed the local tenant first",
+      );
+    }
+  }
+  const endpoints = endpointsFor(arm, session, ledger, rail, mockEnv, requiresDurableStorage);
   return {
     mode,
     arm,
@@ -146,6 +168,8 @@ export function contextFor(
     session,
     endpoints,
     connect: () => connect(endpoints),
+    connectSession: (otherSession) =>
+      connect(endpointsFor(arm, otherSession, ledger, rail, mockEnv, requiresDurableStorage)),
     async registerIntent(text: string) {
       if (arm !== "moat") return;
       const api = new IntentApi(intentApiBase());
@@ -169,15 +193,17 @@ export function contextFor(
       const api = new IntentApi(intentApiBase());
       await api.waitUntilUp();
       const authorization_id = `auth-${session}`;
-      const invoice_id = `inv-${session}`;
+      const { invoice_id: requestedInvoice, ...authorization } = scenario.authorization;
+      const invoice_id =
+        requestedInvoice === null ? undefined : (requestedInvoice ?? `inv-${session}`);
       await api.authorization(session, {
         authorization_id,
-        invoice_id,
-        ...scenario.authorization,
+        ...(invoice_id ? { invoice_id } : {}),
+        ...authorization,
         currency: scenario.authorization.currency.toUpperCase(),
         expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       });
-      return { authorization_id, invoice_id };
+      return { authorization_id, invoice_id: invoice_id ?? "" };
     },
   };
 }
