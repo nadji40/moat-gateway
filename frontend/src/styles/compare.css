@@ -1,64 +1,1552 @@
-/*
- * Compare page styles. Loaded alongside shared.css (pinned from demo/public/app.css).
- *
- * Some selectors below — .rows, .row-*, .flowart, .probes, .probe-*, .rails,
- * .rail — also exist in shared.css. The redeclarations here are intentional:
- * shared.css contains the legacy site's definitions for those classes, which
- * serve the Dashboard and Tests pages. The versions here tune the same classes
- * for the Compare page's layout and animation needs without touching shared.css.
- *
- * Do not remove the duplicates assuming they are accidents.
- */
+/* MOAT Compare — consolidated styles.
+   Shared classes are scoped to .compare-page so other pages (including Dashboard)
+   retain the styling from shared.css. */
+
+/* Hero / flow illustration */
 .compare-page .hero { padding-block: clamp(56px, 9vw, 112px) clamp(40px, 6vw, 72px); }
 .compare-page .flowart { width: min(100%, 520px); margin: 10px auto 40px; }
-.flowart svg { display: block; width: 100%; height: auto; overflow: visible; }
-.c-line { fill: none; stroke: var(--ink-3); stroke-width: 2; }
-.c-ink { fill: none; stroke: var(--ink-2); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-.c-wire { stroke-dasharray: 4 7; animation: compare-flow 1.3s linear infinite; }
-.c-lbl { fill: var(--ink-3); font: 700 11.5px var(--font); letter-spacing: 1.6px; text-anchor: middle; }
-.c-leg { opacity: 0; animation: compare-leg 12s cubic-bezier(.55,0,.45,1) infinite; }
-.c-gate { transform-box: fill-box; transform-origin: center; animation: compare-gate 12s ease-out infinite; }
-.c-paid, .c-no { opacity: 0; transform-box: fill-box; transform-origin: center; }
-.c-paid { animation: compare-paid 12s ease-out infinite; }
-.c-no { animation: compare-no 12s ease-out infinite; }
-@keyframes compare-flow { to { stroke-dashoffset: -11; } }
-@keyframes compare-leg { 0% { opacity: 0; transform: translate(0,0); } 1% { opacity: 1; } 7.5% { opacity: 1; transform: translate(var(--dx),var(--dy)); } 8.7%,100% { opacity: 0; transform: translate(var(--dx),var(--dy)); } }
-@keyframes compare-gate { 0%,8% { transform: scale(1); } 9.4% { transform: scale(1.08); } 12%,56% { transform: scale(1); } 57.4% { transform: scale(1.08); } 60%,100% { transform: scale(1); } }
-@keyframes compare-paid { 0%,17.5% { opacity: 0; transform: scale(.7); } 19% { opacity: 1; transform: scale(1); } 30% { opacity: 1; } 34%,100% { opacity: 0; } }
-@keyframes compare-no { 0%,57% { opacity: 0; transform: scale(.7); } 58.5% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 74%,100% { opacity: 0; } }
-.rows { display: grid; gap: 10px; }
-.rows .row { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; text-align: left; padding: 18px 22px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.03); box-shadow: var(--pane); --c: var(--ink-3); }
-.row-i { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; flex: none; color: var(--c); background: rgba(255,255,255,.04); border: 1px solid var(--line); }
-.row-i svg { width: 19px; height: 19px; }
-.row-t h3 { font-size: 1rem; margin-bottom: 5px; }
-.row-e { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-left: 9px; }
-.row-s { font-size: .86rem; color: var(--ink-2); }
-.row-r { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; text-align: right; text-decoration: none; }
-.row-r i { display: block; font-size: .7rem; font-style: normal; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin-top: 3px; }
-.row-r.bad { color: var(--red-l); } .row-r.warn { color: var(--yellow-l); } .row-r.good { color: var(--green-l); }
-.rows .row.us { border-color: color-mix(in srgb,var(--green-l) 45%,transparent); --c: var(--green-l); }
-.rows .row.us .row-i { background: color-mix(in srgb,var(--green-l) 12%,transparent); border-color: color-mix(in srgb,var(--green-l) 32%,transparent); }
-.probes { margin-top: 30px; display: grid; gap: 14px; }
-.probe { border-radius: 18px; padding: 20px; box-shadow: var(--pane); display: grid; gap: 12px; }
-.probe-h { display: flex; align-items: baseline; justify-content: center; gap: 12px; flex-wrap: wrap; }
-.probe-h h3 { font-size: 1.125rem; }
-.probe-v { font-size: .72rem; color: var(--ink-3); font-weight: 600; }
-.probe-r { display: grid; gap: 7px; margin: 0; font-size: .875rem; }
-.probe-r dt { color: var(--ink-2); }
-.probe-r dd { margin: 0 0 6px; font-weight: 700; }
-.probe-r dd.bad { color: var(--red-l); } .probe-r dd.good { color: var(--green-l); }
-.probe-n { font-size: .82rem; color: var(--ink-3); line-height: 1.6; border-top: 1px solid var(--line); padding-top: 12px; max-width: 68ch; margin: 0 auto; }
-.rails-section { padding-block: 0 clamp(48px, 7vw, 80px); }
-.rails-lead { color: var(--ink); font-weight: 700; letter-spacing: -.01em; }
-.rails { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; color: var(--ink-2); }
-.rail { border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; }
-@media (min-width: 820px) { .probe-r { grid-template-columns: 1fr auto; align-items: baseline; text-align: left; gap: 9px 20px; } .probe-r dd { margin: 0; text-align: right; } }
-@media (max-width: 700px) { .rows .row { grid-template-columns: 1fr; gap: 12px; text-align: center; justify-items: center; padding: 20px; } .row-r { text-align: center; } .row-r i { margin-top: 2px; } }
-@media (prefers-reduced-motion: reduce) { .flowart * { animation: none; } }
+.compare-page .flowart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.compare-page .c-line { fill: none; stroke: var(--ink-3); stroke-width: 2; }
+.compare-page .c-ink { fill: none; stroke: var(--ink-2); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.compare-page .c-wire { stroke-dasharray: 4 7; animation: compare-flow 1.3s linear infinite; }
+.compare-page .c-lbl { fill: var(--ink-3); font: 700 11.5px var(--font); letter-spacing: 1.6px; text-anchor: middle; }
+.compare-page .c-leg { opacity: 0; animation: compare-leg 12s cubic-bezier(.55, 0, .45, 1) infinite; }
+.compare-page .c-gate { transform-box: fill-box; transform-origin: center; animation: compare-gate 12s ease-out infinite; }
+.compare-page .c-paid,
+.compare-page .c-no { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.compare-page .c-paid { animation: compare-paid 12s ease-out infinite; }
+.compare-page .c-no { animation: compare-no 12s ease-out infinite; }
 
-/* Right to left: the sides set above, mirrored. The flow art stays as drawn. */
-html[dir="rtl"] .rows .row { text-align: right; }
-html[dir="rtl"] .row-e { margin-left: 0; margin-right: 9px; }
-html[dir="rtl"] .row-r { text-align: left; }
-@media (min-width: 820px) { html[dir="rtl"] .probe-r { text-align: right; } html[dir="rtl"] .probe-r dd { text-align: left; } }
-@media (max-width: 700px) { html[dir="rtl"] .rows .row, html[dir="rtl"] .row-r { text-align: center; } }
+@keyframes compare-flow { to { stroke-dashoffset: -11; } }
+@keyframes compare-leg {
+  0% { opacity: 0; transform: translate(0, 0); }
+  1% { opacity: 1; }
+  7.5% { opacity: 1; transform: translate(var(--dx), var(--dy)); }
+  8.7%, 100% { opacity: 0; transform: translate(var(--dx), var(--dy)); }
+}
+@keyframes compare-gate {
+  0%, 8% { transform: scale(1); }
+  9.4% { transform: scale(1.08); }
+  12%, 56% { transform: scale(1); }
+  57.4% { transform: scale(1.08); }
+  60%, 100% { transform: scale(1); }
+}
+@keyframes compare-paid {
+  0%, 17.5% { opacity: 0; transform: scale(.7); }
+  19% { opacity: 1; transform: scale(1); }
+  30% { opacity: 1; }
+  34%, 100% { opacity: 0; }
+}
+@keyframes compare-no {
+  0%, 57% { opacity: 0; transform: scale(.7); }
+  58.5% { opacity: 1; transform: scale(1); }
+  70% { opacity: 1; }
+  74%, 100% { opacity: 0; }
+}
+
+/* Comparison rows, still used under “Asked their own question” */
+.compare-page .rows { display: grid; gap: 10px; }
+.compare-page .rows .row {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 18px;
+  align-items: center; text-align: left; padding: 18px 22px;
+  border-radius: 16px; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, .03); box-shadow: var(--pane);
+  --c: var(--ink-3);
+}
+.compare-page .row-i {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: grid; place-items: center; flex: none; color: var(--c);
+  background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+}
+.compare-page .row-i svg { width: 19px; height: 19px; }
+.compare-page .row-t h3 { font-size: 1rem; margin-bottom: 5px; }
+.compare-page .row-e {
+  font-size: .7rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3); margin-left: 9px;
+}
+.compare-page .row-s { font-size: .86rem; color: var(--ink-2); }
+.compare-page .row-r {
+  font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em;
+  white-space: nowrap; text-align: right; text-decoration: none;
+}
+.compare-page .row-r i {
+  display: block; font-size: .7rem; font-style: normal; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-3); margin-top: 3px;
+}
+.compare-page .row-r.bad { color: var(--red-l); }
+.compare-page .row-r.warn { color: var(--yellow-l); }
+.compare-page .row-r.good { color: var(--green-l); }
+.compare-page .rows .row.us {
+  border-color: color-mix(in srgb, var(--green-l) 45%, transparent);
+  --c: var(--green-l);
+}
+.compare-page .rows .row.us .row-i {
+  background: color-mix(in srgb, var(--green-l) 12%, transparent);
+  border-color: color-mix(in srgb, var(--green-l) 32%, transparent);
+}
+
+/* Protocol probe cards */
+.compare-page .probes { margin-top: 30px; display: grid; gap: 14px; }
+.compare-page .probe { border-radius: 18px; padding: 20px; box-shadow: var(--pane); display: grid; gap: 12px; }
+.compare-page .probe-h { display: flex; align-items: baseline; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.compare-page .probe-h h3 { font-size: 1.125rem; }
+.compare-page .probe-v { font-size: .72rem; color: var(--ink-3); font-weight: 600; }
+.compare-page .probe-r { display: grid; gap: 7px; margin: 0; font-size: .875rem; }
+.compare-page .probe-r dt { color: var(--ink-2); }
+.compare-page .probe-r dd { margin: 0 0 6px; font-weight: 700; }
+.compare-page .probe-r dd.bad { color: var(--red-l); }
+.compare-page .probe-r dd.good { color: var(--green-l); }
+.compare-page .probe-n {
+  font-size: .82rem; color: var(--ink-3); line-height: 1.6;
+  border-top: 1px solid var(--line); padding-top: 12px;
+  max-width: 68ch; margin: 0 auto;
+}
+.compare-page .rails-section { padding-block: 0 clamp(48px, 7vw, 80px); }
+.compare-page .rails-lead { color: var(--ink); font-weight: 700; letter-spacing: -.01em; }
+.compare-page .rails { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; color: var(--ink-2); }
+.compare-page .rail { border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; }
+
+/* Glass UI benchmark card. Never paint an opaque Compare-page background:
+   Glass UI draws its WebGL surface behind the page. */
+.compare-page .moat-benchmark-card {
+  width: 100%; margin: 20px 0 28px; padding: 28px 30px 22px;
+  border-radius: 18px;
+  /* CSS fallback only: the library clears this surface when data-glass-live is active. */
+  background: rgba(15, 15, 17, .30);
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: var(--pane);
+}
+.compare-page .moat-benchmark-card[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.compare-page .moat-benchmark-heading { margin-bottom: 12px; }
+.compare-page .moat-benchmark-eyebrow {
+  display: block; color: #92929d; font-size: 11px; font-weight: 800;
+  letter-spacing: .14em; margin-bottom: 8px;
+}
+.compare-page .moat-benchmark-heading h3 {
+  font-size: clamp(23px, 3vw, 32px); line-height: 1.15;
+  margin: 0 0 8px; color: #f5f5f5;
+}
+.compare-page .moat-benchmark-heading p { color: #a1a1aa; font-size: 14px; margin: 0; }
+.compare-page .moat-benchmark-chart { height: 290px; width: 100%; min-width: 0; }
+
+/* SVG Y-axis labels: dark, visually stable icons. These are intentionally
+   NOT WebGL surfaces; their styling does not animate with glass reflections. */
+.compare-page .moat-benchmark-label {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; height: 100%; box-sizing: border-box;
+}
+.compare-page .moat-benchmark-label-icon {
+  width: 48px; height: 48px; flex: 0 0 48px;
+  box-sizing: border-box; padding: 10px;
+  display: grid; place-items: center;
+  background: #101012; border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 15px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 6px 16px rgba(0,0,0,.25);
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  transform: none; animation: none; transition: none;
+}
+.compare-page .moat-benchmark-label-icon svg {
+  display: block; width: 23px; height: 23px; overflow: visible;
+}
+.compare-page .moat-benchmark-label-copy {
+  min-width: 0; display: flex; flex-direction: column;
+  gap: 4px; text-align: left;
+}
+.compare-page .moat-benchmark-label-copy strong {
+  color: var(--ink); font-size: 13px; line-height: 1.2; font-weight: 700;
+}
+.compare-page .moat-benchmark-label-copy span {
+  color: var(--ink-2); font-size: 10px; line-height: 1.35;
+}
+
+/* Tooltip — styles for the current custom MOAT tooltip markup */
+.moat-benchmark-tooltip {
+  width: 280px; box-sizing: border-box; padding: 16px;
+  background: rgba(21, 21, 23, .97); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 16px; color: #f5f5f5;
+  box-shadow: 0 18px 45px rgba(0,0,0,.45);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.moat-tooltip-header { display: flex; align-items: center; gap: 10px; }
+.moat-tooltip-icon {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px;
+  color: #d6d6db; background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1); border-radius: 10px;
+}
+.moat-tooltip-icon svg { width: 20px; height: 20px; }
+.moat-tooltip-heading { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.moat-tooltip-heading strong { color: #f5f5f5; font-size: 13px; line-height: 1.3; }
+.moat-tooltip-heading > span { color: #92929d; font-size: 10px; font-weight: 700; letter-spacing: .07em; }
+.moat-tooltip-count {
+  margin-left: auto; padding: 5px 7px; color: #b8b8c0;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09);
+  border-radius: 7px; font-size: 10px; white-space: nowrap;
+}
+.moat-tooltip-divider { height: 1px; background: rgba(255,255,255,.1); margin: 14px 0; }
+.moat-tooltip-metric { display: flex; align-items: baseline; gap: 7px; }
+.moat-tooltip-metric strong { font-size: 32px; font-weight: 800; line-height: 1; }
+.moat-tooltip-metric span { color: #92929d; font-size: 12px; }
+.moat-tooltip-progress { height: 6px; overflow: hidden; margin-top: 14px; background: rgba(255,255,255,.09); border-radius: 999px; }
+.moat-tooltip-progress > div { height: 100%; border-radius: inherit; }
+.moat-tooltip-description { margin: 13px 0 0; color: #b1b1ba; font-size: 12px; line-height: 1.5; }
+
+/* Support for previous simple tooltip markup, if still present */
+.moat-benchmark-tooltip-title { display: flex; align-items: center; gap: 9px; font-size: 14px; margin-bottom: 10px; }
+.moat-benchmark-tooltip-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.moat-benchmark-tooltip-value { display: flex; align-items: baseline; gap: 6px; }
+.moat-benchmark-tooltip-value strong { font-size: 28px; line-height: 1; }
+.moat-benchmark-tooltip-value span { color: #888891; font-size: 13px; }
+.moat-benchmark-tooltip p { font-size: 12px; }
+
+/* Benchmark status and methodology */
+.compare-page .moat-benchmark-success {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; font-size: 13px; color: #28d58b;
+  background: rgba(40,213,139,.06);
+  border: 1px solid rgba(40,213,139,.18); border-radius: 10px;
+}
+.compare-page .moat-benchmark-success span { font-size: 18px; }
+.compare-page .moat-benchmark-note { margin: 14px 0 0; color: #92929d; font-size: 12px; line-height: 1.6; }
+
+/* RTL */
+html[dir="rtl"] .compare-page .rows .row { text-align: right; }
+html[dir="rtl"] .compare-page .row-e { margin-left: 0; margin-right: 9px; }
+html[dir="rtl"] .compare-page .row-r { text-align: left; }
+html[dir="rtl"] .compare-page .moat-benchmark-label-copy { text-align: right; }
+html[dir="rtl"] .moat-tooltip-count { margin-left: 0; margin-right: auto; }
+
+/* Responsive */
+@media (min-width: 820px) {
+  .compare-page .probe-r { grid-template-columns: 1fr auto; align-items: baseline; text-align: left; gap: 9px 20px; }
+  .compare-page .probe-r dd { margin: 0; text-align: right; }
+  html[dir="rtl"] .compare-page .probe-r { text-align: right; }
+  html[dir="rtl"] .compare-page .probe-r dd { text-align: left; }
+}
+@media (max-width: 700px) {
+  .compare-page .rows .row { grid-template-columns: 1fr; gap: 12px; text-align: center; justify-items: center; padding: 20px; }
+  .compare-page .row-r { text-align: center; }
+  .compare-page .row-r i { margin-top: 2px; }
+  html[dir="rtl"] .compare-page .rows .row,
+  html[dir="rtl"] .compare-page .row-r { text-align: center; }
+
+  .compare-page .moat-benchmark-card { padding: 20px 12px; border-radius: 16px; }
+  .compare-page .moat-benchmark-chart { height: 250px; }
+  .compare-page .moat-benchmark-label { gap: 7px; }
+  .compare-page .moat-benchmark-label-icon { width: 28px; height: 28px; flex-basis: 28px; padding: 5px; border-radius: 9px; }
+  .compare-page .moat-benchmark-label-icon svg { width: 17px; height: 17px; }
+  .compare-page .moat-benchmark-label-copy strong { font-size: 11px; }
+  .compare-page .moat-benchmark-label-copy span { font-size: 9px; }
+  .moat-benchmark-tooltip { max-width: min(280px, 90vw); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compare-page .flowart * { animation: none !important; }
+  .compare-page .moat-benchmark-card *, .moat-benchmark-tooltip * { animation: none !important; transition: none !important; }
+}
+.moat-benchmark-mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .moat-benchmark-desktop {
+    display: none;
+  }
+
+  .moat-benchmark-mobile {
+    display: grid;
+    gap: 20px;
+    padding: 10px 0 20px;
+  }
+
+  .moat-benchmark-mobile-item {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .moat-benchmark-mobile-item + .moat-benchmark-mobile-item {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 20px;
+  }
+
+  .moat-benchmark-mobile-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .moat-benchmark-mobile-heading .moat-benchmark-label-copy {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .moat-benchmark-mobile-heading .moat-benchmark-label-copy span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+  }
+
+  .moat-benchmark-mobile-value {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    font-size: 12px;
+    color: #92929d;
+  }
+
+  .moat-benchmark-mobile-value strong {
+    color: #f5f5f5;
+    font-size: 15px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .moat-benchmark-mobile-track {
+    width: 100%;
+    height: 16px;
+    overflow: hidden;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.07);
+  }
+
+  .moat-benchmark-mobile-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      #dfa15a 0%,
+      #d86a52 45%,
+      #c6455c 100%
+    );
+  }
+
+  .moat-benchmark-mobile-fill.is-zero {
+    background: #28d58b;
+  }
+
+  html[dir="rtl"] .moat-benchmark-mobile-heading,
+  html[dir="rtl"] .moat-benchmark-mobile-value {
+    direction: rtl;
+  }
+}
+
+/* Compare: preserve the original MOAT cursor trail */
+
+body.has-trail .trailfx {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+body.has-trail .compare-page {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+}
+
+/* Keep the Compare background from hiding the trail */
+html.lg-on body.has-trail .compare-page {
+  background: transparent;
+}
+
+
+/* Shared neutral dark-glass icon treatment */
+
+.compare-page .moat-benchmark-label-icon,
+.compare-page .compare-security-flow-card .compare-security-flow-icon {
+  background: rgba(8, 9, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.19);
+  border-radius: 15px;
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.035),
+    0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
+/* Benchmark icon containers — Glass UI styling */
+
+.compare-page .moat-benchmark-label-icon {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  flex: 0 0 48px;
+  padding: 0;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 15px;
+  background: rgba(12, 12, 14, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.compare-page .moat-benchmark-label-icon[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.compare-page .moat-benchmark-label-icon svg {
+  width: 23px;
+  height: 23px;
+  display: block;
+}
+
+.compare-page .moat-benchmark-success-icon {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(40, 213, 139, 0.07);
+  border: 1px solid rgba(40, 213, 139, 0.18);
+  color: #28d58b;
+}
+
+.compare-page .moat-benchmark-success-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+
+/* Crenspire Glass UI — Evidence Tabs */
+
+.compare-page .moat-evidence-tabs {
+  width: 100%;
+  min-width: 0;
+}
+
+.compare-page .moat-evidence-tabs-list {
+  display: inline-flex;
+  max-width: 100%;
+  margin-bottom: 24px;
+  border-radius: 999px;
+}
+
+.compare-page .moat-evidence-tabs-list button {
+  color: #a1a1aa;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.compare-page .moat-evidence-tabs-list button[data-state="active"] {
+  color: #f5f5f5;
+}
+
+.compare-page .moat-evidence-card {
+  width: 100%;
+  padding: 28px;
+  border-radius: 22px;
+}
+
+.compare-page .moat-evidence-card[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.compare-page .moat-evidence-tabs-content {
+  margin-top: 0;
+  outline: none;
+}
+
+@media (max-width: 767px) {
+  .compare-page .moat-evidence-tabs-list {
+    width: 100%;
+    margin-bottom: 18px;
+  }
+
+  .compare-page .moat-evidence-tabs-list button {
+    min-width: 0;
+    flex: 1;
+    padding-inline: 8px;
+    font-size: 11px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .compare-page .moat-evidence-card {
+    padding: 18px 14px;
+  }
+}
+
+/* MOAT evidence — one glass card with three tabs */
+
+.compare-page .moat-evidence-section {
+  min-width: 0;
+}
+
+.compare-page .moat-evidence-tabs {
+  width: 100%;
+  min-width: 0;
+}
+
+.compare-page .moat-evidence-tabs-list {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto 24px;
+  border-radius: 999px;
+}
+
+.compare-page .moat-evidence-tabs-list
+[data-state="active"] {
+  color: #f5f5f5;
+}
+
+.compare-page .moat-evidence-card {
+  width: 100%;
+  min-width: 0;
+  padding: clamp(18px, 3vw, 32px);
+  border-radius: 22px;
+}
+
+.compare-page .moat-evidence-card[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.compare-page .moat-evidence-tabs-content {
+  margin: 0;
+  min-width: 0;
+}
+
+/* Remove the second card, preserve its content */
+
+.compare-page .moat-evidence-tabs-content .probe {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.compare-page .moat-evidence-tabs-content .probe-h {
+  margin-bottom: 28px;
+}
+
+.compare-page .moat-evidence-tabs-content .probe-r {
+  gap: 14px 22px;
+}
+
+.compare-page .moat-evidence-tabs-content .probe-n {
+  margin-top: 26px;
+}
+
+@media (max-width: 767px) {
+  .compare-page .moat-evidence-tabs-list {
+    width: 100%;
+    margin-bottom: 18px;
+  }
+
+  .compare-page .moat-evidence-tabs-list button {
+    flex: 1;
+    min-width: 0;
+    padding-inline: 7px;
+    font-size: 11px;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .compare-page .moat-evidence-card {
+    padding: 20px 14px;
+  }
+
+  .compare-page .moat-evidence-tabs-content .probe-r {
+    grid-template-columns: 1fr;
+  }
+}
+/* Evidence content: no nested glass card */
+
+.compare-page .moat-evidence-panel {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  min-width: 0;
+
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Tabs wrapper: left aligned */
+.compare-page .moat-evidence-tabs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  width: 100%;
+  margin-top: 40px;
+}
+
+
+
+/* Individual tab buttons */
+.compare-page .moat-evidence-tab-trigger {
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0;
+  font-weight: 700;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+/* Active tab: subtle highlight, not a hard rectangle */
+.compare-page .moat-evidence-tab-trigger[data-state='active'] {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 8px 24px rgba(0, 0, 0, 0.22) !important;
+}
+
+
+
+/* Card below tabs */
+.compare-page .moat-evidence-card {
+  width: 100%;
+}
+
+/* Tab content */
+.compare-page .moat-evidence-tabs-content {
+  margin-top: 0;
+  width: 100%;
+}
+
+
+/* ===========================================
+   MOAT — clean Crenspire liquid glass tabs
+   =========================================== */
+
+.compare-page .moat-evidence-tabs {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 22px;
+}
+
+/* One glass capsule, aligned left */
+
+.compare-page .moat-evidence-tabs-list {
+  align-self: flex-start;
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  height: 52px;
+  padding: 5px;
+  margin: 0;
+  gap: 0;
+
+  border-radius: 999px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* The actual Crenspire sliding glass pill */
+
+.compare-page .moat-evidence-tabs-list > span[aria-hidden] {
+  border-radius: 999px !important;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* Tab labels */
+
+.compare-page .moat-evidence-tab-trigger {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  height: 100%;
+  min-height: 0;
+  padding: 0 22px;
+
+  border: 0 !important;
+  border-radius: 999px !important;
+
+  background: transparent !important;
+  box-shadow: none !important;
+  outline-offset: 2px;
+
+  color: #a1a1aa;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.2;
+  white-space: nowrap;
+
+  transition: color 180ms ease;
+}
+
+/* Active state: only text changes.
+   The built-in pill handles the glass effect. */
+
+.compare-page .moat-evidence-tab-trigger[data-state="active"] {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f5f5f5 !important;
+}
+
+/* Hover */
+
+.compare-page .moat-evidence-tab-trigger:hover {
+  color: #ffffff;
+}
+
+/* Keep keyboard accessibility */
+
+.compare-page .moat-evidence-tab-trigger:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.6);
+}
+
+/* Mobile */
+
+@media (max-width: 767px) {
+  .compare-page .moat-evidence-tabs-list {
+    width: 100%;
+    height: 50px;
+  }
+
+  .compare-page .moat-evidence-tab-trigger {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 8px;
+    font-size: 11px;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-page .moat-evidence-tab-trigger {
+    transition: none;
+  }
+
+  .compare-page .moat-evidence-tabs-list > span[aria-hidden] {
+    transition: none;
+  }
+}
+
+
+/* ==========================================
+   MOAT — Security Evidence Lab
+   ========================================== */
+
+.compare-page .moat-evidence-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Header */
+
+.compare-page .moat-evidence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.compare-page .moat-evidence-header-main {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
+.compare-page .moat-evidence-header-icon {
+  width: 65px;
+  height: 65px;
+  flex: 0 0 65px;
+
+  display: grid;
+  place-items: center;
+
+  color: #d2d9e5;
+
+  border: 1px solid rgba(255,255,255,.27);
+  border-radius: 17px;
+
+  background: linear-gradient(
+    145deg,
+    rgba(255,255,255,.11),
+    rgba(12,15,21,.65) 55%
+  );
+
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,.22),
+    0 8px 22px rgba(0,0,0,.22);
+}
+
+.compare-page .moat-evidence-header-copy {
+  min-width: 0;
+}
+
+.compare-page .moat-evidence-header-copy h3 {
+  margin: 0 0 6px;
+  color: #f4f4f6;
+  font-size: clamp(21px, 2vw, 27px);
+  line-height: 1.2;
+}
+
+.compare-page .moat-evidence-header-copy p {
+  margin: 0;
+  color: #999da9;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* Test Evidence chip */
+
+.compare-page .moat-evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+
+  padding: 9px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+
+  background: rgba(12,15,20,.5);
+  color: #c6c9d5;
+
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.compare-page .moat-evidence-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e8a05b;
+  box-shadow: 0 0 10px rgba(232,160,91,.35);
+}
+
+/* Inner glass-like evidence panel */
+
+.compare-page .moat-evidence-inner {
+  width: 100%;
+  min-width: 0;
+  padding: clamp(15px, 2vw, 24px);
+
+  border: 1px solid rgba(180,194,218,.2);
+  border-radius: 19px;
+
+  background: rgba(4,7,12,.42);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 12px 30px rgba(0,0,0,.15);
+}
+
+.compare-page .moat-evidence-inner-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  margin-bottom: 16px;
+
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .19em;
+  color: #bfc9dd;
+}
+
+.compare-page .moat-evidence-inner-meta {
+  color: #8d96a9;
+  font-size: 10px;
+  letter-spacing: .1em;
+  white-space: nowrap;
+}
+
+/* Numbered test rows */
+
+.compare-page .moat-evidence-test-list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.compare-page .moat-evidence-test {
+  display: grid;
+  grid-template-columns: 40px minmax(0,1fr) auto 16px;
+  align-items: center;
+  gap: 16px;
+
+  min-width: 0;
+  padding: 12px 15px;
+
+  border: 1px solid rgba(169,181,203,.19);
+  border-radius: 13px;
+
+  background: rgba(8,11,16,.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+.compare-page .moat-evidence-test-number {
+  width: 38px;
+  height: 38px;
+
+  display: grid;
+  place-items: center;
+
+  border: 1px solid rgba(255,255,255,.19);
+  border-radius: 12px;
+
+  background: rgba(17,20,28,.65);
+  color: #cfd7e7;
+
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-page .moat-evidence-test-description {
+  margin: 0;
+  min-width: 0;
+  color: #e1e3ea;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.5;
+}
+
+.compare-page .moat-evidence-test-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  margin: 0;
+  padding: 9px 12px;
+
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-page .moat-evidence-test-result.is-good {
+  color: #36d9a0;
+  background: rgba(20,109,83,.12);
+  border: 1px solid rgba(54,217,160,.24);
+}
+
+.compare-page .moat-evidence-test-result.is-risk {
+  color: #fa647c;
+  background: rgba(139,31,58,.12);
+  border: 1px solid rgba(250,100,124,.25);
+}
+
+.compare-page .moat-evidence-test-arrow {
+  color: #777f90;
+}
+
+/* Explanatory note */
+
+.compare-page .moat-evidence-footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  margin-top: 22px;
+  padding-top: 17px;
+
+  border-top: 1px solid rgba(255,255,255,.09);
+}
+
+.compare-page .moat-evidence-info {
+  display: grid;
+  place-items: center;
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+
+  border: 1px solid #8f99ae;
+  border-radius: 50%;
+  color: #bbc4d5;
+
+  font-size: 12px;
+  font-family: Georgia, serif;
+}
+
+.compare-page .moat-evidence-footnote p {
+  margin: 0;
+  color: #959aa7;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* Responsive */
+
+@media (max-width: 767px) {
+  .compare-page .moat-evidence-panel {
+    gap: 20px;
+  }
+
+  .compare-page .moat-evidence-header {
+    flex-wrap: wrap;
+  }
+
+  .compare-page .moat-evidence-header-icon {
+    width: 49px;
+    height: 49px;
+    flex-basis: 49px;
+    border-radius: 13px;
+  }
+
+  .compare-page .moat-evidence-header-icon svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .compare-page .moat-evidence-header-main {
+    gap: 13px;
+  }
+
+  .compare-page .moat-evidence-inner-heading {
+    flex-wrap: wrap;
+    line-height: 1.6;
+  }
+
+  .compare-page .moat-evidence-test {
+    grid-template-columns: 36px minmax(0,1fr);
+    gap: 10px 12px;
+    padding: 12px;
+  }
+
+  .compare-page .moat-evidence-test-number {
+    width: 34px;
+    height: 34px;
+  }
+
+  .compare-page .moat-evidence-test-result {
+    grid-column: 2;
+    justify-self: start;
+    white-space: normal;
+    text-align: start;
+  }
+
+  .compare-page .moat-evidence-test-arrow {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-page .moat-evidence-panel * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
+/* ================================================
+   MOAT — Evidence Lab refinement
+   ================================================ */
+
+.compare-page .moat-evidence-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  gap: 24px;
+}
+
+/* Header */
+
+.compare-page .moat-evidence-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.compare-page .moat-evidence-header-main {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* Real Glass UI icon surface */
+
+.compare-page .moat-evidence-header-icon {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 0 !important;
+  box-sizing: border-box;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 17px;
+  color: #d2d9e5;
+
+  background: rgba(14, 16, 20, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Allow the actual Glass UI shader to be visible */
+
+.compare-page .moat-evidence-header-icon[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.compare-page .moat-evidence-header-icon svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.compare-page .moat-evidence-header-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.compare-page .moat-evidence-header-copy h3 {
+  margin: 0 0 5px;
+  color: #f4f4f6;
+  font-size: clamp(21px, 2vw, 27px);
+  line-height: 1.2;
+}
+
+.compare-page .moat-evidence-header-copy p {
+  margin: 0;
+  color: #a0a4b1;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.compare-page .moat-evidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(10,13,17,0.35);
+  color: #c3c8d3;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.compare-page .moat-evidence-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e5a366;
+}
+
+/* Evidence detail panel */
+
+.compare-page .moat-evidence-inner {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: clamp(14px, 2vw, 24px);
+  border: 1px solid rgba(180,194,218,0.20);
+  border-radius: 19px;
+  background: rgba(5,8,13,0.36);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+.compare-page .moat-evidence-inner-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+  color: #c2c9d8;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  line-height: 1.6;
+}
+
+.compare-page .moat-evidence-inner-meta {
+  color: #8d96a9;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+}
+
+/* Actual test data */
+
+.compare-page .moat-evidence-test-list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.compare-page .moat-evidence-test {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid rgba(169,181,203,0.19);
+  border-radius: 13px;
+  background: rgba(8,11,16,0.45);
+}
+
+.compare-page .moat-evidence-test-number {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 12px;
+  color: #cfd7e7;
+  background: rgba(17,20,28,0.55);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-page .moat-evidence-test-description {
+  min-width: 0;
+  margin: 0;
+  color: #e1e3ea;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+/* Verdicts are information, not buttons */
+
+.compare-page .moat-evidence-test-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.compare-page .moat-evidence-test-result.is-good {
+  color: #36d9a0;
+  background: rgba(20,109,83,0.12);
+  border: 1px solid rgba(54,217,160,0.24);
+}
+
+.compare-page .moat-evidence-test-result.is-risk {
+  color: #fa647c;
+  background: rgba(139,31,58,0.12);
+  border: 1px solid rgba(250,100,124,0.25);
+}
+
+/* Notes */
+
+.compare-page .moat-evidence-footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 17px;
+  border-top: 1px solid rgba(255,255,255,0.09);
+  color: #aab4c5;
+}
+
+.compare-page .moat-evidence-footnote svg {
+  flex: 0 0 18px;
+}
+
+.compare-page .moat-evidence-footnote p {
+  margin: 0;
+  color: #959aa7;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+/* Tablet and small desktop */
+
+@media (max-width: 900px) {
+  .compare-page .moat-evidence-panel {
+    gap: 20px;
+  }
+
+  .compare-page .moat-evidence-test {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 10px 12px;
+  }
+
+  .compare-page .moat-evidence-test-result {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+/* Mobile */
+
+@media (max-width: 600px) {
+  .compare-page .moat-evidence-header {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .compare-page .moat-evidence-header-main {
+    flex-basis: 100%;
+    gap: 12px;
+  }
+
+  .compare-page .moat-evidence-header-icon {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    flex-basis: 48px;
+    border-radius: 13px;
+  }
+
+  .compare-page .moat-evidence-header-icon svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .compare-page .moat-evidence-header-copy h3 {
+    font-size: 19px;
+  }
+
+  .compare-page .moat-evidence-header-copy p {
+    font-size: 11px;
+  }
+
+  .compare-page .moat-evidence-chip {
+    margin-inline-start: 60px;
+    font-size: 9px;
+    padding: 7px 10px;
+  }
+
+  .compare-page .moat-evidence-inner {
+    padding: 12px;
+    border-radius: 15px;
+  }
+
+  .compare-page .moat-evidence-test {
+    grid-template-columns: 32px minmax(0, 1fr);
+    padding: 11px;
+    gap: 10px;
+  }
+
+  .compare-page .moat-evidence-test-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    font-size: 11px;
+  }
+
+  .compare-page .moat-evidence-test-description {
+    font-size: 12px;
+  }
+
+  .compare-page .moat-evidence-test-result {
+    padding: 7px 10px;
+    font-size: 11px;
+    white-space: normal;
+    text-align: start;
+  }
+}
+
+/* Arabic support */
+
+html[dir="rtl"] .compare-page .moat-evidence-panel {
+  direction: rtl;
+}
+
+html[dir="rtl"] .compare-page .moat-evidence-header,
+html[dir="rtl"] .compare-page .moat-evidence-test {
+  text-align: right;
+}
+
+html[dir="rtl"] .compare-page .moat-evidence-chip {
+  margin-inline-start: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-page .moat-evidence-panel * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* =========================
+   Evidence card alignment
+   ========================= */
+
+.compare-page .moat-evidence-panel,
+.compare-page .moat-evidence-card,
+.compare-page .moat-evidence-tabs-content {
+  text-align: left;
+}
+
+.compare-page .moat-evidence-header {
+  align-items: flex-start;
+}
+
+.compare-page .moat-evidence-header-main {
+  align-items: flex-start;
+}
+
+.compare-page .moat-evidence-header-copy {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.compare-page .moat-evidence-header-copy h3 {
+  margin: 0 0 6px;
+  text-align: left;
+}
+
+.compare-page .moat-evidence-header-copy p {
+  margin: 0;
+  text-align: left;
+}
+
+.compare-page .moat-evidence-inner {
+  text-align: left;
+}
+
+.compare-page .moat-evidence-inner-heading {
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.compare-page .moat-evidence-test-list {
+  text-align: left;
+}
+
+.compare-page .moat-evidence-test {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 170px;
+  align-items: center;
+  gap: 15px;
+}
+
+.compare-page .moat-evidence-test-description {
+  text-align: left;
+  justify-self: start;
+}
+
+/* =========================
+   Same size result badges
+   ========================= */
+
+.compare-page .moat-evidence-test-result {
+  width: 170px;
+  min-height: 46px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  text-align: center;
+  white-space: nowrap;
+  justify-self: end;
+}
+
+.compare-page .moat-evidence-test-result span {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+}
+
+/* mobile */
+@media (max-width: 900px) {
+  .compare-page .moat-evidence-test {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .compare-page .moat-evidence-test-result {
+    grid-column: 2;
+    justify-self: start;
+    width: 170px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 600px) {
+  .compare-page .moat-evidence-header-copy,
+  .compare-page .moat-evidence-header-copy h3,
+  .compare-page .moat-evidence-header-copy p,
+  .compare-page .moat-evidence-inner,
+  .compare-page .moat-evidence-inner-heading,
+  .compare-page .moat-evidence-test-description {
+    text-align: left;
+  }
+
+  .compare-page .moat-evidence-test {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .compare-page .moat-evidence-test-result {
+    width: 100%;
+    min-height: 42px;
+    justify-self: stretch;
+  }
+
+  .compare-page .moat-evidence-test-result span {
+    text-align: center;
+  }
+}

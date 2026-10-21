@@ -1,23 +1,42 @@
-import Home from '../pages/Home/Home'
-import Compare from '../pages/Compare/Compare'
-import Docs from '../pages/Docs/Docs'
-import Team from '../pages/Team/Team'
-import Navbar from '../components/layout/Navbar'
+
+import { lazy, Suspense } from 'react'
 import type { ComponentType } from 'react'
+
+import Home from '../pages/Home/Home'
+import Navbar from '../components/layout/Navbar'
+
+const Compare = lazy(() => import('../pages/Compare/Compare'))
+const Team = lazy(() => import('../pages/Team/Team'))
+const Docs = lazy(() => import('../pages/Docs/Docs'))
 
 const pages: Record<string, ComponentType> = {
   '/compare': Compare,
-  '/docs': Docs,
   '/team': Team,
+  '/docs': Docs,
 }
 
 export default function App() {
-  const path = location.pathname.replace(/\/+$/, '') || '/'
+  const rawPath = location.pathname.replace(/\/+$/, '') || '/'
+
+  const path =
+    rawPath
+      .replace(/\/index\.html$/, '')
+      .replace(/\.html$/, '')
+      .replace(/\/+$/, '') || '/'
+
   const Page = pages[path] ?? Home
+
   return (
     <>
       <Navbar />
-      <Page />
+
+      <Suspense
+        fallback={
+          <main id="main-content" aria-busy="true" />
+        }
+      >
+        <Page />
+      </Suspense>
     </>
   )
 }

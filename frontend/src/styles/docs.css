@@ -1,16 +1,51 @@
 /* The documentation page: a sticky list of sections beside a long article. */
 .docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; align-items: start; text-align: left; padding-block: 36px 72px; }
-.docs-nav { position: sticky; top: 96px; display: flex; flex-direction: column; gap: 2px; }
+.docs-nav {
+  position: sticky;
+  top: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  /* Independent sidebar scrolling */
+  max-height: calc(100dvh - 112px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
 .docs-k { font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px 12px; }
 .docs-nav a { display: block; padding: 7px 12px; border-radius: 9px; font-size: .875rem; font-weight: 600; color: var(--ink-2); text-decoration: none; transition: color .18s, background .18s; }
 .docs-nav a:hover, .docs-nav a:focus-visible { color: var(--ink); background: rgba(255,255,255,.05); outline: none; }
 .docs-nav a[aria-current] { color: var(--orange); background: rgba(255,95,0,.09); }
+
 @media (max-width: 900px) {
-  .docs { grid-template-columns: 1fr; gap: 24px; }
-  .docs-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 6px; }
-  .docs-k { display: none; }
-  .docs-nav a { border: 1px solid var(--line); background: rgba(255,255,255,.04); padding: 7px 12px; }
+  .docs {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .docs-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .docs-k {
+    display: none;
+  }
+
+  .docs-nav a {
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,.04);
+    padding: 7px 12px;
+  }
 }
+
 
 .docs-body { min-width: 0; }
 .docs-head { margin-bottom: 40px; }
