@@ -67,10 +67,6 @@ export default function VerdictsPane({ feed, onOpenVerdict }: VerdictsPaneProps)
       <div className="search-row">
         <div className="titles" style={{ flex: 1, minWidth: 260 }}>
           <h1 className="page-title">{L('Verdicts', 'الأحكام')}</h1>
-          <div className="page-caption">
-            {L('Payments checked against your approvals: paid, held, or refused with the reason.',
-              'دفعات فُحصت مقابل موافقاتك: مدفوعة، أو مُعلَّقة، أو مرفوضة مع السبب.')}
-          </div>
         </div>
         <div className="search-field">
           <input

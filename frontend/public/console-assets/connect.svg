@@ -1,0 +1,6 @@
+<!-- Moat console asset: connect.svg — sidebar icon — Connect (a plug), drawn to match the other 20px stroke icons -->
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M7.5 2.5V6M12.5 2.5V6" stroke="white" stroke-width="2" stroke-linecap="round"/>
+<path d="M5 6H15V9.5C15 12.26 12.76 14.5 10 14.5C7.24 14.5 5 12.26 5 9.5V6Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+<path d="M10 14.5V17.5" stroke="white" stroke-width="2" stroke-linecap="round"/>
+</svg>

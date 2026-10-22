@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { L } from '../../../i18n'
 import { roleName, ago, LOCALE } from '../formatters'
 import type { ApiKey } from '../types'
-import { Chevrons, MenuCheck, CopyButton } from './bits'
+import { Chevrons, MenuCheck } from './bits'
 
 interface ApiKeysPaneProps {
   keys: ApiKey[]
@@ -83,34 +83,6 @@ export default function ApiKeysPane({ keys, onMintKey, onRevokeKey, error }: Api
   const [expiryOpen, setExpiryOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
 
-  const apiOrigin = typeof location !== 'undefined'
-    ? location.hostname === 'moatgateway.dpdns.org' ? 'https://api.moatgateway.dpdns.org' : location.origin
-    : ''
-
-  const curlAgent = useMemo(() => [
-    `${apiOrigin}/mcp`,
-    '',
-    '# any MCP client, with the agent key as a bearer token:',
-    `curl -s ${apiOrigin}/mcp \\`,
-    "  -H 'authorization: Bearer YOUR_AGENT_KEY' \\",
-    "  -H 'content-type: application/json' \\",
-    "  -H 'accept: application/json, text/event-stream' \\",
-    '  -d \'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"you","version":"1"}}}\'',
-  ].join('\n'), [apiOrigin])
-
-  const curlIntent = useMemo(() => [
-    '# before the agent runs: what the user actually typed, from your own code',
-    `curl -s ${apiOrigin}/v1/session/SESSION_ID/intent \\`,
-    "  -H 'authorization: Bearer YOUR_APPROVER_KEY' \\",
-    "  -H 'content-type: application/json' \\",
-    '  -d \'{"text":"Pay the Northwind Cloud Co invoice INV-4471 for 480 USD."}\'',
-    '',
-    '# what a person signed off, if you use structured authorizations',
-    `curl -s ${apiOrigin}/v1/session/SESSION_ID/authorizations \\`,
-    "  -H 'authorization: Bearer YOUR_APPROVER_KEY' \\",
-    "  -H 'content-type: application/json' \\",
-    '  -d \'{"authorization_id":"auth-1","invoice_id":"INV-4471","payee":"Northwind Cloud Co","amount":"480","currency":"USD","expires_at":"2030-01-01T00:00:00Z"}\'',
-  ].join('\n'), [apiOrigin])
 
   const openCreate = () => {
     setLabel('')
@@ -176,7 +148,6 @@ export default function ApiKeysPane({ keys, onMintKey, onRevokeKey, error }: Api
       <div className="page-head">
         <div className="titles">
           <h1 className="page-title">{L('API keys', 'مفاتيح API')}</h1>
-          <div className="page-caption">{L('Bearer keys for your MCP clients and your application', 'مفاتيح حاملة لعملاء MCP ولتطبيقك')}</div>
         </div>
         <button className="btn-create-key" type="button" onClick={openCreate}>
           {L('CREATE KEY', 'أنشئ مفتاحًا')}
@@ -240,34 +211,6 @@ export default function ApiKeysPane({ keys, onMintKey, onRevokeKey, error }: Api
       <p className="hint foot-note" id="keys-note" style={error ? { color: 'var(--red-l)' } : undefined}>
         {error || L(`${keys.length} ${keys.length === 1 ? 'key' : 'keys'}`, `${keys.length} مفتاح`)}
       </p>
-
-      <div className="page-head" style={{ marginTop: 20 }}>
-        <div className="titles" style={{ maxWidth: 640 }}>
-          <h2 className="page-title">{L('Connect your agent', 'اربط وكيلك')}</h2>
-          <div className="page-caption">
-            {L('The agent holds an agent key. Your application holds an approver key and records what the user typed. The agent never sees it.',
-              'يحمل الوكيل مفتاح وكيل. ويحمل تطبيقك مفتاح مُوافِق ويسجّل ما كتبه المستخدم. ولا يراه الوكيل أبدًا.')}
-          </div>
-        </div>
-      </div>
-
-      <div className="connect-cols" style={{ marginTop: -10 }}>
-        <div className="code-col">
-          <h3>{L('1. The agent', '1. الوكيل')}</h3>
-          <div className="code-block" dir="ltr">
-            <pre id="curl">{curlAgent}</pre>
-            <CopyButton text={curlAgent} />
-          </div>
-          <a className="tests-link" href="/tests">{L('Run the nine tests', 'شغّل الاختبارات التسعة')}</a>
-        </div>
-        <div className="code-col">
-          <h3>{L('2. Your application, with an approver key', '2. تطبيقك، بمفتاح مُوافِق')}</h3>
-          <div className="code-block" dir="ltr">
-            <pre id="curl-intent">{curlIntent}</pre>
-            <CopyButton text={curlIntent} />
-          </div>
-        </div>
-      </div>
 
       {showCreate && (
         <div className="modal-overlay open" onClick={() => setShowCreate(false)}>

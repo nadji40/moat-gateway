@@ -91,9 +91,7 @@
   --slide-dur: 0.42s;
   --bezel-side: inset 0 2px 3.5px #2b2b2b;
 }
-.shell * { box-sizing: border-box; scrollbar-width: none; }
-/* hide scrollbars, scrolling still works */
-.shell *::-webkit-scrollbar { display: none; }
+.shell * { box-sizing: border-box; }
 /* app frame: body never scrolls; the .surface is the single scroller.
    100dvh (with the vh fallback) keeps the frame correct on mobile URL bars. */
 /* minimalist scrollbars: 4px dark thumb, invisible rail */
@@ -1575,3 +1573,195 @@ html[lang="ar"] .shell { --mono: "Roboto Mono", "IBM Plex Sans Arabic", ui-monos
 /* A payee name runs in its own direction, so a Latin name in the Arabic
    page is cut at its end, not its start. */
 .shell .v-payee, .shell .cell-payee, .shell .k-name { unicode-bidi: plaintext; }
+
+/* ============================================================
+   Scrolling you can see. The design hid every scrollbar; with the surface
+   as the only scroller that left no sign there was more below.
+   ============================================================ */
+.shell * { scrollbar-width: thin; scrollbar-color: var(--scroll, #4a4a4a) transparent; }
+.shell *::-webkit-scrollbar { display: block; width: 10px; height: 10px; background: transparent; }
+.shell *::-webkit-scrollbar-thumb {
+  background: var(--scroll, #4a4a4a); border: 3px solid transparent; border-radius: 10px; background-clip: content-box;
+}
+.shell *::-webkit-scrollbar-thumb:hover { background-color: var(--t3); }
+.shell *::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================
+   Nothing spills out of its box: long key names and ids end in an
+   ellipsis, and the stat captions wrap.
+   ============================================================ */
+.shell .signin-card { min-width: 0; overflow: hidden; }
+.shell .signin-name, .shell .signin-mask { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell .signin-key { min-width: 0; }
+@media (min-width: 901px) { .shell .stat-rail { width: 176px; } }
+.shell .stat-card { min-width: 0; }
+.shell .stat-card .lbl, .shell .stat-card .sub { white-space: normal; overflow-wrap: anywhere; }
+.shell .stat-card.big { gap: 4px; }
+
+/* the header's round icon buttons: tour and theme */
+.shell .icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: transparent; color: var(--t1);
+}
+.shell .icon-btn:hover { background: var(--s2); }
+.shell .icon-btn:focus-visible { outline: 2px solid #878282; outline-offset: 1px; }
+
+/* ============================================================
+   The sidebar folds to an icon rail, and says how to unfold it.
+   ============================================================ */
+.shell .sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shell .collapse-btn {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: 30px; height: 30px; border-radius: 8px; border: 0; background: transparent; color: var(--t2); cursor: pointer;
+}
+.shell .collapse-btn:hover { background: var(--s2); color: var(--t1); }
+.shell .collapse-btn:focus-visible { outline: 2px solid #878282; outline-offset: 1px; }
+html[dir="rtl"] .shell .collapse-btn svg { transform: scaleX(-1); }
+.shell .sidebar { transition: width .2s var(--slide-ease); }
+.shell .app.collapsed .sidebar { width: 62px; padding: 20px 8px; }
+.shell .app.collapsed .sidebar-heading,
+.shell .app.collapsed .nav-btn .nav-label,
+.shell .app.collapsed .nav-btn .tab-n,
+.shell .app.collapsed .signin-label,
+.shell .app.collapsed .signin-mask,
+.shell .app.collapsed .signin-name { display: none; }
+.shell .app.collapsed .sidebar-head { justify-content: center; }
+.shell .app.collapsed .nav-btn { justify-content: center; padding: 8px 0; }
+.shell .app.collapsed .signin-card { align-items: center; padding: 10px 0; }
+/* the icon rail below 900px has nothing to fold */
+@media (max-width: 900px) { .shell .collapse-btn { display: none; } .shell .sidebar-head { justify-content: center; } }
+
+/* ============================================================
+   Connect
+   ============================================================ */
+.shell .connect-clients {
+  position: relative; display: flex; gap: 4px; padding: 4px; max-width: 100%; overflow-x: auto;
+  border-radius: 14px; background: var(--s2); border: 1px solid var(--line-strong); width: max-content;
+}
+.shell .connect-clients .thumb {
+  position: absolute; top: 4px; bottom: 4px; left: 0; z-index: 0; border-radius: 10px;
+  background: var(--orange); box-shadow: var(--bezel-orange);
+  transition: transform .3s var(--slide-ease), width .3s var(--slide-ease);
+}
+.shell .connect-clients [role=tab] {
+  position: relative; z-index: 1; flex: none; white-space: nowrap; cursor: pointer;
+  padding: 8px 14px; border: 0; border-radius: 10px; background: transparent;
+  font: 500 13px/1.2 var(--mono); color: var(--t1);
+}
+.shell .connect-clients [role=tab][aria-selected=true] { color: #fff; }
+.shell .connect-panel { display: flex; flex-direction: column; gap: 12px; }
+.shell .connect-where { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font: 500 12px/1.5 var(--mono); color: var(--t2); }
+.shell .connect-once { margin: 0; padding: 10px 14px; border-radius: 10px; font: 500 13px/1.4 var(--font); color: #000; background: var(--yellow); }
+.shell .connect-panel .code-block pre { white-space: pre; overflow-x: auto; }
+
+/* ============================================================
+   The tour: what it is talking about stays lit, the rest dims.
+   ============================================================ */
+.shell .tour { position: fixed; inset: 0; z-index: 60; }
+.shell .tour-dim { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); }
+.shell .tour-ring {
+  position: fixed; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--orange), 0 0 0 9999px rgba(0, 0, 0, .6);
+  transition: top .25s var(--slide-ease), left .25s var(--slide-ease), width .25s var(--slide-ease), height .25s var(--slide-ease);
+}
+.shell .tour-card {
+  position: fixed; width: min(340px, calc(100vw - 24px)); padding: 18px;
+  border-radius: 16px; background: var(--s1); border: 1px solid var(--line-strong);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .45); color: var(--t1); outline: none;
+  transition: top .25s var(--slide-ease), left .25s var(--slide-ease);
+}
+.shell .tour-count { font: 500 11px/1.4 var(--mono); color: var(--t3); }
+.shell .tour-card h2 { margin: 6px 0 6px; font-size: 18px; }
+.shell .tour-card p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: var(--t2); }
+.shell .tour-actions { display: flex; align-items: center; gap: 8px; }
+.shell .tour-gap { flex: 1; }
+.shell .tour-skip { border: 0; background: none; color: var(--t2); cursor: pointer; font: 500 13px var(--font); padding: 6px 2px; }
+.shell .tour-actions .btn { min-height: 36px; padding: 0 14px; }
+@media (prefers-reduced-motion: reduce) { .shell .tour-ring, .shell .tour-card, .shell .connect-clients .thumb, .shell .sidebar { transition: none; } }
+
+/* a fifth place in the phone tab bar */
+@media (max-width: 720px) {
+  .shell .tabbar { grid-template-columns: repeat(5, 1fr); }
+  .shell .tabbar-ico { width: 44px; }
+  .shell .tabbar-btn { font-size: 10.5px; }
+  .shell .icon-btn { width: 38px; height: 38px; }
+  .shell .topbar-actions { gap: 6px; }
+  .shell .topbar-key { display: none; }
+  .shell .connect-clients { width: 100%; }
+}
+
+/* ============================================================
+   Light mode. The tokens carry most of it; what the design wrote as a
+   literal colour is restated here. White line icons are inverted.
+   ============================================================ */
+html[data-theme="light"] body.in-ws { background: #F4F4F2; color: #17171A; }
+html[data-theme="light"] .shell {
+  --page: #F4F4F2;
+  --s1: #FFFFFF;
+  --s2: #F1F1EF;
+  --s3: #E7E7E4;
+  --inset: #FAFAF9;
+  --line-strong: #DADAD6;
+  --line-muted: #E7E7E4;
+  --t1: #17171A;
+  --t2: #5E5E66;
+  --t3: #85858C;
+  --t-cap: #6E6E75;
+  --t-panel: #17171A;
+  --t-label: #3A3A40;
+  --t-mini: #5E5E66;
+  --t-body: #17171A;
+  --t-ph: #8A8A92;
+  --bg: #F4F4F2;
+  --bg-2: #FFFFFF;
+  --ink: #17171A;
+  --line: rgba(0, 0, 0, .1);
+  --scroll: #C4C4C0;
+  --bezel-dark: inset 0 1px 2px rgba(0, 0, 0, .06);
+  --bezel-side: inset 0 1px 2px rgba(0, 0, 0, .06);
+  color: var(--t1);
+}
+html[data-theme="light"] .shell .surface { box-shadow: 0 1px 2px rgba(0, 0, 0, .06); border-color: var(--line-strong); }
+html[data-theme="light"] .shell .panel,
+html[data-theme="light"] .shell .stat-card { border-color: var(--line-strong); box-shadow: none; }
+html[data-theme="light"] .shell .brand span { color: #3A3A40; }
+html[data-theme="light"] .shell .pg-columns .panel-title,
+html[data-theme="light"] .shell .readout-row .rt,
+html[data-theme="light"] .shell #mandate dd { color: var(--t1); }
+html[data-theme="light"] .shell .menu-item.selected,
+html[data-theme="light"] .shell .deck .menu-body > button.selected,
+html[data-theme="light"] .shell .deck .menu-body > button:hover,
+html[data-theme="light"] .shell .deck .menu-body .chip:hover { background: var(--s3); }
+html[data-theme="light"] .shell .nav-btn:not(.active):hover { background: var(--s2); }
+html[data-theme="light"] .shell .btn-dark { background: var(--s2); color: var(--t1); border-color: var(--line-strong); }
+html[data-theme="light"] .shell .code-block { box-shadow: none; }
+html[data-theme="light"] .shell .topbar { border-color: var(--line-muted); }
+html[data-theme="light"] .shell .tabbar { background: color-mix(in srgb, #FFFFFF 92%, transparent); }
+/* white line icons drawn as files: invert them; drawn inline: follow the text */
+html[data-theme="light"] .shell img[src^="/console-assets/"]:not([src*="currency/"]):not([src*="-sepolia"]):not([src*="devnet"]):not([src*="moat-logo"]) { filter: invert(1); }
+html[data-theme="light"] .shell img[src*="moat-logo"] { filter: invert(1) brightness(.35); }
+html[data-theme="light"] .shell svg [stroke="white"] { stroke: var(--t1); }
+html[data-theme="light"] .shell svg [fill="white"] { fill: var(--t1); }
+html[data-theme="light"] .shell .btn-primary svg [stroke="white"],
+html[data-theme="light"] .shell .btn-danger-outline svg [stroke="white"] { stroke: #fff; }
+/* the verdict drawer and its scrim live outside the shell */
+html[data-theme="light"] .drawer { background: #FFFFFF; color: #17171A; border-color: #DADAD6; }
+html[data-theme="light"] .drawer .dr-why li,
+html[data-theme="light"] .drawer .dr-kv dd { color: #17171A; }
+html[data-theme="light"] .drawer .dr-kv dt { color: #5E5E66; }
+html[data-theme="light"] .scrim { background: rgba(0, 0, 0, .3); }
+html[data-theme="light"] .shell .tour-card { box-shadow: 0 18px 50px rgba(0, 0, 0, .18); }
+html[data-theme="light"] .dr-why li { background: #F4F4F2; }
+/* the chart's labels, grid and hover card in light mode */
+html[data-theme="light"] .shell .bklit-axis-text { fill: var(--t2); }
+html[data-theme="light"] .shell .bklit-grid-line { stroke: rgba(0, 0, 0, .12); }
+html[data-theme="light"] .shell .bklit-tooltip { background: #FFFFFF; border-color: #DADAD6; color: #17171A; }
+html[data-theme="light"] .shell .bklit-tooltip-title, html[data-theme="light"] .shell .bklit-tooltip-row b { color: #17171A; }
+html[data-theme="light"] .shell .bklit-tooltip-row { color: #3A3A40; }
+html[data-theme="light"] .shell .key-status.active { color: #13804A; }
+html[data-theme="light"] .shell .key-status.expired,
+html[data-theme="light"] .shell .is-expired { color: #C62828; }
+html[data-theme="light"] .shell .key-status.here { color: #C24A00; }
+/* the coin glyphs are white too: dark on the light chips, white on the orange one that is chosen */
+html[data-theme="light"] .shell .currency-row button:not([aria-checked="true"]) img[src*="currency/"] { filter: invert(1); }

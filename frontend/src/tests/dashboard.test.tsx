@@ -58,7 +58,11 @@ function openDashboard(pane = '') {
 }
 
 describe('the dashboard', () => {
-  beforeEach(() => localStorage.setItem('moat.admin', ADMIN))
+  // The tour opens by itself on a first visit; these tests have seen it.
+  beforeEach(() => {
+    localStorage.setItem('moat.admin', ADMIN)
+    localStorage.setItem('moat.ws.toured', '1')
+  })
   afterEach(() => {
     localStorage.clear()
     window.history.replaceState({}, '', '/')
@@ -196,7 +200,7 @@ describe('the dashboard', () => {
     const tabbar = document.querySelector<HTMLElement>('.tabbar')!
     // Live keys (not revoked, not expired) and recent verdicts are counted.
     await waitFor(() => expect(within(tabbar).getAllByRole('button').map((t) => t.textContent))
-      .toEqual(['Usage', '2API keys', 'Playground', '2Verdicts']))
+      .toEqual(['Usage', '2API keys', 'Connect', 'Playground', '2Verdicts']))
     expect(within(tabbar).getByRole('button', { name: /Usage/ })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(within(tabbar).getByRole('button', { name: /Verdicts/ }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Verdicts' })).toBeInTheDocument()
@@ -204,6 +208,60 @@ describe('the dashboard', () => {
     expect(location.hash).toBe('#pane-verdicts')
     // The signed-in key travels to the header, where a phone shows it.
     expect(document.querySelector('.topbar-key')!.textContent).toBe('first admin key')
+  })
+
+  it('walks a first visitor round the workspace, and remembers that it did', async () => {
+    localStorage.removeItem('moat.ws.toured')
+    gateway()
+    openDashboard()
+    const tour = await screen.findByRole('dialog', { name: 'Your workspace' })
+    expect(within(tour).getByText(/1 of \d/)).toBeInTheDocument()
+    fireEvent.click(within(tour).getByRole('button', { name: 'Next' }))
+    expect(await screen.findByRole('dialog', { name: 'Usage' })).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Usage' })).getByRole('button', { name: 'Next' }))
+    // The tour opens the pane it is talking about.
+    expect(await screen.findByRole('heading', { level: 1, name: 'API keys' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(localStorage.getItem('moat.ws.toured')).toBe('1')
+    // And it is there again from the header.
+    fireEvent.click(screen.getByRole('button', { name: 'Show me around' }))
+    expect(await screen.findByRole('dialog', { name: 'Your workspace' })).toBeInTheDocument()
+  })
+
+  it('switches to light mode and folds the sidebar, and keeps both', async () => {
+    gateway()
+    const first = openDashboard()
+    fireEvent.click(await screen.findByRole('button', { name: 'Light mode' }))
+    expect(document.documentElement.dataset.theme).toBe('light')
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse the sidebar' }))
+    expect(document.querySelector('.app')!.className).toContain('collapsed')
+    first.unmount()
+    expect(document.documentElement.dataset.theme).toBeUndefined()
+    openDashboard()
+    await screen.findByRole('button', { name: 'Dark mode' })
+    expect(document.documentElement.dataset.theme).toBe('light')
+    expect(document.querySelector('.app')!.className).toContain('collapsed')
+    expect(screen.getByRole('button', { name: 'Expand the sidebar' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('gives each AI client its setup, and fills in a fresh agent key', async () => {
+    const seen = gateway()
+    openDashboard('#pane-connect')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Connect' })).toBeInTheDocument()
+    const code = () => document.querySelector('#connect-code')!.textContent!
+    expect(code()).toContain('claude mcp add --transport http moat')
+    expect(code()).toContain('YOUR_AGENT_KEY')
+    fireEvent.click(screen.getByRole('tab', { name: 'OpenAI' }))
+    expect(code()).toContain('"type": "mcp"')
+    fireEvent.click(screen.getByRole('tab', { name: 'Claude API' }))
+    expect(code()).toContain('mcp_toolset')
+    fireEvent.click(screen.getByRole('button', { name: 'CREATE AGENT KEY' }))
+    await waitFor(() => expect(code()).toContain('moat_new_secret'))
+    expect(code()).not.toContain('YOUR_AGENT_KEY')
+    const minted = seen.find((s) => s.url === '/v1/keys' && s.method === 'POST')!
+    expect(minted.body).toMatchObject({ access_role: 'agent', scopes: [] })
+    expect(screen.getByRole('status')).toHaveTextContent('shown once')
   })
 
   it('runs in Arabic, right to left', async () => {

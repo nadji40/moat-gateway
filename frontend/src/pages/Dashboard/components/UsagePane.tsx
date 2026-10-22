@@ -52,7 +52,6 @@ export default function UsagePane({ feed, usage, onOpenVerdict }: UsagePaneProps
       <div className="page-head">
         <div className="titles">
           <h1 className="page-title">{L('Usage', 'الاستخدام')}</h1>
-          <div className="page-caption">{L('How many payments were checked, and what Moat decided', 'كم دفعة فُحصت، وماذا قرّر Moat')}</div>
           {lastAt && (
             <div className="page-caption" id="last-at">
               {usage?.sessions
@@ -78,7 +77,6 @@ export default function UsagePane({ feed, usage, onOpenVerdict }: UsagePaneProps
             <div id="chart-area" style={{ position: 'relative' }}>
               <VerdictBarChart data={buckets} />
             </div>
-            <p className="hint">{L(`From your ${fmt(feed.length)} most recent verdicts.`, `من أحدث ${fmt(feed.length)} حكم لديك.`)}</p>
           </section>
 
           <div className="usage-lists">

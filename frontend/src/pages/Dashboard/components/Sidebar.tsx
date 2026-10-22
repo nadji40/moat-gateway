@@ -8,11 +8,14 @@ interface SidebarProps {
   keyId?: string
   keysCount?: number
   verdictsCount?: number
+  collapsed: boolean
+  onToggleCollapse: () => void
 }
 
 export const TABS: { pane: PaneId; icon: string; label: string; count?: 'keys' | 'verdicts' }[] = [
   { pane: 'pane-usage', icon: 'Usage.svg', label: L('Usage', 'الاستخدام') },
   { pane: 'pane-keys', icon: 'Key.svg', label: L('API keys', 'مفاتيح API'), count: 'keys' },
+  { pane: 'pane-connect', icon: 'connect.svg', label: L('Connect', 'الربط') },
   { pane: 'pane-playground', icon: 'playground.svg', label: L('Playground', 'ساحة التجربة') },
   { pane: 'pane-verdicts', icon: 'Verdicts.svg', label: L('Verdicts', 'الأحكام'), count: 'verdicts' },
 ]
@@ -24,10 +27,23 @@ export default function Sidebar({
   keyId,
   keysCount = 0,
   verdictsCount = 0,
+  collapsed,
+  onToggleCollapse,
 }: SidebarProps) {
   return (
     <div className="sidebar" role="navigation" aria-label={L('Workspace', 'مساحة العمل')}>
-      <div className="sidebar-heading">{L('WORKSPACE', 'مساحة العمل')}</div>
+      <div className="sidebar-head">
+        <div className="sidebar-heading">{L('WORKSPACE', 'مساحة العمل')}</div>
+        <button type="button" className="collapse-btn" onClick={onToggleCollapse} aria-expanded={!collapsed}
+          aria-label={collapsed ? L('Expand the sidebar', 'وسّع الشريط الجانبي') : L('Collapse the sidebar', 'اطوِ الشريط الجانبي')}
+          title={collapsed ? L('Expand', 'وسّع') : L('Collapse', 'اطوِ')}>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="16" rx="3" />
+            <path d="M9 4v16" />
+            <path d={collapsed ? 'M13 10l2 2-2 2' : 'M16 10l-2 2 2 2'} />
+          </svg>
+        </button>
+      </div>
       <div className="nav" role="tablist">
         {TABS.map((t) => {
           const n = t.count === 'keys' ? keysCount : t.count === 'verdicts' ? verdictsCount : 0
@@ -40,6 +56,7 @@ export default function Sidebar({
               data-pane={t.pane}
               aria-selected={activePane === t.pane}
               onClick={() => onPaneChange(t.pane)}
+              title={collapsed ? t.label : undefined}
             >
               <img src={`/console-assets/${t.icon}`} alt="" />
               <span className="nav-label">{t.label}</span>

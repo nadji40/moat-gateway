@@ -7,6 +7,8 @@ import UsagePane from './components/UsagePane'
 import VerdictsPane from './components/VerdictsPane'
 import ApiKeysPane from './components/ApiKeysPane'
 import PlaygroundPane from './components/PlaygroundPane'
+import ConnectPane from './components/ConnectPane'
+import Tour from './components/Tour'
 import GateSection from './components/GateSection'
 import MintedSection from './components/MintedSection'
 import VerdictDrawer from './components/VerdictDrawer'
@@ -17,7 +19,18 @@ import type { Verdict, ApiKey, UsageData, PaneId } from './types'
 import '../../styles/console.css'
 import '../../styles/chart-components.css'
 
-const PANES: PaneId[] = ['pane-usage', 'pane-verdicts', 'pane-keys', 'pane-playground']
+const PANES: PaneId[] = ['pane-usage', 'pane-verdicts', 'pane-keys', 'pane-connect', 'pane-playground']
+
+/* Per-browser preferences: the theme, a folded sidebar, and whether the tour
+   has been seen. Conveniences only, so a private window simply forgets them. */
+const pref = {
+  get: (k: string) => { try { return localStorage.getItem(k) } catch { return null } },
+  set: (k: string, v: string) => { try { localStorage.setItem(k, v) } catch { /* a private window */ } },
+}
+type Theme = 'dark' | 'light'
+const THEME = 'moat.ws.theme'
+const FOLDED = 'moat.ws.collapsed'
+const TOURED = 'moat.ws.toured'
 
 /** The pane named in the address, so a reload or a shared link lands there. */
 function paneFromHash(): PaneId {
@@ -36,6 +49,19 @@ export default function Dashboard() {
   const [error, setError] = useState('')
   const [drawerVerdict, setDrawerVerdict] = useState<Verdict | null>(null)
   const returnToRef = useRef<HTMLElement | null>(null)
+  const [theme, setTheme] = useState<Theme>(() => (pref.get(THEME) === 'light' ? 'light' : 'dark'))
+  const [collapsed, setCollapsed] = useState(() => pref.get(FOLDED) === '1')
+  const [touring, setTouring] = useState(false)
+
+  // The theme belongs to the workspace, so it is set while the workspace is
+  // open and taken off again when it closes.
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    pref.set(THEME, theme)
+    return () => { delete document.documentElement.dataset.theme }
+  }, [theme])
+
+  useEffect(() => { pref.set(FOLDED, collapsed ? '1' : '0') }, [collapsed])
 
   useEffect(() => {
     document.title = L('moat, your workspace', 'moat، مساحة عملك')
@@ -55,13 +81,24 @@ export default function Dashboard() {
     return () => window.removeEventListener('hashchange', follow)
   }, [])
 
-  const choosePane = (pane: PaneId) => {
+  const choosePane = useCallback((pane: PaneId) => {
     setActivePane(pane)
     history.replaceState(null, '', '#' + pane)
     // A new pane starts at its top: the page on a phone, the surface on a desktop.
     window.scrollTo?.({ top: 0 })
     document.querySelector('.surface')?.scrollTo?.({ top: 0 })
-  }
+  }, [])
+
+  // The first time a workspace is opened in this browser, the tour offers
+  // itself; after that it is the button in the header.
+  useEffect(() => {
+    if (authed && !showMinted && !pref.get(TOURED)) setTouring(true)
+  }, [authed, showMinted])
+
+  const endTour = useCallback(() => {
+    setTouring(false)
+    pref.set(TOURED, '1')
+  }, [])
 
   const refresh = useCallback(async () => {
     const [usageRes, feedRes, keysRes] = await Promise.allSettled([
@@ -167,8 +204,9 @@ export default function Dashboard() {
   return (
     <>
       <div className="shell">
-        <Topbar onSignout={handleSignout} keyLabel={keyLabel} />
-        <div className="app">
+        <Topbar onSignout={handleSignout} keyLabel={keyLabel} theme={theme}
+          onTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} onTour={() => setTouring(true)} />
+        <div className={`app ${collapsed ? 'collapsed' : ''}`}>
           <Sidebar
             activePane={activePane}
             onPaneChange={choosePane}
@@ -176,6 +214,8 @@ export default function Dashboard() {
             keyId={currentKey?.id}
             keysCount={liveKeys}
             verdictsCount={feed.length}
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed((c) => !c)}
           />
           <main className="surface" id="main-content">
             {activePane === 'pane-usage' && (
@@ -192,10 +232,12 @@ export default function Dashboard() {
                 error={error}
               />
             )}
+            {activePane === 'pane-connect' && <ConnectPane />}
             {activePane === 'pane-playground' && <PlaygroundPane onAttempted={refresh} />}
           </main>
         </div>
         <Tabbar activePane={activePane} onPaneChange={choosePane} keysCount={liveKeys} verdictsCount={feed.length} />
+        {touring && <Tour onPane={choosePane} onClose={endTour} />}
       </div>
 
       {drawerVerdict && (

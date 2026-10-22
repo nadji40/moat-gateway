@@ -286,7 +286,6 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
       <div className="page-head">
         <div className="titles">
           <h1 className="page-title">{L('Playground', 'ساحة التجربة')}</h1>
-          <div className="page-caption">{L('Try to get a payment past your own policy. Card payments run on your gateway; chain transfers are simulated.', 'حاول تمرير دفعة رغم سياستك. دفعات البطاقة تمر عبر بوابتك؛ والتحويلات على السلسلة محاكاة.')}</div>
         </div>
         <div id="swiper" role="tablist" ref={tablist} aria-label={L('Which rail', 'أي قناة دفع')}>
           <span className="thumb" aria-hidden="true" style={thumb} />

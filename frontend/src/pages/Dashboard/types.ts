@@ -46,4 +46,4 @@ export interface BucketData {
   total: number
 }
 
-export type PaneId = 'pane-usage' | 'pane-verdicts' | 'pane-keys' | 'pane-playground'
+export type PaneId = 'pane-usage' | 'pane-verdicts' | 'pane-keys' | 'pane-connect' | 'pane-playground'
