@@ -1,0 +1,5 @@
+<!-- Moat console asset: aed.svg — currency glyph chip icon: the UAE dirham, drawn in the set's white line style -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M5 3h3.2c2.8 0 4.6 2 4.6 5s-1.8 5-4.6 5H5V3Z" stroke="white" stroke-linejoin="round"/>
+<path d="M2.5 6.6h8M2.5 9.4h8" stroke="white" stroke-linecap="round"/>
+</svg>

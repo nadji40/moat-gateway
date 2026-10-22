@@ -1,0 +1,6 @@
+<!-- Moat console asset: sar.svg — currency glyph chip icon: the Saudi riyal, drawn in the set's white line style -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 3.5v6.2c0 1.2.8 2 2 2h.6" stroke="white" stroke-linecap="round"/>
+<path d="M9.5 3.5v5.3c0 1.9-1.3 3.2-3.2 3.2" stroke="white" stroke-linecap="round"/>
+<path d="M2.5 13.2 13.5 10.4M2.5 10.2 13.5 7.4" stroke="white" stroke-linecap="round"/>
+</svg>
