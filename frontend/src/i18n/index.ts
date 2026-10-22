@@ -31,7 +31,12 @@ export function setLang(next: Lang) {
   try { localStorage.setItem(KEY, next) } catch { /* nothing to remember it in */ }
   const u = new URL(window.location.href)
   u.searchParams.delete('lang')
-  window.location.replace(u.toString())
+  // Going to an address that differs only after the # is a jump within the
+  // page, not a load, so on /dashboard#pane-keys a replace changed nothing
+  // until the next refresh. When only the language changes, reload.
+  const same = (a: URL) => a.origin + a.pathname + a.search
+  if (same(u) === same(new URL(window.location.href))) window.location.reload()
+  else window.location.replace(u.toString())
 }
 
 /** Direction, language and the Arabic font, before React draws anything. */

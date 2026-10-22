@@ -57,7 +57,12 @@
     try { localStorage.setItem(KEY, next); } catch {}
     const u = new URL(location.href);
     u.searchParams.delete("lang");
-    location.replace(u.toString());
+    // An address that differs only after the # is a jump within the page, not
+    // a load, so a replace to it changed nothing until the next refresh. When
+    // only the language changes, reload.
+    const same = (a) => a.origin + a.pathname + a.search;
+    if (same(u) === same(new URL(location.href))) location.reload();
+    else location.replace(u.toString());
   }
 
   window.MOAT_I18N = { lang, ar, L, apply, setLang };
