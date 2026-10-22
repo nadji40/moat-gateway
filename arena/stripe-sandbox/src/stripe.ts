@@ -4,7 +4,10 @@ export type RecipientRole = "authorized" | "unauthorized";
 
 export interface Recipient {
   role: RecipientRole;
+  /** The account's label: the first of its names. */
   payee: string;
+  /** Every supplier name this account answers to. */
+  names: string[];
   secretKey: string;
 }
 
@@ -78,21 +81,39 @@ function required(env: NodeJS.ProcessEnv, name: string): string {
   return value;
 }
 
+/** The names an account answers to: `STRIPE_AUTHORIZED_PAYEE="Monitoring Pro Inc|Al Noor Supplies"`.
+ *  The first is the account's label; each is a separate supplier as far as a
+ *  payment is concerned. */
+function names(value: string | undefined, fallback: string): string[] {
+  const list = (value ?? "")
+    .split("|")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return list.length ? list : [fallback];
+}
+
 export function recipientsFromEnv(env: NodeJS.ProcessEnv = process.env): Recipient[] {
+  const authorized = names(env["STRIPE_AUTHORIZED_PAYEE"], "Monitoring Pro Inc");
+  const unauthorized = names(env["STRIPE_UNAUTHORIZED_PAYEE"], "ProMon Billing Ltd");
   const recipients: Recipient[] = [
     {
       role: "authorized",
-      payee: env["STRIPE_AUTHORIZED_PAYEE"]?.trim() || "Monitoring Pro Inc",
+      payee: authorized[0]!,
+      names: authorized,
       secretKey: required(env, "STRIPE_AUTHORIZED_SECRET_KEY"),
     },
     {
       role: "unauthorized",
-      payee: env["STRIPE_UNAUTHORIZED_PAYEE"]?.trim() || "ProMon Billing Ltd",
+      payee: unauthorized[0]!,
+      names: unauthorized,
       secretKey: required(env, "STRIPE_UNAUTHORIZED_SECRET_KEY"),
     },
   ];
-  if (normalise(recipients[0]!.payee) === normalise(recipients[1]!.payee)) {
-    throw new Error("authorized and unauthorized payees must be different");
+  const seen = new Set<string>();
+  for (const name of [...authorized, ...unauthorized]) {
+    const key = normalise(name);
+    if (seen.has(key)) throw new Error(`payee ${JSON.stringify(name)} is listed for more than one account`);
+    seen.add(key);
   }
   return recipients;
 }
@@ -103,11 +124,10 @@ export function normalise(value: string): string {
 
 export function recipientFor(payee: string, recipients: Recipient[]): Recipient {
   const wanted = normalise(payee);
-  const recipient = recipients.find((candidate) => normalise(candidate.payee) === wanted);
+  const recipient = recipients.find((candidate) => candidate.names.some((name) => normalise(name) === wanted));
   if (!recipient) {
-    throw new Error(
-      `unknown sandbox payee ${JSON.stringify(payee)}; use one of: ${recipients.map((r) => r.payee).join(", ")}`,
-    );
+    const known = recipients.flatMap((r) => r.names).join(", ");
+    throw new Error(`unknown sandbox payee ${JSON.stringify(payee)}; use one of: ${known}`);
   }
   return recipient;
 }
@@ -177,7 +197,7 @@ export async function createPayment(
   currency: string,
   authorizationId: string,
   invoiceId: string,
-  binding: { recipientAccountId?: string; invoiceFingerprint?: string } = {},
+  binding: { recipientAccountId?: string; invoiceFingerprint?: string; payee?: string } = {},
 ): Promise<PaymentSummary> {
   if (!authorizationId.trim()) throw new Error("authorization_id is required");
   if (!invoiceId.trim()) throw new Error("invoice_id is required");
@@ -185,15 +205,18 @@ export async function createPayment(
   if (binding.recipientAccountId && binding.recipientAccountId !== account.id) {
     throw new Error("recipient_account_id does not match the configured Stripe account");
   }
+  // The payment is recorded under the supplier name the caller used, which
+  // is one of the account's names, not always its label.
+  const payee = binding.payee?.trim() || recipient.payee;
   const params = new URLSearchParams();
   params.set("amount", String(majorToMinor(amount, currency)));
   params.set("currency", currency.toLowerCase());
   params.set("payment_method", "pm_card_visa");
   params.set("payment_method_types[]", "card");
   params.set("confirm", "true");
-  params.set("description", `Moat sandbox payment to ${recipient.payee}`);
+  params.set("description", `Moat sandbox payment to ${payee}`);
   params.set("metadata[moat_test]", "true");
-  params.set("metadata[moat_payee]", recipient.payee);
+  params.set("metadata[moat_payee]", payee);
   params.set("metadata[moat_recipient_role]", recipient.role);
   params.set("metadata[moat_account]", account.id);
   params.set("metadata[moat_authorization_id]", authorizationId);

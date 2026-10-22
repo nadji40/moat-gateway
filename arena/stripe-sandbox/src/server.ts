@@ -30,6 +30,7 @@ server.registerTool(
   async ({ payee, amount, currency, authorization_id, invoice_id, recipient_account_id, invoice_fingerprint, simulate_response_loss }) => {
     const recipient = recipientFor(payee, recipients);
     const payment = await createPayment(recipient, amount, currency, authorization_id, invoice_id, {
+      payee,
       ...(recipient_account_id ? { recipientAccountId: recipient_account_id } : {}),
       ...(invoice_fingerprint ? { invoiceFingerprint: invoice_fingerprint } : {}),
     });
