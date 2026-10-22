@@ -28,7 +28,7 @@ const founder: Member = {
 const teams: Team[] = [
   { name: 'Engineering', nameAr: 'الهندسة', members: [
     { name: 'Khawla Hammouda', role: 'Front-end engineer', roleAr: 'مهندسة واجهات أمامية', line: 'The React site you are reading', lineAr: 'موقع React الذي تقرؤه الآن', photo: '/team/khawla.jpg' },
-    { name: 'Rayan Yasser Ouanes', role: 'Design and front-end', roleAr: 'التصميم والواجهات الأمامية', line: 'Design and front-end work across the site', lineAr: 'أعمال التصميم والواجهات الأمامية في الموقع كله', photo: '/team/rayan.jpg' },
+    { name: 'Rayan Yasser Ouanoughi', role: 'Design and front-end', roleAr: 'التصميم والواجهات الأمامية', line: 'Design and front-end work across the site', lineAr: 'أعمال التصميم والواجهات الأمامية في الموقع كله', photo: '/team/rayan.jpg' },
   ] },
   { name: 'Research', nameAr: 'البحث', members: [
     { name: 'Mounya Hasni', role: 'Research analyst', roleAr: 'محلّلة أبحاث', line: 'Regulation and market research: what the rules require, and who needs this', lineAr: 'أبحاث التنظيم والسوق: ما تشترطه القواعد، ومن يحتاج إلى هذا' },
