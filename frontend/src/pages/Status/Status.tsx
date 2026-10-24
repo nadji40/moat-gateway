@@ -52,6 +52,9 @@ type UptimeDay = {
 
   declared?: boolean
 
+  /** sampled by the recorder, logs: from the web server's log, declared, or none */
+  source?: 'sampled' | 'logs' | 'declared' | 'none'
+
   expected?: number
 
   ok?: number
@@ -249,6 +252,8 @@ const controller = new AbortController()
     [timeline]
 
   )
+
+  const fromLogs = full.filter(day => day.source === 'logs').length
 
   const totalExpected = full.reduce(
 
@@ -537,7 +542,9 @@ const controller = new AbortController()
 
                   <small>
 
-                    {L(`over ${full.length} measured days`, `على مدى ${full.length} أيام مقيسة`)}
+                    {fromLogs > 0
+                      ? L(`over ${full.length} days, ${fromLogs} from web logs`, `على مدى ${full.length} يومًا، ${fromLogs} منها من سجلات الخادم`)
+                      : L(`over ${full.length} measured days`, `على مدى ${full.length} أيام مقيسة`)}
 
                   </small>
 
@@ -596,6 +603,7 @@ const controller = new AbortController()
             dayState(day),
             day.partial ? 'partial' : '',
             day.declared ? 'declared' : '',
+            day.source === 'logs' ? 'from-logs' : '',
             selected === day.date ? 'selected' : '',
           ]
             .filter(Boolean)
@@ -652,7 +660,9 @@ const controller = new AbortController()
               ? L('So far today', 'حتى الآن اليوم')
               : day.declared
                 ? L('Declared, not sampled', 'مُصرّح به، غير مقيس')
-                : L('Daily availability', 'التوفر اليومي')}
+                : day.source === 'logs'
+                  ? L('From the web server log, not sampled', 'من سجل الخادم، غير مقيس')
+                  : L('Daily availability', 'التوفر اليومي')}
           </div>
         </div>
       </HoverCardContent>
@@ -849,7 +859,15 @@ const controller = new AbortController()
 
                           )
 
-                          : state === 'degraded'
+                          : day.source === 'logs'
+
+                            ? state === 'degraded'
+
+                              ? L('DEGRADED, FROM WEB LOGS', 'متدهور، من سجلات الخادم')
+
+                              : L('FROM WEB LOGS', 'من سجلات الخادم')
+
+                            : state === 'degraded'
 
                             ? L(
 

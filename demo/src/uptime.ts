@@ -34,6 +34,34 @@ const FILE =
 const TARGET = (process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081") + "/health/ready";
 
 /**
+ * Days reconstructed from the web server's log, written by
+ * scripts/uptime-from-apache.sh. Used only for days before this recorder
+ * existed: a minute in which Apache answered somebody with a 5xx is a minute
+ * down, a minute in which nobody asked is unknown and counted as fine, so it
+ * is a weaker reading than a sample and is labelled as such, never as measured.
+ */
+const LOGS_FILE =
+  process.env["MOAT_UPTIME_LOGS_FILE"] ??
+  (process.env["MOAT_EVM_STATE_DIR"] ? join(process.env["MOAT_EVM_STATE_DIR"], "uptime-logs.json") : undefined);
+
+interface LogDay {
+  requests: number;
+  errors: number;
+  minutesDown: number;
+}
+
+function fromLogs(): Record<string, LogDay> {
+  if (!LOGS_FILE) return {};
+  try {
+    const raw = JSON.parse(readFileSync(LOGS_FILE, "utf8")) as { days?: Record<string, LogDay> };
+    return raw.days ?? {};
+  } catch {
+    // No file, or an unreadable one: those days are simply not from logs.
+    return {};
+  }
+}
+
+/**
  * Days the operator states the service was up, before this recorder existed.
  *
  * The service ran for weeks before anything sampled it, and a strip that
@@ -170,6 +198,12 @@ export interface Day {
   partial: boolean;
   /** Stated by the operator rather than sampled. Never presented as measured. */
   declared: boolean;
+  /**
+   * Where the number comes from: `sampled` by this recorder, `logs` from the
+   * web server's access log (minutes with a 5xx answer), `declared` by the
+   * operator, or `none` for a day nothing speaks for.
+   */
+  source: "sampled" | "logs" | "declared" | "none";
 }
 
 export function uptime(): { days: Day[]; window: number; note: string } {
@@ -182,16 +216,24 @@ export function uptime(): { days: Day[]; window: number; note: string } {
       ? began.getUTCHours() * 60 + began.getUTCMinutes()
       : 0;
 
-  const days = lastDays(DAYS).map((date) => {
+  const logs = fromLogs();
+  const days = lastDays(DAYS).map((date): Day => {
     const partial = date === stamp;
     // A day before this recorder existed was never measured, and drawing it
     // as an outage would claim a month of downtime that never happened.
     if (since && date < since) {
+      // The web server's log speaks for the day: every minute it answered a
+      // visitor with an error is a minute down.
+      const logged = logs[date];
+      if (logged) {
+        const ok = Math.max(0, PER_DAY - logged.minutesDown);
+        return { date, ok, expected: PER_DAY, ratio: ok / PER_DAY, partial: false, declared: false, source: "logs" };
+      }
       // Before the recorder, but inside the declared window.
       if (DECLARED_FROM && date >= DECLARED_FROM) {
-        return { date, ok: PER_DAY, expected: PER_DAY, ratio: 1, partial: false, declared: true };
+        return { date, ok: PER_DAY, expected: PER_DAY, ratio: 1, partial: false, declared: true, source: "declared" };
       }
-      return { date, ok: 0, expected: 0, ratio: null, partial: false, declared: false };
+      return { date, ok: 0, expected: 0, ratio: null, partial: false, declared: false, source: "none" };
     }
     // On the first day, only the minutes since the recorder started could
     // have been sampled. Scoring from midnight would mark the hours before it
@@ -205,6 +247,7 @@ export function uptime(): { days: Day[]; window: number; note: string } {
       ratio: expected ? ok / expected : null,
       partial,
       declared: false,
+      source: "sampled",
     };
   });
 
@@ -214,6 +257,8 @@ export function uptime(): { days: Day[]; window: number; note: string } {
     note:
       "One sample a minute against the gateway's readiness endpoint. A day is " +
       "scored out of 1440 whether or not this process was alive to take the " +
-      "samples, so a gap counts against it.",
+      "samples, so a gap counts against it. Days before the recorder are " +
+      "read from the web server's log, where a minute with a 5xx answer is " +
+      "a minute down, and are marked as such.",
   };
 }

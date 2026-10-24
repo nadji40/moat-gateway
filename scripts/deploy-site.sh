@@ -14,6 +14,13 @@ printf '\n\033[1m--- build frontend\033[0m\n'
 npm ci --no-audit --no-fund --loglevel=error
 npm run build
 
+# The days before the uptime recorder existed come from the web server's log;
+# refresh them so the status page's month stays complete.
+if [[ -r /usr/local/apache/logs/moat-domains-access_log ]]; then
+  printf '\n\033[1m--- uptime from logs\033[0m\n'
+  bash ../scripts/uptime-from-apache.sh
+fi
+
 printf '\n\033[1m--- restart\033[0m\n'
 systemctl restart "$service"
 

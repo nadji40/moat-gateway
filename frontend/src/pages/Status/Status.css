@@ -569,6 +569,13 @@
   );
 }
 
+/* A day read from the web server's log rather than sampled: dotted, so it
+   reads as evidence of a different kind, not as a measured day. */
+.op-day.from-logs {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.16) 1px, transparent 1.5px);
+  background-size: 4px 4px;
+}
+
 .op-day:hover,
 .op-day:focus-visible,
 .op-day.selected {
