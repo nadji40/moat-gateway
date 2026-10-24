@@ -109,6 +109,14 @@ impl Peer {
 /// Write a gateway config into a fresh temp dir and return its path.
 pub fn write_config(name: &str, body: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("moat-test-{}-{}", name, std::process::id()));
+    // Process ids are reused, so the dir may hold a previous run's
+    // evidence.jsonl, and the gateway would continue that chain.
+    match std::fs::remove_dir_all(&dir) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            panic!("clearing {}: {e}", dir.display())
+        }
+        _ => {}
+    }
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("moat.yaml");
     std::fs::write(&path, body).unwrap();
