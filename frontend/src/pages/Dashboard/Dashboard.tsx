@@ -10,6 +10,7 @@ import PlaygroundPane from './components/PlaygroundPane'
 import ConnectPane from './components/ConnectPane'
 import Tour from './components/Tour'
 import GateSection from './components/GateSection'
+import { LiquidGlassProvider } from '../../components/ui/liquid/liquid-glass-provider'
 import MintedSection from './components/MintedSection'
 import VerdictDrawer from './components/VerdictDrawer'
 import Footer from '../../components/layout/Footer'
@@ -180,11 +181,16 @@ export default function Dashboard() {
   }
 
   if (!authed) {
+    // The same liquid-glass renderer as the site's pages, for the gate only:
+    // the signed-in console keeps its own surfaces.
     return (
-      <>
+      <LiquidGlassProvider
+        backdrop="/glass-backdrop.svg"
+        options={{ refraction: 16, dispersion: 0.035, frost: 8, liquid: false }}
+      >
         <GateSection onCreate={handleCreate} onSignin={handleSignin} />
         <Footer />
-      </>
+      </LiquidGlassProvider>
     )
   }
 

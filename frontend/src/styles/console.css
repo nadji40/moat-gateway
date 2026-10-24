@@ -1765,3 +1765,10 @@ html[data-theme="light"] .shell .is-expired { color: #C62828; }
 html[data-theme="light"] .shell .key-status.here { color: #C24A00; }
 /* the coin glyphs are white too: dark on the light chips, white on the orange one that is chosen */
 html[data-theme="light"] .shell .currency-row button:not([aria-checked="true"]) img[src*="currency/"] { filter: invert(1); }
+
+/* ---- the gate on glass ----------------------------------------------------
+   The swiper and the two panels are glass Cards (components/ui/glass) drawn
+   by the liquid-glass renderer; the Card's own column/gap/padding utilities
+   give way to the swiper's row and the panel's header and body. */
+#gate .gate-swiper { flex-direction: row; gap: 4px; padding: 4px; }
+#gate .gate-panel { display: block; gap: 0; padding: 0; }

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { L } from '../../../i18n'
 import { useThumb } from './bits'
+import { Card } from '../../../components/ui/glass/card'
 
 interface GateSectionProps {
   onCreate: (id: string, name: string) => Promise<void>
@@ -61,7 +62,7 @@ export default function GateSection({ onCreate, onSignin }: GateSectionProps) {
   return (
     <div className="wrap">
       <section className="tight" id="gate">
-        <div className="swiper" id="gate-swiper" role="tablist" ref={tablist} aria-label={L('How to start', 'كيف تبدأ')}>
+        <Card material="clear" tint="rgba(255, 135, 55, 0.10)" className="swiper gate-swiper" id="gate-swiper" role="tablist" ref={tablist} aria-label={L('How to start', 'كيف تبدأ')}>
           <span className="thumb" aria-hidden="true" style={thumb} />
           <button
             role="tab"
@@ -79,11 +80,11 @@ export default function GateSection({ onCreate, onSignin }: GateSectionProps) {
           >
             {L('I have a key', 'لديّ مفتاح')}
           </button>
-        </div>
+        </Card>
 
         <div className="deck react-deck" id="gate-deck">
           <div className={`slide ${tab === 'new' ? 'on' : ''}`} id="slide-new" hidden={tab !== 'new'}>
-            <article className="panel glass">
+            <Card material="clear" tint="rgba(255, 135, 55, 0.10)" className="panel gate-panel">
               <div className="ph">
                 <h3>{L('Open a workspace', 'افتح مساحة عمل')}</h3>
               </div>
@@ -131,11 +132,11 @@ export default function GateSection({ onCreate, onSignin }: GateSectionProps) {
                   </p>
                 )}
               </div>
-            </article>
+            </Card>
           </div>
 
           <div className={`slide ${tab === 'key' ? 'on' : ''}`} id="slide-key" hidden={tab !== 'key'}>
-            <article className="panel glass">
+            <Card material="clear" tint="rgba(255, 135, 55, 0.10)" className="panel gate-panel">
               <div className="ph">
                 <h3>{L('Open one you have', 'افتح مساحة لديك')}</h3>
               </div>
@@ -170,7 +171,7 @@ export default function GateSection({ onCreate, onSignin }: GateSectionProps) {
                   </p>
                 )}
               </div>
-            </article>
+            </Card>
           </div>
         </div>
       </section>
