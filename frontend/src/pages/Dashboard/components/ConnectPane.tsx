@@ -11,7 +11,7 @@ function apiOrigin() {
 }
 
 const KEY = 'YOUR_AGENT_KEY'
-const ASK = 'Pay the Northwind Cloud Co invoice INV-4471 for 480 USD.'
+const ASK = 'Pay the Al Noor Supplies invoice INV-4471 for 480 SAR.'
 
 type Client = { id: string; name: string; where: string; lang: string; code: (url: string, key: string) => string }
 
