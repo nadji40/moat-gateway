@@ -89,9 +89,28 @@ groups who want this now:
   approved. Moat's EVM and Solana rails and the on-chain co-signer
   ([ADR 0010](docs/adr/0010-on-chain-co-signer.md)) are built for this.
 
-Both groups share the same constraint: speed is the point of using an agent,
-so the check has to be invisible. Moat adds under two milliseconds per
-payment (see [the numbers](#the-numbers)).
+Further out, the same failure shows up wherever an agent is allowed to pay.
+Each row is a group with the need today, the way it goes wrong for them, and
+the check that holds it:
+
+| Who | What their agent pays | How it goes wrong | What Moat holds it to |
+|---|---|---|---|
+| Accounts-payable teams with foreign suppliers | supplier invoices, by card or bank transfer | a "our bank details have changed" note on an invoice; a lookalike supplier name | the approved payee and amount; one spending limit across currencies |
+| Mobile-credit and gaming top-up resellers | bulk top-ups from distributors, many times a day | a distributor portal that redirects the payment; an order repeated after a timeout | one authorization is one payment; duplicates refused, lost replies held |
+| Travel and booking desks | flights, hotels and visas for staff or customers | a fare that moves between quote and purchase; a lookalike booking site | step-up when the price passes the tolerance; the payee from the user, never from a page |
+| E-commerce merchants automating restock and ad spend | stock from suppliers, budgets on ad platforms | a price change mid-session; a month's budget spent in an hour | the session total; every currency valued against the limit |
+| Freelance and creator payout operations | payouts to many payees | the old "my account has changed" message, now read by an agent | payee details from the approval, not from the message |
+| Subscription and SaaS administration | renewals, seat upgrades, usage overages | an authorization reused; a second charge after a lost reply | replays refused; provider outcomes reconciled, never retried blind |
+| Logistics and customs brokers | freight, customs and port invoices | invoice fraud, already common with people, now at machine speed | the invoice tied to its approval; every verdict signed |
+| On-chain treasuries and trading agents | transfers and swaps on EVM and Solana | a poisoned lookalike address; an agent draining a wallet | the co-signer refuses anything outside the approved transfer ([ADR 0010](docs/adr/0010-on-chain-co-signer.md)) |
+| Teams that build agents for other companies | whatever their clients' agents buy | the builder carries the blame for one wrong payment | a gateway dropped in front of any MCP client, with evidence to show the client |
+| Payment providers and neobanks opening agent APIs | their merchants' agent payments | merchants will not switch on payments they cannot bound | an authorization layer the merchant controls, with an audit trail |
+| Accountants and bookkeepers running AI across clients | bills for several companies at once | one client's payee in another client's run; nothing to show the auditor | workspace isolation; a hash-chained evidence log per workspace |
+| Public bodies and NGOs piloting assistants | grants, stipends and vendor payments | a payment nobody can account for afterwards | a signed record of what was asked, approved, attempted and decided |
+
+All of them share one constraint: speed is the point of using an agent, so
+the check has to be invisible. Moat adds under two milliseconds per payment
+(see [the numbers](#the-numbers)).
 
 ## What Moat does
 
