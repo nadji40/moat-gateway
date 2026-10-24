@@ -1,0 +1,41 @@
+# /etc/systemd/system/moat-demo.service
+#
+# The public site: the React pages, the classic pages, the try-it sandbox and
+# the uptime recorder, in one process on 127.0.0.1:8787 behind Apache.
+# Secrets come from /etc/moat/moat-demo.env (root-only), never from here.
+#
+# The home directory is read-only on purpose, so everything the process
+# writes lives under /var/lib/moat: the uptime tally included, or a restart
+# would start the status page over from nothing.
+[Unit]
+Description=Moat public try-it page
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=moat
+Group=moat
+WorkingDirectory=/home/moat/demo
+EnvironmentFile=/etc/moat/moat-demo.env
+Environment=MOAT_DEMO_PORT=8787
+Environment=MOAT_EVM_STATE_DIR=/var/lib/moat/demo-state
+Environment=MOAT_DEMO_KEYS=/var/lib/moat/demo-keys
+Environment=MOAT_UPTIME_FILE=/var/lib/moat/demo-state/uptime.json
+Environment=NODE_ENV=production
+ExecStart=/usr/local/bin/node22 --import tsx /home/moat/demo/src/server.ts
+Restart=always
+RestartSec=3s
+TimeoutStopSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadOnlyPaths=/home/moat
+ReadWritePaths=/var/lib/moat/demo /var/lib/moat/demo-state /var/lib/moat/demo-keys /home/moat/arena/results
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

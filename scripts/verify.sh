@@ -9,6 +9,7 @@
 #   scripts/verify.sh            everything
 #   scripts/verify.sh rust       the crates only
 #   scripts/verify.sh arena      the TypeScript workspace only
+#   scripts/verify.sh demo       the public site process only
 #
 # Exits non-zero on the first failure, and says which check failed rather than
 # leaving the last hundred lines of cargo output to be read backwards.
@@ -41,6 +42,16 @@ if [[ "$scope" == "all" || "$scope" == "arena" ]]; then
     step "pnpm test" pnpm --dir arena test
   else
     echo "arena/package.json not present; skipping"
+  fi
+fi
+
+# The public site's process: the sandbox and the uptime recorder.
+if [[ "$scope" == "all" || "$scope" == "demo" ]]; then
+  if [[ -f demo/package.json ]]; then
+    step "demo typecheck" npm --prefix demo run typecheck
+    step "demo test" npm --prefix demo test
+  else
+    echo "demo/package.json not present; skipping"
   fi
 fi
 

@@ -22,8 +22,15 @@ const PER_DAY = 1440;
 const DAYS = 30;
 const EVERY_MS = 60_000;
 
+// The tally has to outlive the process, or every deploy would wipe a month of
+// samples and the page would open on "0 measured days". Under systemd the
+// home directory is read-only, so the file goes in the state directory the
+// unit makes writable, and only falls back to the home directory elsewhere.
 const FILE =
-  process.env["MOAT_UPTIME_FILE"] ?? join(process.env["HOME"] ?? ".", ".moat-uptime.json");
+  process.env["MOAT_UPTIME_FILE"] ??
+  (process.env["MOAT_EVM_STATE_DIR"]
+    ? join(process.env["MOAT_EVM_STATE_DIR"], "uptime.json")
+    : join(process.env["HOME"] ?? ".", ".moat-uptime.json"));
 const TARGET = (process.env["MOAT_GATEWAY_URL"] ?? "http://127.0.0.1:7081") + "/health/ready";
 
 /**
@@ -54,6 +61,8 @@ let tally: Tally = {};
 let since: string | undefined;
 let startedAt: string | undefined;
 let timer: NodeJS.Timeout | undefined;
+/** Said once: a tally that cannot be saved is lost at the next restart. */
+let warnedUnsaved = false;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -93,8 +102,16 @@ function save(): void {
       ...(startedAt ? { startedAt } : {}),
     };
     writeFileSync(FILE, JSON.stringify(store), "utf8");
-  } catch {
-    /* a read-only disk should not take the process down */
+  } catch (error) {
+    // A read-only disk should not take the process down, but it must not be
+    // quiet about it either: that is how a month of samples goes missing.
+    if (!warnedUnsaved) {
+      warnedUnsaved = true;
+      process.stderr.write(
+        `uptime: cannot save the tally to ${FILE} (${String(error)}); ` +
+          "it will be lost when this process stops. Set MOAT_UPTIME_FILE to a writable path.\n",
+      );
+    }
   }
 }
 
@@ -106,14 +123,22 @@ async function sample(): Promise<void> {
   } catch {
     ok = false;
   }
-  if (!ok) return;
-  const day = today();
+  if (ok) recordSample();
+}
+
+/** One sample that answered, counted against its day and written down. */
+export function recordSample(day = today()): void {
   tally[day] = (tally[day] ?? 0) + 1;
 
   // Keep a little more than the strip shows, and no more.
   const keep = new Set(lastDays(DAYS + 5));
   for (const key of Object.keys(tally)) if (!keep.has(key)) delete tally[key];
   save();
+}
+
+/** Where the tally is kept, so a test or an operator can look. */
+export function uptimeFile(): string {
+  return FILE;
 }
 
 function lastDays(n: number): string[] {
