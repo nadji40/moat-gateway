@@ -32,32 +32,31 @@ describe('documentation and team pages', () => {
     expect(writeText).toHaveBeenCalledWith(document.querySelector('#quickstart pre')!.textContent)
   })
 
-  it('draws the team as a molecule: founder at the centre, four teams, ten people', async () => {
+  it('lays the team out as the deck does: two rows of five, the founder larger in the middle', async () => {
     window.history.replaceState({}, '', '/team')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(/pay only what was asked/i)
-    expect(document.querySelectorAll('.mol-node.center')).toHaveLength(1)
-    expect([...document.querySelectorAll('.mol-node.team')].map((n) => n.getAttribute('aria-label')))
-      .toEqual(['Engineering team', 'Research team', 'Data team', 'Security team'])
-    expect(document.querySelectorAll('.mol-node.member')).toHaveLength(9)
-    expect(document.querySelectorAll('.mol-edge')).toHaveLength(13)
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(/an algerian team with a global dream/i)
 
-    // Choosing a person shows who they are and lights their path.
-    fireEvent.click(screen.getByRole('button', { name: 'Dhoha Boumediene, Policy data' }))
-    expect(document.querySelector('.mol-card h3')).toHaveTextContent('Dhoha Boumediene')
-    expect(document.querySelector('.mol-card .tm-role')).toHaveTextContent('Data team')
-    expect(document.querySelectorAll('.mol-edge.on')).toHaveLength(2)
+    const tiles = [...document.querySelectorAll('.tm-deck .tm-tile')]
+    expect(tiles).toHaveLength(10)
+    // The founder is the third tile: the middle of the first row of five.
+    expect(tiles[2]).toHaveClass('founder')
+    expect(tiles[2]!.querySelector('img')).toHaveAttribute('src', '/team/nadji.jpg')
+    expect(tiles[2]!.querySelector('.tm-role')).toHaveTextContent(/founder/i)
+    expect(document.querySelectorAll('.tm-tile.founder')).toHaveLength(1)
 
-    // A given photo is used in the molecule and the list; everyone else
-    // keeps a placeholder until theirs arrives.
-    expect(document.querySelector('.mol-node.center image')).toHaveAttribute('href', '/team/nadji.jpg')
-    expect(document.querySelectorAll('.tm-groups .tm-card')).toHaveLength(10)
-    const photos = document.querySelectorAll('.tm-groups img.tm-pic').length
-    const pending = document.querySelectorAll('.tm-groups .tm-initials[data-photo="pending"]').length
-    expect(photos).toBeGreaterThan(0)
-    expect(photos + pending).toBe(10)
-    expect(document.querySelectorAll('.mol-node image')).toHaveLength(photos)
+    // Everyone has a portrait on the deck's notched tile, and a name whose
+    // given name is the warm word.
+    expect(document.querySelectorAll('.tm-tile .tm-photo.gl-notch img')).toHaveLength(10)
+    const names = tiles.map((t) => t.querySelector('.tm-name')?.textContent)
+    expect(names).toContain('Dhoha Boumediene')
+    expect(names).toContain('Redwan Benmoussa')
+    expect(tiles.find((t) => t.textContent?.includes('Dhoha'))!.querySelector('.tm-name b')).toHaveTextContent('Dhoha')
+    expect(tiles.find((t) => t.textContent?.includes('Dhoha'))!.querySelector('.tm-role')).toHaveTextContent('Policy data')
+
+    // The three facts stay under the people.
+    expect(document.querySelectorAll('.tm-how .tm-fact')).toHaveLength(3)
   })
 
 })

@@ -8,8 +8,11 @@ import { L } from '../../../i18n'
  */
 export default function Hero() {
   return (
-    <header className="hero">
-      <div>
+    <header className="hero home-hero">
+      {/* The deck's cover: the glass panels, darkened, fading into the black
+          of the page. Decoration only; the words sit on top of it. */}
+      <div className="home-hero-bg" aria-hidden="true" />
+      <div className="home-hero-fg">
         {/* Animated brand mark. aria-hidden: purely decorative. */}
         <div className="heromark" aria-hidden="true">
           <svg viewBox="69 43 144 144" xmlns="http://www.w3.org/2000/svg">

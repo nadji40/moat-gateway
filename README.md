@@ -206,7 +206,7 @@ Built by a team of ten for Thirduni Cohort 1, October 2026.
 | **Adam Belkadi** | Security engineer | Keys, permissions, workspace isolation and the dashboard's access model |
 | **Rofeida Imoussaine** | Security engineer | Attacks on the payment checks: the whitespace-folded payee names (PR #2) and the cross-session max-payments attack (PR #4), which found and led to a fix of a real gateway bug |
 | **Zahra Boucheta** | Data and ML | The intent reader evaluation: which model, which drafter depth is fastest on which hardware (`research/intent-reader`, co-author on 50b764d) |
-| **Redwan Ben** | Adversarial data | The attack corpus and the refusal/reference-number cases the reader had to learn from his corpus (co-author on 267139f) |
+| **Redwan Benmoussa** | Adversarial data | The attack corpus and the refusal/reference-number cases the reader had to learn from his corpus (co-author on 267139f) |
 | **Dhoha Boumediene** | Policy data | The spending-limit and currency rules: one approval is one payment, split payments stop at the session total, every currency valued against the limit, over-precise amounts refused (co-author on dc4cbbf, cbf4f60, 36fa3b8, 6beec30, 1cfe8b7) |
 | **Meriem Sara Aounallah** | Language data | How Moat reads amounts and currencies the way people write them: a currency the user did not name is held, trailing zeros are not precision, a currency must be borne out by the message (co-author on 4a02c30, 3b15e7a, 36fa3b8, 1cfe8b7) |
 | **Mounya Hasni** | Research analyst | Regulation and market research: what the rules require, and who needs this |

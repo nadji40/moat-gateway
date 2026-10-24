@@ -10,14 +10,14 @@ import { L } from '../../../i18n'
  */
 export default function HowItWorks() {
   return (
-    <section id="how" className="tight">
+    <section id="how" className="tight gl-glow">
       <div className="head">
         <h2>{L('Three answers: under a millisecond', 'ثلاث إجابات: في أقل من ثانية')}</h2>
       </div>
 
       {/* Flow diagram — aria-hidden because the verdict cards below
           provide the same information in a readable form */}
-      <div className="flowart" aria-hidden="true">
+      <div className="flowart gl-board home-flowboard" aria-hidden="true">
         <svg viewBox="0 0 460 104" xmlns="http://www.w3.org/2000/svg">
           <style>{`
             .a-line{fill:none;stroke:var(--ink-3);stroke-width:2}
@@ -161,7 +161,7 @@ export default function HowItWorks() {
           approved). All three stay in the page for screen readers; the
           example rows are illustration and are hidden from them. */}
       <div className="verdict3">
-        <article className="vcard glass v-allow">
+        <article className="vcard glass gl-card v-allow">
           <div className="vc-top">
             <span className="vc-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12.3l2.7 2.7L16 9.6" /></svg>
@@ -178,7 +178,7 @@ export default function HowItWorks() {
             </span>
           </div>
         </article>
-        <article className="vcard glass v-hold">
+        <article className="vcard glass gl-card v-hold">
           <div className="vc-top">
             <span className="vc-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M10 9v6M14 9v6" /></svg>
@@ -195,7 +195,7 @@ export default function HowItWorks() {
             </span>
           </div>
         </article>
-        <article className="vcard glass v-deny">
+        <article className="vcard glass gl-card v-deny">
           <div className="vc-top">
             <span className="vc-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>

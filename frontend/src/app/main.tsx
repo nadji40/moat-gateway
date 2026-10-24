@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 // (index.html, compare/, docs/ and team/). Importing from the shared entry point
 // ensures every style is available regardless of which document loads first.
 import '../styles/shared.css'
+import '../styles/glass.css'
 import '../styles/home.css'
 import '../styles/footer.css'
 import '../styles/compare.css'

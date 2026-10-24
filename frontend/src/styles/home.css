@@ -353,3 +353,117 @@ html[dir="rtl"] .more svg { transform: scaleX(-1); }
 .chk-more .more { margin-top: 0; }
 .chk-more .more + .more { margin-left: 0; margin-right: 0; }
 html[dir="rtl"] .chk-more .more + .more { margin-right: 0; }
+
+/* ── The glass pass: the deck's cover behind the hero, the deck's cards and
+   the status page's board under every section ────────────────────────── */
+
+/* Hero: the deck's glass panels behind the mark and the headline, reaching
+   up under the sticky nav and fading to black at the sides and below. */
+.home-hero { position: relative; isolation: isolate; }
+.home-hero-fg { position: relative; }
+.home-hero-bg {
+  position: absolute;
+  z-index: -1;
+  top: -140px;
+  bottom: -40px;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: url('/deck/glass-dark.jpg') center 38% / cover no-repeat;
+  opacity: .92;
+  -webkit-mask-image:
+    radial-gradient(90% 75% at 50% 42%, #000 20%, rgba(0,0,0,.55) 55%, transparent 100%),
+    linear-gradient(180deg, #000 70%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    radial-gradient(90% 75% at 50% 42%, #000 20%, rgba(0,0,0,.55) 55%, transparent 100%),
+    linear-gradient(180deg, #000 70%, transparent 100%);
+  mask-composite: intersect;
+}
+/* a thin veil so the panels never fight the headline */
+.home-hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 55% at 50% 60%, rgba(0,0,0,.55), transparent 70%);
+}
+.home-hero h1 .g {
+  background: linear-gradient(92deg, #ffd2b3 0%, var(--orange-l) 35%, var(--orange) 65%, #c8415a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.home-hero .heromark svg { filter: drop-shadow(0 6px 24px rgba(255, 95, 0, .35)); }
+@media (max-width: 560px) {
+  .home-hero-bg { top: -100px; background-position: center 30%; }
+}
+
+/* The traced attack: the step numbers are the deck's rings. */
+.tr-n {
+  background: rgba(255, 95, 0, .06);
+  border: 1.5px solid rgba(255, 138, 76, .42);
+  box-shadow: 0 0 0 5px var(--bg), 0 0 18px -4px rgba(255, 95, 0, .55);
+}
+.tr-step .tr-head { color: var(--ink); }
+.tr-card.gl-card { gap: 12px; }
+
+/* The three answers: the diagram sits on the status page's board. */
+.home-flowboard {
+  padding: 28px clamp(18px, 4vw, 44px) 18px;
+  margin-bottom: 34px;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, .03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, .03) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.vcard.gl-card { border-radius: 18px; }
+
+/* The checks: the payment pill takes the deck's rim. */
+.chk-pay { border-color: rgba(255, 138, 76, .42); background: rgba(255, 95, 0, .05); }
+.chk-card.gl-card { border-radius: 18px; }
+
+/* The closing band: the deck's last slide. */
+.home-band {
+  text-align: start;
+  padding: clamp(40px, 7vw, 76px) clamp(24px, 6vw, 72px);
+  background:
+    radial-gradient(60% 80% at 100% 50%, rgba(200, 65, 90, .22), transparent 70%),
+    var(--gl-board-bg);
+}
+.home-band::before { inset: auto -20% -70% 0; }
+.home-band-art {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(46%, 520px);
+  pointer-events: none;
+  background: url('/deck/closing.jpg') 60% 20% / cover no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%);
+  mask-image: linear-gradient(90deg, transparent, #000 45%);
+  opacity: .9;
+}
+html[dir="rtl"] .home-band-art {
+  inset: 0 auto 0 0;
+  transform: scaleX(-1);
+}
+.home-band-title { font-size: clamp(1.9rem, 4.6vw, 3.4rem); line-height: 1.04; max-width: 14ch; }
+.home-band .row { justify-content: flex-start; margin-top: 28px; }
+.home-band-cta { padding: 14px 24px; font-size: 1rem; }
+.home-band-cta svg { width: 16px; height: 16px; }
+html[dir="rtl"] .home-band-cta svg { transform: scaleX(-1); }
+@media (max-width: 760px) {
+  .home-band-art { width: 100%; inset: auto 0 0 0; height: 55%;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 60%); mask-image: linear-gradient(180deg, transparent, #000 60%); opacity: .5; }
+  .home-band-title { max-width: none; }
+}
+
+/* The haze behind a section spreads to the viewport's edges and past the
+   section's top and bottom, so no box edge shows where it stops. */
+#problem.gl-glow::before,
+#how.gl-glow::before,
+#checks.gl-glow::before {
+  inset: -12% calc(50% - 50vw);
+  background:
+    radial-gradient(42% 46% at 22% 30%, rgba(255, 95, 0, .16), transparent 70%),
+    radial-gradient(36% 40% at 80% 60%, rgba(200, 65, 90, .13), transparent 70%);
+}

@@ -23,6 +23,10 @@ html.lg-on [data-glass-live] {
 html.lg-on .lg-control[data-glass-live]:active { scale: none; }
 html.lg-ready [data-glass-backdrop] { visibility: hidden; }
 html.lg-on body { background: transparent; }
+/* The body goes transparent so the canvas shows through, but the canvas does
+   not cover the scrollbar gutter: without a colour on <html> the browser
+   paints that strip in its own default, white, on a black site. */
+html.lg-on { background: var(--bg, #000); }
 `
 
 const LiquidGlassContext = React.createContext<LiquidGlass | null>(null)

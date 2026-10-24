@@ -1,11 +1,18 @@
-/* The documentation page: a sticky list of sections beside a long article. */
-.docs { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; align-items: start; text-align: left; padding-block: 36px 72px; }
+/* The documentation page: a sticky list of sections beside a long article,
+   on the site's glass (styles/glass.css): the list is a board, the lede and
+   tables are panels, code blocks are rimmed cards, and the warm haze stays
+   at the top so the article below reads on black. */
+.docs-page { width: 100%; }
+.docs { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 48px; align-items: start; text-align: left; padding-block: 36px 72px; }
+
+/* ---- the section list: a board ---- */
 .docs-nav {
   position: sticky;
   top: 96px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  padding: 14px 10px;
 
   /* Independent sidebar scrolling */
   max-height: calc(100dvh - 112px);
@@ -13,12 +20,40 @@
   overflow-x: hidden;
   overscroll-behavior-y: contain;
   scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-color: rgba(255, 138, 76, 0.35) transparent;
 }
-.docs-k { font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px 12px; }
-.docs-nav a { display: block; padding: 7px 12px; border-radius: 9px; font-size: .875rem; font-weight: 600; color: var(--ink-2); text-decoration: none; transition: color .18s, background .18s; }
+.docs-k { font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 4px 0 10px 12px; }
+.docs-nav a {
+  position: relative;
+  display: block;
+  padding: 8px 12px 8px 16px;
+  border-radius: 10px;
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: color .18s, background .18s, box-shadow .18s;
+}
+/* a thin warm tick the current section lights */
+.docs-nav a::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 5px;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 3px;
+  background: var(--orange);
+  transform: translateY(-50%);
+  transition: height .2s var(--ease);
+}
 .docs-nav a:hover, .docs-nav a:focus-visible { color: var(--ink); background: rgba(255,255,255,.05); outline: none; }
-.docs-nav a[aria-current] { color: var(--orange); background: rgba(255,95,0,.09); }
+.docs-nav a[aria-current] {
+  color: var(--orange-l);
+  background: rgba(255, 95, 0, .10);
+  box-shadow: inset 0 0 0 1px rgba(255, 138, 76, .22), 0 0 22px -8px rgba(255, 95, 0, .7);
+}
+.docs-nav a[aria-current]::before { height: 60%; box-shadow: 0 0 8px var(--orange); }
 
 @media (max-width: 900px) {
   .docs {
@@ -31,6 +66,7 @@
     flex-direction: row;
     flex-wrap: wrap;
     gap: 6px;
+    padding: 10px;
     max-height: none;
     overflow: visible;
   }
@@ -44,38 +80,123 @@
     background: rgba(255,255,255,.04);
     padding: 7px 12px;
   }
+  .docs-nav a::before { display: none; }
 }
 
-
+/* ---- the article ---- */
 .docs-body { min-width: 0; }
-.docs-head { margin-bottom: 40px; }
-.docs-head h1 { font-size: clamp(1.9rem, 4.2vw, 2.8rem); }
-.docs-head .lede { color: var(--ink-2); margin-top: 16px; font-size: 1.0625rem; line-height: 1.6; max-width: 62ch; }
+.docs-head { margin-bottom: 44px; }
+.docs-head h1 { font-size: clamp(1.9rem, 4.2vw, 2.9rem); letter-spacing: -.03em; }
+.docs-head .docs-lede {
+  color: var(--ink-2);
+  margin-top: 18px;
+  padding: 14px 18px;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  max-width: 68ch;
+}
+.docs-head .docs-lede code {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--gl-rim-soft);
+  background: rgba(255, 95, 0, .08);
+  color: var(--gl-ink-warm);
+  font-size: .86em;
+}
 .docs-body section { padding-block: 0; margin-bottom: 52px; scroll-margin-top: 96px; }
-.docs-body h2 { font-size: 1.5rem; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+/* a warm rule between sections, as on the status page */
+.docs-body section + section::before {
+  content: "";
+  display: block;
+  height: 1px;
+  margin: 0 0 40px;
+  background: linear-gradient(90deg, transparent, rgba(255, 132, 30, .55) 20%, rgba(255, 255, 255, .18) 50%, rgba(255, 132, 30, .55) 80%, transparent);
+}
+.docs-body h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 1.6rem;
+  letter-spacing: -.02em;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.docs-body h2::before {
+  content: "";
+  width: 6px;
+  height: 22px;
+  flex: none;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--orange-l), var(--orange));
+  box-shadow: 0 0 12px rgba(255, 95, 0, .55);
+}
 .docs-body p { color: var(--ink-2); line-height: 1.65; margin: 0 0 14px; max-width: 72ch; }
 .docs-body p strong { color: var(--ink); }
 .docs-body p a { color: var(--orange-l); text-decoration: none; }
 .docs-body p a:hover { text-decoration: underline; }
 .docs-body code { font-family: var(--mono); font-size: .9em; color: var(--ink); background: rgba(255,255,255,.07); padding: 1px 6px; border-radius: 5px; }
 
-.docs-body .codewrap { margin: 0 0 18px; }
+/* ---- code: a rimmed card ---- */
+.docs-body .codewrap { margin: 0 0 20px; }
 .docs-body .codebar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.docs-body .codebar-lbl { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.docs-body .codebar-lbl { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gl-ink-warm); }
 .docs-body .codebar-sp { flex: 1; }
-.docs-body pre { margin: 0; padding: 16px 18px; border-radius: 14px; font-size: .84rem; line-height: 1.55; text-align: left; overflow-x: auto; white-space: pre; color: var(--ink); -webkit-user-select: text; user-select: text; }
+.docs-body .docs-copy {
+  padding: 6px 14px;
+  border-color: var(--gl-rim-soft);
+  background: rgba(255, 95, 0, .06);
+  color: var(--ink);
+}
+.docs-body .docs-copy:hover { border-color: var(--orange-l); background: rgba(255, 95, 0, .14); }
+.docs-body pre.docs-code {
+  margin: 0;
+  padding: 18px 20px;
+  border-radius: var(--gl-radius-s);
+  border: 1px solid var(--gl-rim);
+  background: linear-gradient(180deg, rgba(22, 16, 13, .92), rgba(8, 6, 5, .96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .07),
+    0 0 0 1px rgba(255, 95, 0, .06),
+    0 28px 60px -34px rgba(255, 95, 0, .45);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  font-size: .84rem;
+  line-height: 1.55;
+  text-align: left;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--ink);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 138, 76, .35) transparent;
+  -webkit-user-select: text;
+  user-select: text;
+}
 
-.tblwrap { overflow-x: auto; margin: 0 0 18px; border-radius: 14px; border: 1px solid var(--line); }
+/* ---- tables: a panel with the status page's header row ---- */
+.tblwrap { overflow-x: auto; margin: 0 0 20px; }
 .tbl { width: 100%; border-collapse: collapse; font-size: .875rem; }
-.tbl th, .tbl td { padding: 10px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
-.tbl th { font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); background: rgba(255,255,255,.03); }
+.tbl th, .tbl td { padding: 11px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.tbl th {
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--gl-ink-warm);
+  background: linear-gradient(180deg, rgba(255, 95, 0, .10), rgba(255, 95, 0, .04));
+  border-bottom: 1px solid var(--gl-rim-soft);
+}
 .tbl tr:last-child td { border-bottom: 0; }
+.tbl tbody tr:hover td { background: rgba(255, 255, 255, .025); }
 .tbl td { color: var(--ink-2); line-height: 1.5; }
 .tbl td code { white-space: nowrap; }
 
 /* Right to left: the grid puts the section list on the right by itself; the
  * sides set above are mirrored. Code blocks and their copy bar stay left to right. */
 html[dir="rtl"] .docs { text-align: right; }
-html[dir="rtl"] .docs-k { margin: 0 12px 10px 0; }
+html[dir="rtl"] .docs-k { margin: 4px 12px 10px 0; }
+html[dir="rtl"] .docs-nav a { padding: 8px 16px 8px 12px; }
 html[dir="rtl"] .tbl th, html[dir="rtl"] .tbl td { text-align: right; }
 html[dir="rtl"] .docs-body .codebar { direction: ltr; }
+html[dir="rtl"] .docs-body h2::before { order: 0; }

@@ -170,7 +170,7 @@ export default function SecurityFeatures() {
 
   const current = FEATURES[active]!
   return (
-    <section id="checks" className="tight" ref={section}>
+    <section id="checks" className="tight gl-glow" ref={section}>
       <div className="head">
         <h2>{L('What it checks', 'ما الذي يتحقق منه')}</h2>
       </div>
@@ -195,7 +195,7 @@ export default function SecurityFeatures() {
               <article
                 key={f.title}
                 ref={(el) => { cards.current[i] = el }}
-                className={`chk-card glass${i === active && !done ? ' is-active' : ''}${passed(i) ? ' is-passed' : ''}`}
+                className={`chk-card glass gl-card${i === active && !done ? ' is-active' : ''}${passed(i) ? ' is-passed' : ''}`}
                 data-d={Math.min(Math.abs(i - active), 3)}
               >
                 <span className="chk-badge" aria-hidden="true">{CHECK}</span>

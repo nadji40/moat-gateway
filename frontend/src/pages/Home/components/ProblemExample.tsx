@@ -32,7 +32,7 @@ export default function ProblemExample() {
   }, [])
 
   return (
-    <section id="problem" className="tight">
+    <section id="problem" className="tight gl-glow">
       <div className="head">
         <h2>{L("The rails can't tell who asked. Moat can.", 'قنوات الدفع لا تعرف من طلب. Moat تعرف.')}</h2>
       </div>
@@ -43,7 +43,7 @@ export default function ProblemExample() {
           {/* 1 — what the user asked */}
           <li className="tr-step" style={{ ['--i' as string]: 0 }}>
             <div className="tr-head"><span className="tr-n">1</span>{L('The user asks', 'المستخدم يطلب')}</div>
-            <div className="tr-card glass">
+            <div className="tr-card glass gl-card">
               <div className="tr-chat">
                 <span className="tr-avatar" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
@@ -62,7 +62,7 @@ export default function ProblemExample() {
           {/* 2 — the page the agent read, with a line planted in it */}
           <li className="tr-step" style={{ ['--i' as string]: 1 }}>
             <div className="tr-head"><span className="tr-n">2</span>{L('The agent reads a page', 'الوكيل يقرأ صفحة')}</div>
-            <div className="tr-card glass">
+            <div className="tr-card glass gl-card">
               <div className="tr-browser">
                 <div className="tr-bar" aria-hidden="true"><i /><i /><i /><span>invoices.example.com</span></div>
                 <div className="tr-page">
@@ -86,7 +86,7 @@ export default function ProblemExample() {
           {/* 3 — the payment the agent built */}
           <li className="tr-step" style={{ ['--i' as string]: 2 }}>
             <div className="tr-head"><span className="tr-n">3</span>{L('The agent tries to pay', 'الوكيل يحاول الدفع')}</div>
-            <div className="tr-card glass">
+            <div className="tr-card glass gl-card">
               <dl className="tr-slip">
                 <div><dt>{L('Payee', 'المستفيد')}</dt><dd className="bad"><bdi>Nova Studio</bdi></dd></div>
                 <div><dt>{L('Amount', 'المبلغ')}</dt><dd className="mono"><bdi>480 USD</bdi></dd></div>
@@ -103,7 +103,7 @@ export default function ProblemExample() {
                 <g fill="none" stroke="currentColor" strokeWidth="14" strokeLinecap="round"><path d="M117 52.4 A67 67 0 0 1 202.7 141.2" /><path d="M177.5 171.2 A67 67 0 0 1 86.1 76.6" /></g>
               </svg>
             </span>Moat</div>
-            <div className="tr-card glass tr-verdict">
+            <div className="tr-card glass gl-card tr-verdict">
               <span className="tr-stamp">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
                 {L('Refused', 'مرفوضة')}

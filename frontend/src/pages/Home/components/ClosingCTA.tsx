@@ -9,10 +9,21 @@ import { L } from '../../../i18n'
 export default function ClosingCTA() {
   return (
     <section className="tight">
-      <div className="band glass">
-        <h2>{L('Put Moat in front of your agent', 'ضع Moat أمام وكيلك')}</h2>
+      <div className="band glass gl-board home-band">
+        {/* The deck's last slide: the person with the tablet, on the far
+            side, fading into the board. Decoration only. */}
+        <div className="home-band-art" aria-hidden="true" />
+        <h2 className="home-band-title">
+          {L(
+            <>Put Moat in front of<br /><span className="gl-grad">your agent</span></>,
+            <>ضع Moat أمام<br /><span className="gl-grad">وكيلك</span></>,
+          )}
+        </h2>
         <div className="row">
-          <a className="btn" href="/dashboard">{L('Open a workspace', 'افتح مساحة عمل')}</a>
+          <a className="gl-pill home-band-cta" href="/dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            {L('Open a workspace', 'افتح مساحة عمل')}
+          </a>
         </div>
       </div>
     </section>

@@ -44,16 +44,16 @@ function Code({ children, lang }: { children: string; lang?: string }) {
       <div className="codebar">
         {lang && <span className="codebar-lbl">{lang}</span>}
         <span className="codebar-sp" />
-        <button type="button" className="chip" onClick={copy} aria-label={L('Copy to clipboard', 'نسخ إلى الحافظة')}>{label}</button>
+        <button type="button" className="chip docs-copy" onClick={copy} aria-label={L('Copy to clipboard', 'نسخ إلى الحافظة')}>{label}</button>
       </div>
-      <pre className="glass" ref={pre}>{children}</pre>
+      <pre className="glass docs-code" ref={pre}>{children}</pre>
     </div>
   )
 }
 
 function Table({ head, rows }: { head: string[]; rows: string[][] }) {
   return (
-    <div className="tblwrap">
+    <div className="tblwrap gl-panel">
       <table className="tbl">
         <thead><tr>{head.map((h) => <th key={h}>{h}</th>)}</tr></thead>
         <tbody>{rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{j === 0 ? <code>{c}</code> : c}</td>)}</tr>)}</tbody>
@@ -91,8 +91,9 @@ export default function Docs() {
 
   return (
     <>
+      <div className="docs-page gl-glow top">
       <main className="docs wrap">
-        <aside className="docs-nav" aria-label={L('On this page', 'في هذه الصفحة')}>
+        <aside className="docs-nav gl-board" aria-label={L('On this page', 'في هذه الصفحة')}>
           <p className="docs-k">{L('Documentation', 'التوثيق')}</p>
           {SECTIONS.map(([id, label, labelAr]) => (
             <a key={id} href={`#${id}`} aria-current={active === id ? 'true' : undefined}>{L<string>(label, labelAr)}</a>
@@ -102,8 +103,8 @@ export default function Docs() {
         <article className="docs-body">
           <header className="docs-head">
             <p className="kicker">{L('Documentation', 'التوثيق')}</p>
-            <h1>{L('Moat, from first call to production', 'Moat، من أول طلب إلى الإنتاج')}</h1>
-            <p className="lede">{L(<>Everything here runs against the public API at <code>{base}</code>. The sandbox needs no key. A workspace does.</>, <>كل ما هنا يعمل على الواجهة البرمجية العامة في <code>{base}</code>. لا تحتاج بيئة التجربة إلى مفتاح، أما مساحة العمل فتحتاج إليه.</>)}</p>
+            <h1>{L(<>Moat, from first call <span className="gl-grad">to production</span></>, <>Moat، من أول طلب <span className="gl-grad">إلى الإنتاج</span></>)}</h1>
+            <p className="lede docs-lede gl-panel">{L(<>Everything here runs against the public API at <code>{base}</code>. The sandbox needs no key. A workspace does.</>, <>كل ما هنا يعمل على الواجهة البرمجية العامة في <code>{base}</code>. لا تحتاج بيئة التجربة إلى مفتاح، أما مساحة العمل فتحتاج إليه.</>)}</p>
           </header>
 
           <section id="overview">
@@ -344,6 +345,7 @@ auth: { required: true }`}</Code>
           </section>
         </article>
       </main>
+      </div>
       <Footer />
     </>
   )

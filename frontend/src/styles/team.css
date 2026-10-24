@@ -1,88 +1,85 @@
-/* The team page: the team as a molecule on a wide screen, as a list on a
-   phone, then three facts. */
+/* The team page: the deck's layout, two rows of five portraits on the warm
+   gradient, the founder larger in the middle of the first row; then three
+   facts. */
 .team .hero .lede { max-width: 60ch; }
+.team .hero .kicker { color: var(--orange-l); }
 
-/* ---- the molecule ---- */
-.mol-wrap { display: grid; gap: 18px; justify-items: center; }
-.mol { width: 100%; max-width: 1080px; height: auto; overflow: visible; }
-.mol-halo { opacity: .55; animation: mol-breathe 9s ease-in-out infinite; transform-origin: 500px 400px; transform-box: view-box; }
-@keyframes mol-breathe { 50% { opacity: .9; transform: scale(1.06); } }
+/* ---- the deck ---- */
+.tm-deck {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: clamp(14px, 2.4vw, 32px);
+  row-gap: clamp(28px, 4vw, 48px);
+  align-items: start;
+  text-align: start;
+}
+.tm-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* the portrait is a square at the column's width; the founder's is wider
+     than its column and the row makes room for it */
+  --tile: 100%;
+}
+.tm-tile.founder { --tile: 128%; margin-top: -8%; z-index: 1; }
+.tm-tile.founder .tm-photo { width: var(--tile); margin-inline-start: -14%; }
+.tm-photo {
+  width: var(--tile);
+  aspect-ratio: 1;
+  background: linear-gradient(160deg, #d9482c, #ff8a3d 55%, #c8415a);
+  box-shadow: 0 30px 60px -36px rgba(255, 95, 0, 0.7);
+  transition: transform 0.4s var(--ease);
+}
+.tm-tile:hover .tm-photo { transform: translateY(-4px); }
+.tm-photo img { object-position: 50% 18%; }
 
-.mol-edge { stroke: rgba(255,255,255,.14); stroke-width: 1.6; opacity: 0; transition: opacity .8s var(--ease), stroke .5s, stroke-width .5s; }
-.mol-edges.in .mol-edge { opacity: 1; }
-.mol-edge.core { stroke: rgba(255,138,76,.32); stroke-width: 2.2; }
-.mol-edge.on { stroke: var(--orange); stroke-width: 2.6; }
-.mol-pulses circle { fill: var(--orange-l); filter: drop-shadow(0 0 4px rgba(255,138,76,.9)); }
-
-.mol-node { cursor: pointer; outline: none; opacity: 0; animation: mol-in 1.4s var(--ease) forwards; }
-@keyframes mol-in { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
-.mol-dot { fill: #0D0D10; stroke: rgba(255,255,255,.22); stroke-width: 1.5; transition: stroke .4s, fill .4s; }
-.mol-node.team .mol-dot { fill: #141418; stroke: rgba(255,138,76,.55); stroke-width: 2; }
-.mol-node.center .mol-dot { fill: url(#mol-core); stroke: none; }
-/* a photo keeps the node's edge, in orange at the centre */
-.mol-rim { fill: none; stroke: rgba(255,255,255,.25); stroke-width: 2; pointer-events: none; }
-.mol-node.center .mol-rim { stroke: var(--orange); stroke-width: 3; }
-.mol-node.on .mol-rim { stroke: var(--orange); }
-.mol-node.on .mol-dot { stroke: var(--orange); }
-.mol-node.sel .mol-dot { stroke-width: 3; }
-.mol-node:hover .mol-dot, .mol-node:focus-visible .mol-dot { stroke: var(--orange-l); stroke-width: 3; }
-.mol-node:focus-visible .mol-dot { stroke-dasharray: 3 3; }
-
-.mol text { font-family: var(--font); }
-.mol-ini, .mol-team { pointer-events: none; }
-.mol-ini { fill: var(--ink); font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
-.mol-node.center .mol-ini { fill: #000; font-size: 26px; }
-.mol-team { fill: var(--ink); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
-.mol-name { fill: var(--ink); font-size: 15px; font-weight: 700; }
-.mol-role { fill: var(--ink-3); font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.mol-node.on .mol-role { fill: var(--orange-l); }
-
-/* the card that says who is selected */
-.mol-card { width: min(560px, 100%); min-height: 112px; border-radius: 18px; padding: 18px 20px; display: flex; gap: 18px; align-items: center; text-align: left; }
-.mol-card h3 { font-size: 1.15rem; margin: 2px 0 0; }
-.mol-card .tm-sub { color: var(--ink-2); font-size: .85rem; font-weight: 600; margin-top: 2px; }
-.mol-card .tm-line { margin-top: 6px; }
-
-@media (prefers-reduced-motion: reduce) {
-  .mol-halo { animation: none; }
-  .mol-node { animation: none; opacity: 1; }
-  .mol-edge { opacity: 1; transition: none; }
+.tm-name {
+  margin: 18px 0 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.tm-tile.founder .tm-name { font-size: 1.15rem; margin-top: 22px; }
+.tm-role {
+  margin: 4px 0 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.tm-line {
+  margin: 10px 0 0;
+  color: var(--ink-3);
+  font-size: 0.84rem;
+  line-height: 1.55;
 }
 
-/* ---- the list, for phones ---- */
-.tm-groups { display: none; gap: 30px; }
+@media (max-width: 1100px) {
+  .tm-tile.founder { --tile: 118%; margin-top: -5%; }
+  .tm-tile.founder .tm-photo { margin-inline-start: -9%; }
+}
 @media (max-width: 760px) {
-  .mol-wrap { display: none; }
-  .tm-groups { display: grid; }
+  .tm-deck { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; row-gap: 28px; }
+  /* on a phone the founder leads, at full width */
+  .tm-tile.founder { order: -1; grid-column: 1 / -1; --tile: 100%; margin-top: 0; }
+  .tm-tile.founder .tm-photo { width: 100%; margin-inline-start: 0; aspect-ratio: 4 / 3; }
+  .tm-photo img { object-position: 50% 22%; }
 }
-.tm-group { display: grid; gap: 12px; text-align: left; }
-.tm-h { font-size: .75rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); padding-left: 2px; }
-.tm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; text-align: left; }
-.tm-card { border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
-.tm-card h3 { font-size: 1.05rem; margin-top: 12px; }
-.tm-role { font-size: .75rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--orange); }
-.tm-line { color: var(--ink-2); font-size: .9rem; line-height: 1.5; margin-top: 4px; }
-.tm-pic { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; flex: none; }
-.tm-initials { font-weight: 800; font-size: 1.3rem; letter-spacing: -.02em; color: var(--ink);
-  background: radial-gradient(circle at 30% 30%, rgba(255,138,76,.35), rgba(255,95,0,.12) 60%, rgba(255,255,255,.04));
-  border: 1px solid rgba(255,138,76,.3); }
 
-.tm-how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; text-align: left; }
+/* ---- the facts ---- */
+.tm-how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; text-align: start; }
 @media (max-width: 760px) { .tm-how { grid-template-columns: 1fr; } }
-.tm-fact { border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+.tm-fact { padding: 20px; display: flex; flex-direction: column; gap: 6px; }
 .tm-fact b { font-size: 1rem; }
-.tm-fact span { color: var(--ink-2); font-size: .92rem; line-height: 1.5; }
+.tm-fact span { color: var(--ink-2); font-size: 0.92rem; line-height: 1.5; }
 
 /* ---- right to left (Arabic) ---- */
-/* The molecule itself keeps direction: ltr (set on the svg) so its label
-   anchors hold; the card and the list read from the right. */
-html[dir="rtl"] .mol-card,
-html[dir="rtl"] .tm-group,
-html[dir="rtl"] .tm-grid,
-html[dir="rtl"] .tm-how { text-align: right; }
-html[dir="rtl"] .tm-h { padding-left: 0; padding-right: 2px; }
 /* Arabic letters must stay joined: no tracking on the small caps labels. */
-html[dir="rtl"] .tm-h,
-html[dir="rtl"] .tm-role,
-html[dir="rtl"] .mol-role,
-html[dir="rtl"] .mol-team { letter-spacing: 0; }
+html[dir="rtl"] .tm-role { letter-spacing: 0; }
+html[dir="rtl"] .tm-tile.founder .tm-photo { margin-inline-start: -14%; }

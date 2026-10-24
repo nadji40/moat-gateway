@@ -1,0 +1,187 @@
+/* The site's glass: the patterns the Status page and the pitch deck share,
+   written once so Home, Docs and Team can use them without carrying the
+   Status page's own classes.
+
+   Three surfaces, in order of weight:
+   - .gl-board  the Status page's board: deep, soft, big radius, a hairline
+                of light on top (an .op-board without the shoulders)
+   - .gl-card   the deck's card: near-black with a thin orange rim and a warm
+                shadow (the "use cases" cards)
+   - .gl-panel  a quiet panel for text: a breath of white over black
+
+   One shape: .gl-notch, the deck's photo tile with the top-right corner
+   bitten out. One accent: .gl-grad, the deck's white-to-orange gradient on
+   a heading's key word. One light: .gl-glow, the orange-to-pink haze the
+   deck sets behind everything. */
+
+:root {
+  --gl-rim: rgba(255, 138, 76, 0.42);
+  --gl-rim-soft: rgba(255, 138, 76, 0.18);
+  --gl-ink-warm: #ffb27a;
+  --gl-pink: #c8415a;
+  --gl-board-bg: rgba(13, 18, 24, 0.55);
+  --gl-board-line: rgba(222, 232, 242, 0.09);
+  --gl-radius: 28px;
+  --gl-radius-s: 18px;
+}
+
+/* ---- the warm haze behind a page ---------------------------------------- */
+.gl-glow {
+  position: relative;
+  isolation: isolate;
+}
+/* The haze reaches the viewport's edges whatever the element's width, so a
+   .wrap-width page never shows the haze's box. */
+.gl-glow::before {
+  content: "";
+  position: absolute;
+  inset: -8% calc(50% - 50vw);
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(58% 42% at 18% 12%, rgba(255, 95, 0, 0.26), transparent 70%),
+    radial-gradient(44% 38% at 84% 28%, rgba(200, 65, 90, 0.22), transparent 70%),
+    radial-gradient(60% 40% at 50% 100%, rgba(255, 120, 40, 0.10), transparent 70%);
+}
+/* the same haze, held to the top of a long page so the text below stays on black */
+.gl-glow.top::before { height: min(900px, 90vh); inset-block-end: auto; }
+
+/* ---- surfaces ------------------------------------------------------------ */
+.gl-board {
+  position: relative;
+  border-radius: var(--gl-radius);
+  border: 1px solid var(--gl-board-line);
+  background: var(--gl-board-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    0 24px 60px -32px rgba(0, 0, 0, 0.9);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+/* when the WebGL engine draws this surface, the CSS glass steps aside */
+.gl-board[data-glass-live],
+.gl-card[data-glass-live],
+.gl-panel[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.gl-card {
+  position: relative;
+  border-radius: var(--gl-radius-s);
+  border: 1px solid var(--gl-rim);
+  background: linear-gradient(180deg, rgba(22, 16, 13, 0.92), rgba(8, 6, 5, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 0 0 1px rgba(255, 95, 0, 0.06),
+    0 28px 60px -34px rgba(255, 95, 0, 0.45);
+  transition: border-color 0.25s var(--ease), transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+.gl-card:hover {
+  border-color: var(--orange-l);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 0 0 1px rgba(255, 95, 0, 0.12),
+    0 30px 70px -30px rgba(255, 95, 0, 0.6);
+}
+.gl-card.lift:hover { transform: translateY(-3px); }
+
+.gl-panel {
+  border-radius: var(--gl-radius-s);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ---- the notched photo tile --------------------------------------------- */
+/* The deck's portrait: a rounded square whose top-right corner is bitten out
+   in a quarter circle, so a label can sit in the bite. The bite is a mask,
+   so the image underneath keeps its own gradient. The notch follows the
+   reading direction: top-left in Arabic. */
+.gl-notch {
+  --notch: 46px;
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--gl-radius);
+  -webkit-mask:
+    radial-gradient(circle var(--notch) at 100% 0, transparent 97%, #000 100%);
+  mask:
+    radial-gradient(circle var(--notch) at 100% 0, transparent 97%, #000 100%);
+}
+html[dir="rtl"] .gl-notch {
+  -webkit-mask: radial-gradient(circle var(--notch) at 0 0, transparent 97%, #000 100%);
+  mask: radial-gradient(circle var(--notch) at 0 0, transparent 97%, #000 100%);
+}
+.gl-notch > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---- type ----------------------------------------------------------------- */
+.gl-grad {
+  background: linear-gradient(92deg, #ffd2b3 0%, var(--orange-l) 35%, var(--orange) 65%, var(--gl-pink) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* the deck's two-tone name: the given name warm, the family name white */
+.gl-name b { color: var(--orange-l); font-weight: inherit; }
+
+/* the deck's numbered step: a thin orange ring with the number inside */
+.gl-num {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--gl-rim);
+  color: var(--ink);
+  font: 700 0.8rem var(--font);
+  letter-spacing: 0.02em;
+  background: rgba(255, 95, 0, 0.06);
+  box-shadow: 0 0 18px -6px rgba(255, 95, 0, 0.6);
+}
+
+/* the deck's outlined pill (the e-mail on the last slide) */
+.gl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--gl-rim);
+  background: rgba(255, 95, 0, 0.06);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color 0.2s, background 0.2s;
+}
+.gl-pill:hover { border-color: var(--orange-l); background: rgba(255, 95, 0, 0.12); }
+
+/* ---- small textures ------------------------------------------------------- */
+/* a faint grid, for a board that holds a diagram */
+.gl-grid-tex {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+/* a thin warm rule between sections, as on the status page */
+.gl-rule {
+  height: 1px;
+  width: 100%;
+  border: 0;
+  margin: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 132, 30, 0.65) 20%, rgba(255, 255, 255, 0.22) 50%, rgba(255, 132, 30, 0.65) 80%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-card, .gl-card.lift:hover { transition: none; transform: none; }
+}
