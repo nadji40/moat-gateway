@@ -1,0 +1,1735 @@
+
+/* ==========================================================
+   MOAT STATUS — COMPACT LIQUID GLASS DESIGN
+   Scoped to Status page only
+   ========================================================== */
+
+
+.status-pulse-page {
+  --pulse-green: #00e5a3;
+  --pulse-red: #ff5367;
+  --pulse-amber: #ff9f1a;
+
+  position: relative;
+  isolation: isolate;
+
+  /* Exactly the same horizontal container as Navbar .wrap */
+  width: 100%;
+  max-width: var(--max, 1240px);
+  margin-inline: auto;
+  padding-inline: var(--pad, clamp(20px, 5vw, 64px));
+  padding-top: 20px;
+  padding-bottom: 70px;
+
+  min-height: 0;
+  color: #f7f8fc;
+}
+
+/* Keep all Status content within the same column */
+.status-pulse-page .status-pulse-section {
+  width: 100%;
+  min-width: 0;
+  margin-inline: auto;
+}
+
+/* Shoulder-shaped header */
+.status-pulse-page .op-board {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: auto;
+}
+
+/* Daily history and pagination */
+.status-pulse-page .op-history {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.status-pulse-page .op-pager {
+  max-width: 100%;
+}
+
+/* Prevent horizontal overflow */
+.status-pulse-page .op-strip-side {
+  min-width: 0;
+}
+
+.status-pulse-page .op-strip-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+
+.status-pulse-section {
+  width: 100%;
+  min-width: 0;
+}
+
+/* ================= PAGE HEADING ================= */
+
+.status-pulse-heading {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  margin: 0 0 12px;
+  padding: 0 0 18px;
+}
+
+.status-pulse-heading h1 {
+  margin: 0 0 8px;
+  color: #f7f8fc;
+  font-size: clamp(2.5rem, 4.2vw, 4rem);
+  line-height: 1.1;
+  letter-spacing: -0.06em;
+  font-weight: 800;
+}
+
+.status-pulse-heading p {
+  margin: 0;
+  color: #a7acbb;
+  font-size: clamp(0.85rem, 1.2vw, 1rem);
+}
+
+.op-mock-badge {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 5px 11px;
+  border: 1px solid #756341;
+  border-radius: 999px;
+  color: #d1b78c;
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+}
+
+/* ================= SHOULDER GLASS CARD ================= */
+
+.status-pulse-page .op-board {
+  position: relative;
+  display: block;
+  isolation: isolate;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+
+  padding: 28px 26px 24px;
+
+  border: 0;
+  border-radius: 28px;
+  background: rgba(22, 28, 36, 0.25);
+}
+
+/* Real Crenspire WebGL owns this surface */
+.status-pulse-page .op-board[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Hide obsolete decorative shoulder layers */
+.status-pulse-page .op-board-glass,
+.status-pulse-page .status-overview-outline {
+  display: none;
+}
+
+.status-pulse-page .op-board-top {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 215px minmax(0, 1fr);
+  align-items: center;
+  gap: 26px;
+  min-height: 235px;
+}
+
+/* ================= REPORTING WINDOW ================= */
+
+.status-pulse-page .op-board > .op-window-shoulder {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  bottom: auto;
+  left: auto;
+  z-index: 5;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  width: 206px;
+  max-width: calc(100% - 48px);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  transform: none;
+}
+
+.status-pulse-page .op-window-card {
+  box-sizing: border-box;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+
+  gap: 7px !important;
+  width: 100% !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 6px 8px !important;
+
+  border: 1px solid rgba(235, 240, 248, 0.18);
+  border-radius: 15px !important;
+  background: rgba(20, 24, 33, 0.27);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+
+  direction: ltr;
+}
+
+.status-pulse-page .op-window-card[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.status-pulse-page .op-window-icon {
+  flex: 0 0 32px;
+  display: grid;
+  place-items: center;
+
+  width: 32px;
+  height: 32px;
+
+  border-radius: 10px;
+  border: 1px solid rgba(245, 247, 255, 0.16);
+  background: rgba(27, 31, 40, 0.26);
+  color: #f8fafc;
+}
+
+.status-pulse-page .op-window-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.status-pulse-page .op-window-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  gap: 4px;
+  text-align: left;
+}
+
+.status-pulse-page .op-window-copy small {
+  color: rgba(224, 230, 241, 0.8);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.status-pulse-page .op-window-copy strong {
+  color: #f8fafc;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Legend below Reporting Window */
+
+.status-pulse-page .op-window-shoulder > .op-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  width: 100%;
+
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* ================= AVAILABILITY GAUGE ================= */
+
+.status-pulse-page .op-gauge-shell {
+  position: relative;
+  isolation: isolate;
+  width: 205px;
+  height: 205px;
+  flex: 0 0 205px;
+}
+
+/* Preserve the separate liquid-glass rim */
+
+.status-pulse-page .op-gauge-liquid {
+  position: absolute;
+  inset: -7px;
+  z-index: 0;
+
+  width: calc(100% + 14px);
+  height: calc(100% + 14px);
+  padding: 0;
+  margin: 0;
+
+  border-radius: 50% !important;
+  pointer-events: none;
+}
+
+.status-pulse-page .op-gauge-shell .op-gauge {
+  position: relative;
+  z-index: 1;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 0;
+
+  border-radius: 50%;
+  isolation: isolate;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Single dynamic status color:
+   Green >= 80%, orange >= 50%, red < 50%.
+   The color comes from Status.tsx. */
+
+.status-pulse-page .op-gauge::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  z-index: 1;
+
+  border-radius: 50%;
+  border: 0;
+
+  background: conic-gradient(
+    from -90deg,
+    color-mix(
+      in srgb,
+      var(--op-gauge-color, #00e5a3) 85%,
+      white
+    ) 0%,
+    var(--op-gauge-color, #00e5a3)
+      var(--op-pct, 0%),
+    rgba(108, 118, 129, 0.22)
+      var(--op-pct, 0%) 100%
+  );
+
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 13px),
+    #000 calc(100% - 12px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 13px),
+    #000 calc(100% - 12px)
+  );
+
+  pointer-events: none;
+}
+
+/* Dark inner face */
+
+.status-pulse-page .op-gauge::after {
+  content: "";
+  position: absolute;
+  inset: 16px;
+  z-index: 0;
+
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+
+  background: radial-gradient(
+    circle at 35% 20%,
+    rgba(15, 34, 30, 0.6),
+    #05090b 72%
+  );
+
+  box-shadow:
+    inset 0 1px 2px rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
+/* Center the three text lines */
+
+.status-pulse-page .op-gauge-core {
+  position: relative;
+  z-index: 2;
+
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+
+  width: calc(100% - 36px);
+  height: calc(100% - 36px);
+  padding: 12px;
+  margin: 0;
+
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.status-pulse-page .op-gauge-core strong {
+  display: block;
+  margin: 0;
+
+  color: #fff;
+  font-size: clamp(1.9rem, 2.6vw, 2.45rem);
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+.status-pulse-page .op-gauge-core span {
+  display: block;
+  margin: 0;
+
+  color: #eef3f5;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.status-pulse-page .op-gauge-core small {
+  display: block;
+  margin: 0;
+
+  color: #b3bbca;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+/* Unknown availability */
+
+.status-pulse-page .op-gauge.is-unknown {
+  background: transparent;
+  box-shadow: none;
+}
+
+.status-pulse-page .op-gauge.is-unknown::before {
+  background: rgba(112, 125, 140, 0.42);
+}
+
+/* ================= LEGEND ================= */
+
+.op-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: #abb6c4;
+  font-size: 0.7rem;
+}
+
+.op-key-dot {
+  display: inline-block;
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  margin-inline-start: 0;
+  border-radius: 50%;
+}
+
+.op-key-dot.healthy {
+  background: var(--pulse-green);
+}
+
+.op-key-dot.degraded {
+  background: var(--pulse-red);
+}
+
+.op-key-dot.unknown {
+  background: #66717e;
+}
+
+/* ================= DAILY TIMELINE ================= */
+
+.status-pulse-page .op-strip-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 55px;
+  padding-bottom: 0;
+}
+
+.status-pulse-page .op-strip-top {
+  display: none;
+}
+
+.op-strip-wrap {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+
+  padding: 8px 7px;
+  border: 1px solid rgba(222, 232, 242, 0.09);
+  border-radius: 15px;
+  background: rgba(13, 18, 24, 0.5);
+
+  scrollbar-width: thin;
+  scrollbar-color: #49515d transparent;
+
+}
+
+.op-strip {
+  display: grid;
+  direction: ltr;
+  grid-template-columns: repeat(30, minmax(15px, 1fr));
+  min-width: 630px;
+  gap: 4px;
+}
+
+.op-day {
+  position: relative;
+  min-width: 0;
+  height: 37px;
+
+  border: 1px solid #586473;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #202832, #101820);
+
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    filter 0.15s,
+    border-color 0.15s;
+
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.op-day > span:first-child {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.op-day > span:first-child::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #788390;
+}
+
+.op-day.healthy {
+  border-color: #00b77e;
+  background: linear-gradient(#075b46, #023427);
+}
+
+.op-day.healthy > span:first-child::after {
+  background: #00f4b0;
+  box-shadow: 0 0 6px #00f4b0;
+}
+
+.op-day.warning {
+  border-color: #ce9958;
+  background: linear-gradient(#815629, #4c3117);
+}
+
+.op-day.degraded {
+  border-color: #fc7281;
+  background: linear-gradient(#ed5665, #bb314a);
+}
+
+.op-day.degraded > span:first-child::after {
+  background: #ffe7e8;
+}
+
+.op-day.partial {
+  opacity: 0.88;
+}
+
+.op-day.declared {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 5px,
+    rgba(255, 255, 255, 0.11) 5px 8px
+  );
+}
+
+.op-day:hover,
+.op-day:focus-visible,
+.op-day.selected {
+  z-index: 4;
+  outline: 2px solid rgba(228, 245, 239, 0.85);
+  outline-offset: 1px;
+  filter: brightness(1.15);
+  transform: translateY(-2px);
+}
+
+
+
+
+
+
+.op-strip-ends {
+  display: flex;
+  direction: ltr;
+  justify-content: space-between;
+  padding: 0 5px;
+  color: #b7c1ce;
+  font-size: 0.75rem;
+}
+
+.op-selected {
+  align-self: center;
+  padding: 5px 10px;
+
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(9, 13, 18, 0.6);
+
+  font-size: 0.72rem;
+  color: #d5dce6;
+}
+
+/* ================= HISTORY CARDS ================= */
+
+.op-history {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-inline-start: 24px;
+}
+
+.op-history::before {
+  content: "";
+  position: absolute;
+  top: 23px;
+  bottom: 23px;
+  inset-inline-start: 8px;
+
+  width: 1px;
+  background: linear-gradient(#08da9a 0 70%, #ed5966);
+}
+
+.status-pulse-page .op-history-glass {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+
+  border: 1px solid rgba(223, 230, 241, 0.18);
+  border-radius: 19px;
+  overflow: visible;
+
+  background: linear-gradient(
+    120deg,
+    rgba(18, 24, 32, 0.75),
+    rgba(8, 11, 16, 0.7)
+  );
+
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* Real WebGL on history cards */
+.status-pulse-page .op-history-glass[data-glass-live] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.op-history-glass::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -20px;
+  top: calc(50% - 4px);
+
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+
+  background: var(--pulse-green);
+  box-shadow: 0 0 9px var(--pulse-green);
+}
+
+.op-history-glass.degraded::before {
+  background: var(--pulse-red);
+  box-shadow: 0 0 9px var(--pulse-red);
+}
+
+.op-record {
+  position: relative;
+  display: grid;
+  grid-template-columns:
+    54px minmax(140px, 1fr)
+    minmax(130px, 0.9fr)
+    112px 100px 36px;
+  align-items: center;
+  gap: 16px;
+
+  width: 100%;
+  min-height: 74px;
+  padding: 9px 15px;
+
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+
+  color: #f4f7fa;
+  text-align: start;
+  font: inherit;
+  cursor: pointer;
+}
+
+.op-history-glass:hover,
+.op-history-glass.selected {
+  border-color: rgba(235, 243, 251, 0.44);
+}
+
+.op-record:focus-visible {
+  outline: 2px solid #e0e7ee;
+  outline-offset: 2px;
+}
+
+.op-record-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+
+  background: rgba(0, 107, 73, 0.21);
+  border: 1px solid rgba(0, 235, 162, 0.25);
+}
+
+.op-record-icon > span {
+  width: 21px;
+  height: 21px;
+  border: 3px solid var(--pulse-green);
+  border-radius: 50%;
+}
+
+.op-record.degraded .op-record-icon {
+  background: rgba(125, 20, 40, 0.2);
+  border-color: rgba(250, 95, 113, 0.28);
+}
+
+.op-record.degraded .op-record-icon > span {
+  border-color: var(--pulse-red);
+}
+
+.op-record-date {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.op-record-date strong {
+  font-size: 1rem;
+}
+
+.op-record-date small {
+  font-size: 0.83rem;
+  color: #a9b5c5;
+}
+
+.op-record-tag {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+  font-size: 0.64rem;
+  letter-spacing: 0.13em;
+  color: #b4bfcd;
+}
+
+.op-record-tag i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pulse-green);
+  box-shadow: 0 0 9px var(--pulse-green);
+}
+
+.op-record.degraded .op-record-tag i {
+  background: var(--pulse-red);
+  box-shadow: 0 0 9px var(--pulse-red);
+}
+
+.op-record-bars {
+  display: flex;
+  justify-content: end;
+  align-items: flex-end;
+  gap: 4px;
+  height: 30px;
+}
+
+.op-record-bars i {
+  display: block;
+  width: 5px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(#04efc3, #006c5a);
+}
+
+.op-record.degraded .op-record-bars i {
+  background: linear-gradient(#fa6a7c, #8a1830);
+}
+
+.op-record-value {
+  text-align: end;
+  font-size: 1.42rem;
+  color: var(--pulse-green);
+  white-space: nowrap;
+}
+
+.op-record.degraded .op-record-value {
+  color: var(--pulse-red);
+}
+
+.op-record.warning .op-record-value {
+  color: var(--pulse-amber);
+}
+
+.op-record-arrow {
+  display: grid;
+  place-items: center;
+
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+
+  color: #e8ecf2;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(35, 41, 49, 0.65);
+}
+
+/* ================= LOADING / ERRORS ================= */
+
+.op-empty {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+
+  min-height: 84px;
+  padding: 20px;
+
+  border: 1px solid rgba(225, 233, 243, 0.15);
+  border-radius: 18px;
+  background: rgba(15, 20, 27, 0.65);
+  color: #b6c0cd;
+}
+
+.op-empty.op-error {
+  color: #ff9aa9;
+}
+
+.op-empty button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid #586373;
+
+  color: white;
+  background: #272e39;
+  cursor: pointer;
+}
+
+/* ================= RESPONSIVE — REPAIRED ================= */
+@media (max-width: 1100px) {
+  .status-pulse-page .op-board-top { gap: 20px; }
+  .status-pulse-page .op-record { min-width: 0; }
+}
+@media (max-width: 900px) {
+  .status-pulse-page .status-pulse-heading {
+    position: relative; margin: 0 0 18px; padding: 0; pointer-events: auto;
+  }
+  .status-pulse-page .op-board { padding: 22px 18px; border-radius: 22px; }
+  .status-pulse-page .op-board-top {
+    grid-template-columns: minmax(0, 1fr); gap: 20px;
+    justify-items: center; min-height: 0;
+  }
+  .status-pulse-page .op-gauge-shell {
+    width: 180px; height: 180px; flex-basis: 180px;
+  }
+  .status-pulse-page .op-strip-side {
+    width: 100%; display: flex; flex-direction: column; gap: 12px;
+    justify-content: center; padding: 0; min-width: 0;
+  }
+  .status-pulse-page .op-board > .op-window-shoulder {
+    position: static; inset: auto; margin: 0 auto 16px;
+    width: min(100%, 360px); max-width: 100%;
+  }
+  .status-pulse-page .op-window-card { width: 100% !important; }
+  .status-pulse-page .op-strip-wrap { width: 100%; overflow-x: auto; }
+  .status-pulse-page .op-strip { min-width: 520px; }
+  /* No shoulder/cutout shape on tablet or mobile. Keep Glass UI material. */
+  .status-pulse-page .op-board { clip-path: none !important; border-radius: 22px !important; }
+  .status-pulse-page .op-board::before,
+  .status-pulse-page .op-board::after { clip-path: none !important; }
+}
+@media (max-width: 700px) {
+  .status-pulse-page {
+    padding-inline: clamp(12px, 4vw, 20px); padding-top: 16px; padding-bottom: 38px;
+  }
+  .status-pulse-page .status-pulse-heading h1 { font-size: clamp(2rem, 9vw, 2.8rem); }
+  .status-pulse-page .status-pulse-heading p { font-size: .84rem; }
+  .status-pulse-page .op-board { padding: 16px 12px; border-radius: 18px !important; }
+  .status-pulse-page .op-gauge-shell { width: 156px; height: 156px; flex-basis: 156px; }
+  .status-pulse-page .op-gauge-core strong { font-size: 1.75rem; }
+  .status-pulse-page .op-strip { min-width: 480px; }
+  .status-pulse-page .op-strip-wrap { overflow-x: auto; overscroll-behavior-inline: contain; }
+  .status-pulse-page .op-history { padding-inline-start: 12px; min-width: 0; }
+  .status-pulse-page .op-history::before { inset-inline-start: 4px; }
+  .status-pulse-page .op-history-glass::before { inset-inline-start: -12px; }
+  .status-pulse-page .op-record {
+    display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 26px !important;
+    gap: 8px; padding: 10px 8px; min-width: 0; min-height: 66px;
+    align-items: center;
+  }
+  .status-pulse-page .op-record-icon { width: 36px; height: 36px; border-radius: 11px; }
+  .status-pulse-page .op-record-icon > span { width: 15px; height: 15px; }
+  .status-pulse-page .op-record-date { min-width: 0; }
+  .status-pulse-page .op-record-date strong { font-size: .82rem; overflow-wrap: anywhere; }
+  .status-pulse-page .op-record-date small { font-size: .68rem; }
+  .status-pulse-page .op-record-tag,
+  .status-pulse-page .op-record-bars { display: none !important; }
+  .status-pulse-page .op-record-value { font-size: 1rem; white-space: nowrap; }
+  .status-pulse-page .op-record-arrow { width: 25px; height: 25px; }
+}
+@media (max-width: 390px) {
+  .status-pulse-page .op-record { grid-template-columns: 32px minmax(0,1fr) auto 22px !important; gap: 5px; }
+  .status-pulse-page .op-record-icon { width: 30px; height: 30px; }
+  .status-pulse-page .op-record-value { font-size: .87rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .op-day {
+    transition: none;
+  }
+}
+.status-pulse-page .op-strip-wrap {
+  margin: 0;
+}
+
+.status-pulse-page .op-strip-ends {
+  margin-top: 4px;
+}
+
+
+/* ==========================================
+   STATUS — HEADER POSITIONING FIX
+   Bring heading into the shoulder cutout
+   ========================================== */
+
+@media (min-width: 901px) {
+
+  /* Remove large empty area beneath navbar */
+  .status-pulse-page .status-pulse-section {
+    position: relative;
+    margin-top: -45px;
+  }
+
+  /* Place title between the raised shoulders */
+  .status-pulse-page .status-pulse-heading {
+    position: relative;
+    z-index: 3;
+    margin: 0 0 -55px;
+    padding: 0;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .status-pulse-page .status-pulse-heading h1 {
+    margin: 0 0 8px;
+    font-size: clamp(2.7rem, 4vw, 3.5rem);
+    line-height: 1.05;
+  }
+
+  .status-pulse-page .status-pulse-heading p {
+    margin: 1;
+    font-size: 0.95rem;
+  }
+
+  /* Keep demo badge just below subtitle */
+  .status-pulse-page .op-mock-badge {
+    margin-top: 8px;
+  }
+
+  /* Card sits close beneath heading */
+  .status-pulse-page .op-board {
+    position: relative;
+    z-index: 1;
+    margin-top: 0;
+    padding: 22px 26px 20px;
+    min-height: 0;
+  }
+
+  /* Compact content within the shoulder card */
+  .status-pulse-page .op-board-top {
+    min-height: 218px;
+    align-items: center;
+  }
+
+  /* Timeline centered without excess top spacing */
+  .status-pulse-page .op-strip-side {
+    justify-content: center;
+    padding-top: 35px;
+    padding-bottom: 0;
+  }
+}
+.status-pulse-page .op-record {
+  display: grid;
+  grid-template-columns:
+    54px
+    145px
+    max-content
+    minmax(0, 1fr)
+    120px
+    90px;
+
+  align-items: center;
+  column-gap: 10px;
+
+  width: 100%;
+  min-height: 68px;
+  padding: 8px 14px;
+}
+.status-pulse-page .op-record-icon {
+  width: 48px;
+  height: 48px;
+}
+
+/* Keep the date and status close together */
+.status-pulse-page .op-record-date {
+  min-width: 0;
+  gap: 3px;
+}
+.status-pulse-page .op-record-date strong {
+  font-size: 0.98rem;
+}
+
+.status-pulse-page .op-record-date small {
+  font-size: 0.79rem;
+}
+
+.status-pulse-page .op-record-tag {
+  grid-column: 3;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  white-space: nowrap;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+}
+.status-pulse-page .op-record-bars {
+  grid-column: 5;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 4px;
+  height: 28px;
+}
+
+.status-pulse-page .op-record-bars i {
+  display: block;
+  flex: 0 0 5px;
+  width: 5px;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(
+    to top,
+    #006b54,
+    #00e5a3
+  );
+}
+
+.status-pulse-page .op-record.degraded .op-record-bars i {
+  background: linear-gradient(
+    to top,
+    #96172d,
+    #ff5367
+  );
+}
+
+.status-pulse-page .op-record-value {
+  grid-column: 6;
+  justify-self: end;
+  text-align: right;
+  font-size: 1.35rem;
+}
+
+.status-pulse-page .op-record-arrow {
+  display: none !important;
+}
+
+.status-pulse-page .op-history {
+  gap: 6px;
+}
+
+/* Tablet */
+@media (min-width: 701px) and (max-width: 1100px) {
+  .status-pulse-page .op-record {
+    grid-template-columns:
+      48px
+      120px
+      max-content
+      minmax(0, 1fr)
+      85px
+      75px;
+    column-gap: 8px;
+  }
+
+  .status-pulse-page .op-record-bars {
+    display: flex;
+    gap: 3px;
+  }
+
+  .status-pulse-page .op-record-bars i {
+    width: 4px;
+    flex-basis: 4px;
+  }
+}
+
+/* Mobile: hide bars only when there is insufficient space */
+@media (max-width: 700px) {
+  .status-pulse-page .op-record {
+    grid-template-columns:
+      42px
+      minmax(0, 1fr)
+      auto;
+    gap: 8px;
+    min-height: 64px;
+    padding: 8px;
+  }
+
+  .status-pulse-page .op-record-date {
+    grid-column: 2;
+  }
+
+  .status-pulse-page .op-record-tag,
+  .status-pulse-page .op-record-bars {
+    display: none;
+  }
+
+  .status-pulse-page .op-record-value {
+    grid-column: 3;
+    font-size: 1.04rem;
+  }
+}
+
+
+/* ============================================
+   STATUS — CRENSPIRE LIQUID GLASS PAGINATION
+   ============================================ */
+
+.status-pulse-page nav.status-pagination {
+  display: flex;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  margin: 24px auto 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.status-pulse-page .status-pagination-content {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  width: max-content;
+  min-height: 64px;
+  margin: 0;
+  padding: 7px 12px;
+  border-radius: 999px !important;
+  list-style: none;
+
+  /* Real Crenspire glass owns the outer surface */
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.status-pulse-page .status-pagination-content > li {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  list-style: none;
+}
+
+.status-pulse-page .status-pagination-content a {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  color: #f5f7fa;
+  font-size: 15px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+/* Stable Previous / Next buttons */
+.status-pulse-page .status-pagination-content
+a[aria-label="Go to previous page"],
+.status-pulse-page .status-pagination-content
+a[aria-label="Go to next page"] {
+  width: 104px;
+  min-width: 104px;
+  gap: 6px;
+  border-radius: 999px;
+}
+
+/* Dark active circle — never white */
+.status-pulse-page .status-pagination-content
+a[aria-current="page"] {
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+
+  color: #ffffff !important;
+  background:
+    radial-gradient(
+      circle at 30% 20%,
+      rgba(255,255,255,0.15),
+      transparent 60%
+    ),
+    linear-gradient(
+      145deg,
+      #454a53,
+      #22262e
+    ) !important;
+
+  border: 1px solid rgba(255,255,255,0.20) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.15),
+    0 4px 12px rgba(0,0,0,0.35) !important;
+}
+
+/* Hover without changing element size */
+.status-pulse-page .status-pagination-content
+a:not([aria-current="page"]):not([aria-disabled="true"]):hover {
+  background: rgba(255,255,255,0.08);
+}
+
+/* Disabled navigation */
+.status-pulse-page .status-pagination-content
+a[aria-disabled="true"] {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Ellipsis */
+.status-pulse-page .status-pagination-content li > span {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 46px;
+  min-width: 46px;
+  height: 46px;
+  color: #f5f7fa;
+}
+
+/* Mobile */
+@media (max-width: 700px) {
+  .status-pulse-page .status-pagination-content {
+    gap: 0;
+    min-height: 50px;
+    padding: 5px 7px;
+  }
+
+  .status-pulse-page .status-pagination-content a,
+  .status-pulse-page .status-pagination-content li > span,
+  .status-pulse-page .status-pagination-content
+  a[aria-current="page"] {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    font-size: 12px;
+  }
+
+  .status-pulse-page .status-pagination-content
+  a[aria-label="Go to previous page"],
+  .status-pulse-page .status-pagination-content
+  a[aria-label="Go to next page"] {
+    width: 80px;
+    min-width: 80px;
+    font-size: 11px;
+  }
+}
+
+/* Status timeline hover card — dark glass overlay */
+.status-timeline-hover {
+  color: #f7f8fc;
+  background: rgba(12, 16, 23, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.42),
+    inset 0 1px rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+   position: relative;
+  z-index: 9999 !important;
+  isolation: isolate;
+}
+/* History and pagination: responsive safety guards */
+.status-pulse-page .op-history,
+.status-pulse-page .op-history-glass,
+.status-pulse-page .op-record { max-width: 100%; box-sizing: border-box; }
+@media (max-width: 700px) {
+  .status-pulse-page .status-pagination-content { max-width: 100%; gap: 2px; padding: 5px 7px; min-height: 44px; }
+  .status-pulse-page .status-pagination-content a,
+  .status-pulse-page .status-pagination-content li > span { min-width: 32px; width: auto; height: 34px; min-height: 34px; font-size: .79rem; }
+  .status-pulse-page nav.status-pagination { max-width: 100%; overflow-x: auto; }
+}
+
+/* ==========================================================
+   STATUS SMALL-SCREEN REBUILD (do not alter desktop layout)
+   Shoulder shape is also removed at the component attribute.
+   ========================================================== */
+@media (max-width: 900px) {
+  .status-pulse-page, .status-pulse-page * { box-sizing: border-box; }
+  .status-pulse-page .status-pulse-section { margin-top: 0 !important; }
+  .status-pulse-page .status-pulse-heading {
+    position: relative !important; margin: 0 0 18px !important;
+    padding: 0 8px !important; text-align: center; pointer-events: auto;
+  }
+  .status-pulse-page .op-board {
+    display: flex !important; flex-direction: column !important;
+    gap: 18px !important; width: 100% !important; min-height: 0 !important;
+    padding: 18px 14px !important; border-radius: 22px !important;
+    overflow: visible !important; clip-path: none !important;
+    --lg-bezel: 0px;
+  }
+  .status-pulse-page .op-board::before,
+  .status-pulse-page .op-board::after { content: none !important; }
+  .status-pulse-page .op-board > .op-window-shoulder {
+    position: relative !important; inset: auto !important;
+    order: 0; margin: 0 !important; padding: 0 !important;
+    width: 100% !important; max-width: 100% !important;
+    align-items: stretch !important; gap: 12px !important;
+  }
+  .status-pulse-page .op-window-card {
+    width: 100% !important; max-width: 100% !important;
+    height: auto !important; min-height: 60px !important;
+    padding: 10px 12px !important; border-radius: 16px !important;
+  }
+  .status-pulse-page .op-window-copy strong {
+    font-size: 11px !important; letter-spacing: 0 !important;
+    white-space: normal !important; overflow-wrap: anywhere;
+  }
+  .status-pulse-page .op-window-shoulder > .op-key {
+    flex-wrap: wrap !important; white-space: normal !important;
+    justify-content: center !important; gap: 7px 12px !important;
+  }
+  .status-pulse-page .op-board-top {
+    order: 1; display: flex !important; flex-direction: column !important;
+    align-items: center !important; gap: 18px !important;
+    width: 100% !important; min-height: 0 !important; padding: 0 !important;
+  }
+  .status-pulse-page .op-gauge-shell {
+    width: 160px !important; height: 160px !important;
+    flex: 0 0 160px !important; margin: 0 auto !important;
+  }
+  .status-pulse-page .op-strip-side {
+    width: 100% !important; min-width: 0 !important;
+    padding: 0 !important; gap: 10px !important;
+  }
+  .status-pulse-page .op-strip-wrap {
+    width: 100% !important; max-width: 100% !important;
+    overflow-x: auto !important; overflow-y: hidden !important;
+    padding: 8px 6px !important; border-radius: 14px !important;
+  }
+  .status-pulse-page .op-strip { min-width: 520px !important; }
+  .status-pulse-page .op-history {
+    width: 100% !important; min-width: 0 !important;
+    margin-top: 0 !important; padding-inline-start: 12px !important;
+  }
+  .status-pulse-page .op-history::before { inset-inline-start: 4px !important; }
+  .status-pulse-page .op-history-glass { width: 100% !important; min-width: 0 !important; }
+  .status-pulse-page .op-history-glass::before { inset-inline-start: -12px !important; }
+  .status-pulse-page .op-record {
+    display: grid !important;
+    grid-template-columns: 38px minmax(0,1fr) max-content !important;
+    column-gap: 9px !important; min-width: 0 !important;
+    min-height: 64px !important; padding: 9px 10px !important;
+  }
+  .status-pulse-page .op-record-icon { grid-column: 1 !important; }
+  .status-pulse-page .op-record-date { grid-column: 2 !important; min-width: 0; }
+  .status-pulse-page .op-record-value {
+    grid-column: 3 !important; justify-self: end !important;
+    font-size: clamp(.85rem, 3.5vw, 1.05rem) !important;
+  }
+  .status-pulse-page .op-record-tag,
+  .status-pulse-page .op-record-bars,
+  .status-pulse-page .op-record-arrow { display: none !important; }
+  .status-pulse-page .op-record-date strong { font-size: clamp(.8rem, 3.5vw, 1rem); }
+  .status-pulse-page nav.status-pagination {
+    display: flex; width: 100% !important; max-width: 100% !important;
+    margin: 16px auto 6px !important; overflow-x: auto !important;
+    justify-content: safe center !important;
+  }
+  .status-pulse-page .status-pagination-content {
+    width: max-content !important; max-width: none !important;
+    min-height: 42px !important; gap: 0 !important;
+    padding: 4px 6px !important;
+  }
+  .status-pulse-page .status-pagination-content a,
+  .status-pulse-page .status-pagination-content li > span,
+  .status-pulse-page .status-pagination-content a[aria-current="page"] {
+    width: 29px !important; min-width: 29px !important;
+    height: 32px !important; min-height: 32px !important;
+    font-size: 11px !important;
+  }
+  .status-pulse-page .status-pagination-content a[aria-label="Go to previous page"],
+  .status-pulse-page .status-pagination-content a[aria-label="Go to next page"] {
+    width: auto !important; min-width: 55px !important;
+    padding: 0 3px !important; gap: 2px !important; font-size: 10px !important;
+  }
+}
+@media (max-width: 400px) {
+  .status-pulse-page { padding-inline: 12px !important; }
+  .status-pulse-page .op-board { padding: 16px 10px !important; }
+  .status-pulse-page .op-record { column-gap: 6px !important; padding: 8px 7px !important; }
+  .status-pulse-page .op-record-icon { width: 34px !important; height: 34px !important; }
+}
+
+/* Mobile visual polish: space the window, availability ring, strip and history. */
+@media (max-width: 900px) {
+  .status-pulse-page .op-board { gap: 0 !important; }
+  .status-pulse-page .op-board > .op-window-shoulder {
+    margin-bottom: 26px !important;
+    gap: 12px !important;
+    z-index: 1 !important;
+  }
+  .status-pulse-page .op-board-top {
+    gap: 0 !important;
+    padding-top: 0 !important;
+  }
+  .status-pulse-page .op-gauge-shell {
+    width: 150px !important;
+    height: 150px !important;
+    flex: 0 0 150px !important;
+    margin: 0 auto 28px !important;
+  }
+  .status-pulse-page .op-gauge-liquid { inset: -5px !important; width: calc(100% + 10px); height: calc(100% + 10px); }
+  .status-pulse-page .op-gauge-core { gap: 3px; padding: 9px; }
+  .status-pulse-page .op-gauge-core strong { font-size: clamp(1.55rem, 5vw, 1.9rem) !important; }
+  .status-pulse-page .op-gauge-core span { font-size: .84rem !important; }
+  .status-pulse-page .op-gauge-core small { font-size: .64rem !important; white-space: normal; }
+  .status-pulse-page .op-strip-side { padding: 0 !important; margin-bottom: 20px !important; }
+  .status-pulse-page .op-history { margin-top: 0 !important; row-gap: 12px !important; }
+  .status-pulse-page .op-record { min-height: 66px !important; }
+}
+@media (max-width: 400px) {
+  .status-pulse-page .op-board > .op-window-shoulder { margin-bottom: 24px !important; }
+  .status-pulse-page .op-gauge-shell { margin-bottom: 25px !important; }
+  .status-pulse-page .op-strip-side { margin-bottom: 18px !important; }
+  .status-pulse-page .op-history { row-gap: 10px !important; }
+}
+
+/* Mobile: visible breathing room between the timeline panel and history cards.
+   This overrides the earlier margin-top: 0 !important rule. */
+@media (max-width: 900px) {
+  .status-pulse-page .op-board + .op-history {
+    margin-top: 24px !important;
+  }
+}
+
+/* Arabic: retain readable technical values */
+.status-pulse-page[dir="rtl"] .op-record-value,
+.status-pulse-page[dir="rtl"] .op-record-date small,
+.status-pulse-page[dir="rtl"] .op-window-copy strong {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Arabic: align record labels naturally */
+.status-pulse-page[dir="rtl"] .op-record-date,
+.status-pulse-page[dir="rtl"] .op-record-tag {
+  text-align: right;
+}
+
+/* Arabic: maintain RTL pagination reading direction */
+.status-pulse-page[dir="rtl"] .status-pagination {
+  direction: rtl;
+}
+
+
+/* ==========================================================
+   MOAT STATUS — ARABIC RTL MIRRORING
+   Scope: Status page only.
+   English layout stays unchanged.
+   ========================================================== */
+
+.status-pulse-page[dir="rtl"] {
+  direction: rtl;
+}
+
+/* ---- OVERVIEW: MIRROR THE TWO COLUMNS ---- */
+
+@media (min-width: 901px) {
+  .status-pulse-page[dir="rtl"] .op-board-top {
+    direction: rtl;
+    grid-template-columns: 215px minmax(0, 1fr);
+  }
+
+  /* Move reporting window to the opposite shoulder */
+  .status-pulse-page[dir="rtl"]
+  .op-board > .op-window-shoulder {
+    right: auto;
+    left: 24px;
+  }
+}
+
+/* Reporting window text and icon */
+
+.status-pulse-page[dir="rtl"] .op-window-card {
+  direction: rtl;
+  flex-direction: row !important;
+}
+
+.status-pulse-page[dir="rtl"] .op-window-copy {
+  align-items: flex-start;
+  text-align: right;
+}
+
+.status-pulse-page[dir="rtl"] .op-window-copy strong {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;
+}
+
+/* Keep the gauge's percentage and ring orientation readable */
+
+.status-pulse-page[dir="rtl"] .op-gauge {
+  direction: ltr;
+}
+
+.status-pulse-page[dir="rtl"] .op-gauge-core {
+  direction: rtl;
+}
+
+.status-pulse-page[dir="rtl"] .op-gauge-core strong {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* ---- 30-DAY TIMELINE ---- */
+
+/* First chronological day on the right, latest on the left */
+
+.status-pulse-page[dir="rtl"] .op-strip {
+  direction: rtl;
+}
+
+.status-pulse-page[dir="rtl"] .op-strip-ends {
+  direction: rtl;
+}
+
+.status-pulse-page[dir="rtl"] .op-strip-wrap {
+  direction: rtl;
+}
+
+/* ---- DAILY HISTORY CARDS ---- */
+
+.status-pulse-page[dir="rtl"] .op-history {
+  direction: rtl;
+}
+
+.status-pulse-page[dir="rtl"] .op-record {
+  direction: rtl;
+  text-align: right;
+}
+
+/* Grid flows from right to left */
+.status-pulse-page[dir="rtl"] .op-record-icon {
+  grid-column: 1;
+}
+
+.status-pulse-page[dir="rtl"] .op-record-date {
+  grid-column: 2;
+  align-items: flex-start;
+  text-align: right;
+}
+
+.status-pulse-page[dir="rtl"] .op-record-tag {
+  grid-column: 3;
+  justify-self: start;
+  flex-direction: row;
+  letter-spacing: normal;
+}
+
+.status-pulse-page[dir="rtl"] .op-record-bars {
+  grid-column: 5;
+  direction: ltr;
+  justify-content: flex-end;
+}
+
+.status-pulse-page[dir="rtl"] .op-record-value {
+  grid-column: 6;
+  direction: ltr;
+  unicode-bidi: isolate;
+  justify-self: end;
+  text-align: left;
+}
+
+.status-pulse-page[dir="rtl"] .op-record-date small {
+  direction: ltr;
+  unicode-bidi: isolate;
+  align-self: flex-start;
+}
+
+/* ---- PAGINATION ---- */
+
+.status-pulse-page[dir="rtl"] .status-pagination,
+.status-pulse-page[dir="rtl"] .status-pagination-content {
+  direction: rtl;
+}
+
+/* Keep numeric page labels readable */
+.status-pulse-page[dir="rtl"]
+.status-pagination-content a[aria-label^="Page "] {
+  unicode-bidi: isolate;
+}
+
+/* ---- RIGHT NOW ---- */
+
+/* Header and summary cards */
+.status-pulse-page[dir="rtl"] .rn-section {
+  direction: rtl;
+}
+
+.status-pulse-page[dir="rtl"] .rn-heading,
+.status-pulse-page[dir="rtl"] .rn-panel-title,
+.status-pulse-page[dir="rtl"] .rn-metrics,
+.status-pulse-page[dir="rtl"] .rn-metric {
+  direction: rtl;
+}
+
+/* Endpoint rows: method at right, HTTP code at left */
+.status-pulse-page[dir="rtl"] .rn-endpoint {
+  direction: rtl;
+  text-align: right;
+}
+
+/* Keep technical strings in their native direction */
+.status-pulse-page[dir="rtl"] .rn-route strong,
+.status-pulse-page[dir="rtl"] .rn-method,
+.status-pulse-page[dir="rtl"] .rn-latency,
+.status-pulse-page[dir="rtl"] .rn-code {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.status-pulse-page[dir="rtl"] .rn-route {
+  min-width: 0;
+  text-align: right;
+}
+
+.status-pulse-page[dir="rtl"] .rn-route strong {
+  display: block;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.status-pulse-page[dir="rtl"] .rn-route small {
+  display: block;
+  direction: rtl;
+  text-align: right;
+}
+
+/* Preserve chart and waveform orientation */
+.status-pulse-page[dir="rtl"] .rn-wave,
+.status-pulse-page[dir="rtl"] .rn-bars {
+  direction: ltr;
+}
+
+/* ---- RESPONSIVE RTL ---- */
+
+@media (max-width: 900px) {
+  .status-pulse-page[dir="rtl"] .op-board-top {
+    direction: rtl;
+  }
+
+  .status-pulse-page[dir="rtl"]
+  .op-board > .op-window-shoulder {
+    left: auto;
+    right: auto;
+  }
+
+  .status-pulse-page[dir="rtl"] .op-strip-side {
+    direction: rtl;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .status-pulse-page[dir="rtl"] .rn-endpoint {
+    direction: rtl;
+  }
+}
+
+@media (max-width: 700px) {
+  .status-pulse-page[dir="rtl"] .op-record {
+    direction: rtl;
+    grid-template-columns:
+      38px minmax(0, 1fr) max-content !important;
+  }
+
+  .status-pulse-page[dir="rtl"] .op-record-icon {
+    grid-column: 1 !important;
+  }
+
+  .status-pulse-page[dir="rtl"] .op-record-date {
+    grid-column: 2 !important;
+  }
+
+  .status-pulse-page[dir="rtl"] .op-record-value {
+    grid-column: 3 !important;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 390px) {
+  .status-pulse-page[dir="rtl"] .op-record {
+    grid-template-columns:
+      32px minmax(0, 1fr) max-content !important;
+    gap: 5px;
+  }
+}

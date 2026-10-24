@@ -78,7 +78,7 @@ export function LiquidGlassProvider({ backdrop, live, options, children }: Liqui
     if (!canvas) return
     if (window.matchMedia("(prefers-reduced-transparency: reduce)").matches) return
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    const lg = new LiquidGlass(canvas, { ...options, mode, liquid: reduceMotion ? false : options?.liquid ?? true })
+    const lg = new LiquidGlass(canvas, { ...options, mode, liquid: reduceMotion ? false : options?.liquid ?? false })
     if (lg.failed) return
     document.documentElement.classList.add("lg-on")
     lg.scan(document.body)

@@ -7,10 +7,12 @@ export default defineConfig(({ mode }) => {
   const target = env.MOAT_BACKEND_ORIGIN || 'http://127.0.0.1:8787'
   // Keep legacy documents and their requests on this origin, preserving the
   // shared navigation's localStorage auth state. No legacy page is rebuilt.
+  // changeOrigin rewrites the Host header to the target's, which a remote
+  // MOAT_BACKEND_ORIGIN behind Cloudflare needs; a local gateway does not care.
   const proxy = {
-    '^/(v1|mcp)(/|$)': { target },
-    '^/(tests|status)(\\.html)?(\\?|$)': { target },
-    '^/((app|footer)\\.(css|js)|trail\\.js)(\\?|$)': { target },
+    '^/(v1|mcp)(/|$)': { target, changeOrigin: true },
+    '^/(tests|status\\.html)(\\?|$)': { target, changeOrigin: true },
+    '^/((app|footer)\\.(css|js)|trail\\.js)(\\?|$)': { target, changeOrigin: true },
   }
 
   return {
@@ -25,10 +27,12 @@ export default defineConfig(({ mode }) => {
           docs: resolve(process.cwd(), 'docs/index.html'),
           team: resolve(process.cwd(), 'team/index.html'),
           dashboard: resolve(process.cwd(), 'dashboard/index.html'),
+          status: resolve(process.cwd(), 'status/index.html'),
         },
       },
     },
     server: { host: '127.0.0.1', port: 5174, strictPort: true, proxy },
     preview: { host: '127.0.0.1', port: 4174, strictPort: true, proxy },
+    resolve: { alias: { '@': resolve(import.meta.dirname, './src') } },
   }
 })

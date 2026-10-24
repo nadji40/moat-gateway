@@ -3,7 +3,7 @@ import type { ComponentType } from 'react'
 
 import Home from '../pages/Home/Home'
 import Navbar from '../components/layout/Navbar'
-
+const Status = lazy(() => import('../pages/Status/Status'))
 const Compare = lazy(() => import('../pages/Compare/Compare'))
 const Team = lazy(() => import('../pages/Team/Team'))
 const Docs = lazy(() => import('../pages/Docs/Docs'))
@@ -14,6 +14,7 @@ const pages: Record<string, ComponentType> = {
   '/team': Team,
   '/docs': Docs,
   '/dashboard': Dashboard,
+  '/status': Status,
 }
 
 export default function App() {

@@ -71,24 +71,36 @@ const FS = `precision highp float;
 #define MAXS ${MAXS}
 varying vec2 vUv;
 uniform sampler2D uTex;uniform sampler2D uBlur;uniform vec2 uRes;uniform vec4 uFit;
-uniform vec4 uG[MAXG];uniform vec4 uGP[MAXG];uniform vec4 uGT[MAXG];uniform int uGN;
+uniform vec4 uG[MAXG];uniform vec4 uGP[MAXG];uniform vec4 uGT[MAXG];uniform float uShoulder[MAXG];uniform int uGN;
 uniform vec4 uS[MAXS];uniform vec4 uSC[MAXS];uniform vec4 uSP[MAXS];uniform int uSN;
 uniform float uBezel;uniform float uStrength;uniform float uDisp;uniform float uMergeK;uniform float uDark;uniform vec2 uPtr;
 float sdRR(vec2 p,vec2 b,float r){r=min(r,min(b.x,b.y));vec2 q=abs(p)-b+r;return length(max(q,0.))+min(max(q.x,q.y),0.)-r;}
+// Opt-in Status overview: lower center top, high rounded shoulders on either side.
+// The regular rounded-rectangle SDF remains the default for every other glass item.
+float glassDistance(vec2 p,vec4 rect,float radius,float shoulder){
+ float d=sdRR(p-rect.xy,rect.zw,radius);
+ if(shoulder<.5)return d;
+ float x=abs((p.x-rect.x)/max(rect.z,1.));
+ // x ~ 0 in the lowered center, x ~ 1 at the outer edge.
+ float t=smoothstep(.48,.62,x);
+ float top=rect.y-rect.w+rect.w*.52*(1.-t);
+ // Restrict glass to below the curved top edge.
+ return max(d,top-p.y);
+}
 float smin(float a,float b,float k){float h=max(k-abs(a-b),0.)/k;return min(a,b)-h*h*k*.25;}
 float lay(vec4 q){return q.y>1.5?1.:0.;}
 float field(vec2 p,float L){
  float dm=1e4;float dh=1e4;
  for(int i=0;i<MAXG;i++){if(i>=uGN)break;
 if(uGT[i].w<.002||abs(lay(uGP[i])-L)>.5)continue;
-float d=sdRR(p-uG[i].xy,uG[i].zw,uGP[i].x);
+float d=glassDistance(p,uG[i],uGP[i].x,uShoulder[i]);
 if(uGP[i].y>.5&&uGP[i].y<1.5)dm=smin(dm,d,uMergeK);else dh=min(dh,d);}
  return min(dm,dh);}
 void nearest(vec2 p,float L,out vec4 P,out vec4 T,out float hm){
  float best=1e4;P=vec4(0.);T=vec4(0.);hm=1.;
  for(int i=0;i<MAXG;i++){if(i>=uGN)break;
 if(uGT[i].w<.002||abs(lay(uGP[i])-L)>.5)continue;
-float d=sdRR(p-uG[i].xy,uG[i].zw,uGP[i].x);
+float d=glassDistance(p,uG[i],uGP[i].x,uShoulder[i]);
 if(d<best){best=d;P=uGP[i];T=uGT[i];hm=min(uG[i].z,uG[i].w);}}}
 vec3 bg(vec2 px,float fr){vec2 u=clamp(px/uRes,0.,1.);vec3 c=texture2D(uTex,u*uFit.xy+uFit.zw).rgb;
  if(fr>.001)c=mix(c,texture2D(uBlur,u).rgb,fr);return c;}
@@ -187,12 +199,13 @@ export class LiquidGlass {
   private raf = 0
   private frames = 0
   private nextId = 1
+  private bShoulder = new Float32Array(MAXG)
   private bG = new Float32Array(MAXG * 4); private bGP = new Float32Array(MAXG * 4); private bGT = new Float32Array(MAXG * 4)
   private bS = new Float32Array(MAXS * 4); private bSC = new Float32Array(MAXS * 4); private bSP = new Float32Array(MAXS * 4)
 
   constructor(canvas: HTMLCanvasElement, opts: LiquidGlassOptions = {}) {
     this.canvas = canvas
-    this.o = { refraction: 28, dispersion: 0.1, frost: 14, bezel: 26, mergeK: 40, mode: "light", liquid: true, ...opts }
+    this.o = { refraction: 28, dispersion: 0.1, frost: 14, bezel: 26, mergeK: 40, mode: "light", liquid: false, ...opts }
     const gl = canvas.getContext("webgl", { antialias: false })
     if (!gl || gl.isContextLost()) { this.failed = true; console.warn("LiquidGlass: WebGL unavailable"); return }
     this.gl = gl
@@ -217,6 +230,7 @@ export class LiquidGlass {
     const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0)
     ;["uTex", "uBlur", "uRes", "uFit", "uGN", "uSN", "uBezel", "uStrength", "uDisp", "uMergeK", "uDark", "uPtr"].forEach(n => this.u[n] = gl.getUniformLocation(pr, n))
     ;["uG", "uGP", "uGT", "uS", "uSC", "uSP"].forEach(n => this.u[n] = gl.getUniformLocation(pr, n + "[0]"))
+    this.u.uShoulder = gl.getUniformLocation(pr, "uShoulder[0]")
     this.tex = this._tex(0); this.blurTex = this._tex(1)
     gl.uniform1i(this.u.uTex, 0); gl.uniform1i(this.u.uBlur, 1)
     this.blurC = document.createElement("canvas")
@@ -424,12 +438,13 @@ export class LiquidGlass {
       const op = effectiveOpacity(el)
       const cx = (r.left + r.width / 2 - cr.left) * k, cy = (r.top + r.height / 2 - cr.top) * k
       const hx = r.width / 2 * k / it.sx, hy = r.height / 2 * k / it.sy
-      if (it.last) { it.v.x = it.v.x * 0.6 + (cx - it.last.x) * 0.4; it.v.y = it.v.y * 0.6 + (cy - it.last.y) * 0.4 }
-      it.last = { x: cx, y: cy }
-      const g = it.pressed && liquid ? 1 + it.grow : 1, sq = liquid ? it.squash : 0
-      const ax = Math.abs(it.v.x), ay = Math.abs(it.v.y)
-      const tX = g * (1 + Math.min(ax * 0.018 * sq, 0.35) - Math.min(ay * 0.009 * sq, 0.18))
-      const tY = g * (1 + Math.min(ay * 0.018 * sq, 0.35) - Math.min(ax * 0.009 * sq, 0.18))
+      // Scrolling changes viewport coordinates, not the shape of the glass.
+      // Do not convert movement between frames into squash/stretch: that caused
+      // the WebGL surface and its DOM content to appear to wobble on scroll.
+      // Preserve the optional press-to-grow animation only.
+      const g = it.pressed && liquid ? 1 + it.grow : 1
+      const tX = g
+      const tY = g
       if (liquid) { it.vx = (it.vx + (tX - it.sx) * 0.22) * 0.7; it.sx += it.vx; it.vy = (it.vy + (tY - it.sy) * 0.22) * 0.7; it.sy += it.vy }
       else { it.sx = tX; it.sy = tY; it.vx = it.vy = 0 }
       const scs = Math.abs(it.sx - 1) < 0.002 && Math.abs(it.sy - 1) < 0.002 ? "" : `${it.sx.toFixed(4)} ${it.sy.toFixed(4)}`
@@ -445,6 +460,7 @@ export class LiquidGlass {
       this.bG.set([cx, cy, Hx, Hy], n * 4)
       this.bGP.set([rad, layer >= 1 ? 2 : (it.merge ? 1 : 0), it.t, it.frost], n * 4)
       this.bGT.set([tc[0], tc[1], tc[2], op], n * 4)
+      this.bShoulder[n] = el.dataset.glassShape === "shoulders" ? 1 : 0
       n++
     }
     let m = 0
@@ -463,7 +479,7 @@ export class LiquidGlass {
     }
     const u = this.u, o = this.o
     gl.uniform2f(u.uRes, W, H); gl.uniform4fv(u.uFit, this.fit)
-    gl.uniform4fv(u.uG, this.bG); gl.uniform4fv(u.uGP, this.bGP); gl.uniform4fv(u.uGT, this.bGT); gl.uniform1i(u.uGN, n)
+    gl.uniform4fv(u.uG, this.bG); gl.uniform4fv(u.uGP, this.bGP); gl.uniform4fv(u.uGT, this.bGT); gl.uniform1fv(u.uShoulder, this.bShoulder); gl.uniform1i(u.uGN, n)
     gl.uniform4fv(u.uS, this.bS); gl.uniform4fv(u.uSC, this.bSC); gl.uniform4fv(u.uSP, this.bSP); gl.uniform1i(u.uSN, m)
     gl.uniform1f(u.uBezel, o.bezel); gl.uniform1f(u.uStrength, o.refraction); gl.uniform1f(u.uDisp, o.dispersion)
     gl.uniform1f(u.uMergeK, Math.max(o.mergeK, 0.001)); gl.uniform1f(u.uDark, dark ? 1 : 0)
