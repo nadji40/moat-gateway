@@ -1,5 +1,6 @@
 import { Card } from '../../components/ui/glass/card'
 import { L } from '../../i18n'
+import { Play, ScanSearch, ShieldOff } from 'lucide-react'
 import './security-flow.css'
 
 type Kind = 'mandate' | 'classifier' | 'gateway'
@@ -72,17 +73,10 @@ export default function SecurityFlow() {
   return (
     <section className="compare-security-flow" aria-labelledby="compare-security-flow-heading">
       <div className="compare-security-flow-heading">
-        <span className="compare-security-flow-rule" aria-hidden="true" />
         <h2 id="compare-security-flow-heading">
           {L('ASKED THEIR OWN QUESTION', 'طرحوا سؤالهم الخاص')}
         </h2>
-        <span className="compare-security-flow-rule" aria-hidden="true" />
-      </div>
-
-      <div className="compare-security-flow-intro" aria-hidden="true">
-        <span className="compare-security-flow-intro-rule" />
-        <span>{L('THREE DISTINCT APPROACHES', 'ثلاثة أساليب مختلفة')}</span>
-        <span className="compare-security-flow-intro-rule" />
+        <p className="compare-section-subtitle">{L('Three approaches to the same payment security problem.', 'ثلاثة أساليب لمعالجة مشكلة أمان الدفع نفسها.')}</p>
       </div>
 
       <div className="compare-security-flow-cards">
@@ -117,11 +111,13 @@ export default function SecurityFlow() {
 
             <div className="compare-security-flow-result">
               <span className="compare-security-flow-result-icon" aria-hidden="true">
-                {approach.kind === 'mandate'
-                  ? '▶'
-                  : approach.kind === 'classifier'
-                    ? '▥'
-                    : '⊘'}
+                {approach.kind === 'mandate' ? (
+                  <Play size={19} strokeWidth={2.2} fill="currentColor" />
+                ) : approach.kind === 'classifier' ? (
+                  <ScanSearch size={19} strokeWidth={2} />
+                ) : (
+                  <ShieldOff size={19} strokeWidth={2} />
+                )}
               </span>
               <span className="compare-security-flow-result-copy">
                 <strong>{L(approach.value, approach.valueAr)}</strong>

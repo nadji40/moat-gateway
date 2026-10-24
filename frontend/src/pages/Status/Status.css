@@ -1740,3 +1740,260 @@ a[aria-disabled="true"] {
     gap: 5px;
   }
 }
+/* ==========================================================
+   MOAT STATUS — 3 FLOATING ORANGE GLOW BUBBLES
+   Different sizes · Full-page movement · Soft orange glow
+   ========================================================== */
+
+.status-pulse-page {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+}
+
+/* Shared bubble styling */
+.status-pulse-page::before,
+.status-pulse-page::after,
+.status-pulse-page .status-pulse-section::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 116, 21, 0.65) 0%,
+    rgba(255, 116, 21, 0.40) 22%,
+    rgba(255, 116, 21, 0.20) 48%,
+    rgba(255, 116, 21, 0.06) 72%,
+    transparent 100%
+  );
+
+  filter: blur(45px);
+  will-change: transform, opacity;
+}
+
+/* Large bubble */
+.status-pulse-page::before {
+  width: clamp(380px, 48vw, 650px);
+  height: clamp(380px, 48vw, 650px);
+  top: 4%;
+  left: -18%;
+
+  animation: status-bubble-large 35s ease-in-out infinite alternate;
+}
+
+/* Medium bubble */
+.status-pulse-page::after {
+  width: clamp(300px, 35vw, 480px);
+  height: clamp(300px, 35vw, 480px);
+  top: 45%;
+  right: -15%;
+
+  animation: status-bubble-medium 29s ease-in-out infinite alternate;
+}
+
+/* Small bubble — position relative to the full Status section */
+.status-pulse-page .status-pulse-section::before {
+  width: clamp(220px, 26vw, 340px);
+  height: clamp(220px, 26vw, 340px);
+  top: 80%;
+  left: 8%;
+
+  animation: status-bubble-small 24s ease-in-out infinite alternate;
+}
+
+/* Keep content above the glow */
+.status-pulse-page > .status-pulse-section,
+.status-pulse-page > .rn-section {
+  position: relative;
+  z-index: 1;
+}
+
+.status-pulse-page .status-pulse-section > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Large — diagonal journey */
+@keyframes status-bubble-large {
+  0% {
+    transform: translate(0, 0) scale(0.9);
+    opacity: 0.55;
+  }
+  25% {
+    transform: translate(55vw, 20vh) scale(1.08);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(70vw, 60vh) scale(0.95);
+    opacity: 0.65;
+  }
+  75% {
+    transform: translate(20vw, 100vh) scale(1.12);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(65vw, 145vh) scale(1);
+    opacity: 0.6;
+  }
+}
+
+/* Medium — crossing from right to left */
+@keyframes status-bubble-medium {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.65;
+  }
+  25% {
+    transform: translate(-45vw, -20vh) scale(1.1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translate(-75vw, 30vh) scale(0.9);
+    opacity: 0.55;
+  }
+  75% {
+    transform: translate(-25vw, 75vh) scale(1.15);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(-65vw, -55vh) scale(1);
+    opacity: 0.65;
+  }
+}
+
+/* Small — roaming upward and diagonally */
+@keyframes status-bubble-small {
+  0% {
+    transform: translate(0, 0) scale(0.9);
+    opacity: 0.5;
+  }
+  25% {
+    transform: translate(45vw, -50vh) scale(1.18);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(70vw, -100vh) scale(1);
+    opacity: 0.6;
+  }
+  75% {
+    transform: translate(25vw, -145vh) scale(1.12);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(65vw, -180vh) scale(0.95);
+    opacity: 0.55;
+  }
+}
+
+/* Mobile optimization */
+@media (max-width: 700px) {
+  .status-pulse-page::before {
+    width: 350px;
+    height: 350px;
+    left: -140px;
+  }
+
+  .status-pulse-page::after {
+    width: 290px;
+    height: 290px;
+    right: -110px;
+  }
+
+  .status-pulse-page .status-pulse-section::before {
+    width: 210px;
+    height: 210px;
+  }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse-page::before,
+  .status-pulse-page::after,
+  .status-pulse-page .status-pulse-section::before {
+    animation: none;
+    opacity: 0.35;
+    will-change: auto;
+  }
+}
+
+/* ==========================================================
+   STATUS — SECTION SPACING REFINEMENT
+   Overview → history → pagination → Right Now
+   Keep glass surfaces, timeline, and background orbs unchanged.
+   ========================================================== */
+
+/* Consistent breathing room between the overview and history. */
+.status-pulse-page .op-board + .op-history {
+  margin-top: 26px;
+}
+
+/* Pagination belongs to the timeline, but should not touch the next section. */
+.status-pulse-page nav.status-pagination {
+  margin-top: 24px;
+  margin-bottom: 14px;
+}
+
+/* Separate the two main sections without creating a double margin. */
+.status-pulse-page > .status-pulse-section {
+  margin-bottom: 42px !important;
+}
+
+.status-pulse-page > .rn-section {
+  margin-top: 0 !important;
+  margin-bottom: 28px !important;
+}
+
+/* The orange divider is part of the second section's heading area. */
+.status-pulse-page > .rn-section::before {
+  margin-bottom: 32px;
+}
+
+.status-pulse-page .rn-heading {
+  margin-bottom: 28px;
+}
+
+/* Maintain a measured gap from the checks heading to its metric capsule. */
+.status-pulse-page .rn-metrics {
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  /* Earlier mobile rules use !important; explicitly resolve them here. */
+  .status-pulse-page .op-board + .op-history {
+    margin-top: 22px !important;
+  }
+
+  .status-pulse-page > .status-pulse-section {
+    margin-bottom: 32px !important;
+  }
+
+  .status-pulse-page > .rn-section {
+    margin-top: 0 !important;
+    margin-bottom: 22px !important;
+  }
+
+  .status-pulse-page > .rn-section::before {
+    margin-bottom: 24px;
+  }
+
+  .status-pulse-page .rn-heading {
+    margin-bottom: 24px;
+  }
+}
+
+@media (max-width: 580px) {
+  .status-pulse-page > .status-pulse-section {
+    margin-bottom: 26px !important;
+  }
+
+  .status-pulse-page > .rn-section::before {
+    margin-bottom: 20px;
+  }
+
+  .status-pulse-page .rn-heading {
+    margin-bottom: 20px;
+  }
+}

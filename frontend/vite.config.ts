@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   // MOAT_BACKEND_ORIGIN behind Cloudflare needs; a local gateway does not care.
   const proxy = {
     '^/(v1|mcp)(/|$)': { target, changeOrigin: true },
-    '^/(tests|status\\.html)(\\?|$)': { target, changeOrigin: true },
+    '^/status\\.html(\\?|$)': { target, changeOrigin: true },
     '^/((app|footer)\\.(css|js)|trail\\.js)(\\?|$)': { target, changeOrigin: true },
   }
 
@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => {
           team: resolve(process.cwd(), 'team/index.html'),
           dashboard: resolve(process.cwd(), 'dashboard/index.html'),
           status: resolve(process.cwd(), 'status/index.html'),
+          tests: resolve(process.cwd(), 'tests/index.html'),
         },
       },
     },
