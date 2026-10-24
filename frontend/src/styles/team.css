@@ -3,9 +3,9 @@
    bitten out, the founder half as large again in the middle of the first
    row and raised above it; then three facts.
 
-   The slide's tile is 151 px with a 20 px radius and a 45 px bite, so the
-   radius is 13% of the tile and the bite 30%: both are set in container
-   units so every tile, whatever its width, keeps the slide's proportions. */
+   The tile's shape (three rounded corners, the fourth cut on the diagonal)
+   is the #tm-tag clip path in Team.tsx, in bounding-box units, so every
+   tile keeps the slide's proportions whatever its width. */
 .team .hero { padding-block: clamp(40px, 7vw, 88px) clamp(16px, 3vw, 36px); }
 /* one line on a wide screen, as on the slide */
 .team .hero h1 { font-weight: 600; letter-spacing: -0.02em; font-size: clamp(1.9rem, 3.6vw, 3.4rem); }
@@ -37,12 +37,13 @@
 .tm-photo {
   width: 100%;
   aspect-ratio: 1;
-  --notch: 30cqw;
-  border-radius: 13cqw;
+  overflow: hidden;
+  clip-path: url(#tm-tag);
   background: linear-gradient(160deg, #d9482c, #ff8a3d 55%, #c8415a);
-  box-shadow: 0 30px 60px -36px rgba(255, 95, 0, 0.7);
   transition: transform 0.4s var(--ease);
 }
+.tm-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+html[dir="rtl"] .tm-photo { clip-path: url(#tm-tag-rtl); }
 .tm-tile:hover .tm-photo { transform: translateY(-4px); }
 .tm-photo img { object-position: 50% 18%; }
 
@@ -52,8 +53,6 @@
   width: 148%;
   margin-inline-start: -24%;
   aspect-ratio: 224 / 227;
-  --notch: 44cqw;
-  border-radius: 19cqw;
 }
 
 .tm-name {
@@ -89,7 +88,7 @@
   .tm-deck { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; row-gap: 32px; }
   /* on a phone the founder leads, at full width */
   .tm-tile.founder { order: -1; grid-column: 1 / -1; margin-top: 0; }
-  .tm-tile.founder .tm-photo { width: 100%; margin-inline-start: 0; aspect-ratio: 4 / 3; --notch: 22cqw; border-radius: 9cqw; }
+  .tm-tile.founder .tm-photo { width: 100%; margin-inline-start: 0; aspect-ratio: 4 / 3; }
   .tm-photo img { object-position: 50% 22%; }
   .tm-name { margin-top: 18px; }
 }

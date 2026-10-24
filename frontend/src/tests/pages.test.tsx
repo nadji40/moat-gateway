@@ -48,7 +48,7 @@ describe('documentation and team pages', () => {
 
     // Everyone has a portrait on the deck's notched tile, and a name whose
     // given name is the warm word.
-    expect(document.querySelectorAll('.tm-tile .tm-photo.gl-notch img')).toHaveLength(10)
+    expect(document.querySelectorAll('.tm-tile .tm-photo img')).toHaveLength(10)
     const names = tiles.map((t) => t.querySelector('.tm-name')?.textContent)
     expect(names).toContain('Dhoha Boumediene')
     expect(names).toContain('Redwan Benmoussa')

@@ -54,7 +54,7 @@ function Tile({ m }: { m: Member }) {
   const name = `${m.first} ${m.rest}`
   return (
     <li className={m.founder ? 'tm-tile founder' : 'tm-tile'}>
-      <div className="tm-photo gl-notch">
+      <div className="tm-photo">
         <img src={m.photo} alt={name} loading="lazy" width={435} height={326} />
       </div>
       <h3 className="tm-name gl-name"><b>{m.first}</b> {m.rest}</h3>
@@ -64,9 +64,31 @@ function Tile({ m }: { m: Member }) {
   )
 }
 
+/* The slide's tile: three rounded corners and the fourth cut on the diagonal
+   from 70% of the top edge to 30% of the right edge, both ends of the cut
+   softened. In bounding-box units, so it fits every tile at any size; the
+   second is its mirror, for Arabic. */
+const r = 0.12
+const tag = (flip: boolean) => {
+  const x = (v: number) => (flip ? 1 - v : v)
+  return [
+    `M ${x(0)} ${r} A ${r} ${r} 0 0 ${flip ? 0 : 1} ${x(r)} 0`,
+    `L ${x(0.64)} 0 Q ${x(0.70)} 0 ${x(0.742)} 0.042`,
+    `L ${x(0.958)} 0.258 Q ${x(1)} 0.30 ${x(1)} 0.36`,
+    `L ${x(1)} ${1 - r} A ${r} ${r} 0 0 ${flip ? 0 : 1} ${x(1 - r)} 1`,
+    `L ${x(r)} 1 A ${r} ${r} 0 0 ${flip ? 0 : 1} ${x(0)} ${1 - r} Z`,
+  ].join(' ')
+}
+
 export default function Team() {
   return (
     <>
+      <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}>
+        <defs>
+          <clipPath id="tm-tag" clipPathUnits="objectBoundingBox"><path d={tag(false)} /></clipPath>
+          <clipPath id="tm-tag-rtl" clipPathUnits="objectBoundingBox"><path d={tag(true)} /></clipPath>
+        </defs>
+      </svg>
       <div className="wrap team gl-glow top">
         <header className="hero">
           <div>
