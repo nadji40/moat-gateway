@@ -20,34 +20,34 @@ type Member = {
 export const members: Member[] = [
   { first: 'Redwan', rest: 'Benmoussa', role: 'Adversarial data', roleAr: 'بيانات الهجمات',
     line: 'Develops the attack corpus, testing every way a malicious payment could get past Moat.',
-    lineAr: 'يبني مجموعة الهجمات، ويجرّب كل طريقة لتمرير دفعة خبيثة رغم Moat.', photo: '/team/redwan.jpg' },
+    lineAr: 'يبني مجموعة الهجمات، ويجرّب كل طريقة لتمرير دفعة خبيثة رغم Moat.', photo: '/team/deck/redwan.jpg' },
   { first: 'Meriem Sara', rest: 'Aounallah', role: 'Language data', roleAr: 'بيانات اللغة',
     line: 'Arabic dialects, names and currencies, so Moat understands what people actually write.',
-    lineAr: 'اللهجات العربية والأسماء والعملات، ليفهم Moat ما يكتبه الناس فعلًا.', photo: '/team/meriem.jpg' },
+    lineAr: 'اللهجات العربية والأسماء والعملات، ليفهم Moat ما يكتبه الناس فعلًا.', photo: '/team/deck/meriem.jpg' },
   { first: 'Khentit', rest: 'Nadji Sabri', role: 'Founder & general manager', roleAr: 'المؤسس والمدير العام',
     line: 'Started Moat. Builds the gateway, the policy engine and the infrastructure it runs on.',
-    lineAr: 'أسّس Moat. يبني البوابة ومحرّك السياسات والبنية التحتية التي تعمل عليها.', photo: '/team/nadji.jpg', founder: true },
+    lineAr: 'أسّس Moat. يبني البوابة ومحرّك السياسات والبنية التحتية التي تعمل عليها.', photo: '/team/deck/nadji.jpg', founder: true },
   { first: 'Dhoha', rest: 'Boumediene', role: 'Policy data', roleAr: 'بيانات السياسات',
     line: 'Legitimate payments, limits and currencies: making sure the right payments go through.',
-    lineAr: 'الدفعات السليمة والحدود والعملات: لضمان مرور الدفعات الصحيحة.', photo: '/team/dhoha.jpg' },
+    lineAr: 'الدفعات السليمة والحدود والعملات: لضمان مرور الدفعات الصحيحة.', photo: '/team/deck/dhoha.jpg' },
   { first: 'Zahra', rest: 'Boucheta', role: 'Data / ML engineer', roleAr: 'مهندسة بيانات وتعلّم آلة',
     line: 'The intent reader: which model, how accurate, how fast.',
-    lineAr: 'قارئ النية: أي نموذج، وبأي دقة، وبأي سرعة.', photo: '/team/zahra.jpg' },
+    lineAr: 'قارئ النية: أي نموذج، وبأي دقة، وبأي سرعة.', photo: '/team/deck/zahra.jpg' },
   { first: 'Rayan Yasser', rest: 'Ouanoughi', role: 'Design and front-end', roleAr: 'التصميم والواجهات الأمامية',
     line: 'Design and front-end work across the site, the dashboard included.',
-    lineAr: 'أعمال التصميم والواجهات الأمامية في الموقع كله، ولوحة التحكم معه.', photo: '/team/rayan.jpg' },
+    lineAr: 'أعمال التصميم والواجهات الأمامية في الموقع كله، ولوحة التحكم معه.', photo: '/team/deck/rayan.jpg' },
   { first: 'Khawla', rest: 'Hammouda', role: 'Front-end engineer', roleAr: 'مهندسة واجهات أمامية',
     line: 'The React site you are reading.',
-    lineAr: 'موقع React الذي تقرؤه الآن.', photo: '/team/khawla.jpg' },
+    lineAr: 'موقع React الذي تقرؤه الآن.', photo: '/team/deck/khawla.jpg' },
   { first: 'Mounya', rest: 'Hasni', role: 'Research analyst', roleAr: 'محلّلة أبحاث',
     line: 'Regulatory and market research: what the rules require, and who needs Moat.',
-    lineAr: 'أبحاث التنظيم والسوق: ما تشترطه القواعد، ومن يحتاج إلى Moat.', photo: '/team/mounya.jpg' },
+    lineAr: 'أبحاث التنظيم والسوق: ما تشترطه القواعد، ومن يحتاج إلى Moat.', photo: '/team/deck/mounya.jpg' },
   { first: 'Rofeida', rest: 'Imoussaine', role: 'Security engineer', roleAr: 'مهندسة أمن',
     line: 'Attacks on the payment checks, the intent reader and the evidence chain.',
-    lineAr: 'الهجمات على فحوص الدفع وقارئ النية وسلسلة الأدلة.', photo: '/team/rofeida.jpg' },
+    lineAr: 'الهجمات على فحوص الدفع وقارئ النية وسلسلة الأدلة.', photo: '/team/deck/rofeida.jpg' },
   { first: 'Adam', rest: 'Belkadi', role: 'Security engineer', roleAr: 'مهندس أمن',
     line: 'Keys, permissions, workspace isolation and the dashboard.',
-    lineAr: 'المفاتيح والصلاحيات وعزل مساحات العمل ولوحة التحكم.', photo: '/team/adam.jpg' },
+    lineAr: 'المفاتيح والصلاحيات وعزل مساحات العمل ولوحة التحكم.', photo: '/team/deck/adam.jpg' },
 ]
 
 function Tile({ m }: { m: Member }) {
@@ -70,12 +70,7 @@ export default function Team() {
       <div className="wrap team gl-glow top">
         <header className="hero">
           <div>
-            <p className="kicker">{L('The team', 'الفريق')}</p>
-            <h1>{L(<>An Algerian team <span className="gl-grad">with a global dream</span></>, <>فريق جزائري <span className="gl-grad">بحلم عالمي</span></>)}</h1>
-            <p className="lede">{L(
-              'Ten people who want agents to pay only what was asked. Half of us build Moat; the other half spend their week trying to get a payment past it.',
-              'عشرة أشخاص يريدون للوكلاء ألّا يدفعوا إلا ما طُلب. نصفنا يبني Moat، والنصف الآخر يقضي أسبوعه محاولًا تمرير دفعة رغمه.',
-            )}</p>
+            <h1>{L('An Algerian Team With A Global Dream', 'فريق جزائري بحلم عالمي')}</h1>
           </div>
         </header>
 

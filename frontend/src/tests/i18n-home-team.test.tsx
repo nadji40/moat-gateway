@@ -33,7 +33,6 @@ describe('the homepage and team page in Arabic', () => {
 
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('فريق جزائري')
     expect(document.querySelector('.tm-tile.founder .tm-role')).toHaveTextContent('المؤسس')
-    expect(document.querySelector('.hero .lede')).toHaveTextContent('عشرة أشخاص يريدون للوكلاء')
     // Names stay in Latin script; roles and lines are Arabic.
     expect(document.querySelectorAll('.tm-tile .tm-name')).toHaveLength(10)
     expect([...document.querySelectorAll('.tm-name')].map((n) => n.textContent)).toContain('Dhoha Boumediene')

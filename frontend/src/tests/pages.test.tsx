@@ -42,7 +42,7 @@ describe('documentation and team pages', () => {
     expect(tiles).toHaveLength(10)
     // The founder is the third tile: the middle of the first row of five.
     expect(tiles[2]).toHaveClass('founder')
-    expect(tiles[2]!.querySelector('img')).toHaveAttribute('src', '/team/nadji.jpg')
+    expect(tiles[2]!.querySelector('img')).toHaveAttribute('src', '/team/deck/nadji.jpg')
     expect(tiles[2]!.querySelector('.tm-role')).toHaveTextContent(/founder/i)
     expect(document.querySelectorAll('.tm-tile.founder')).toHaveLength(1)
 

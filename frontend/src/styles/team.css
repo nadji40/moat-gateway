@@ -1,8 +1,20 @@
-/* The team page: the deck's layout, two rows of five portraits on the warm
-   gradient, the founder larger in the middle of the first row; then three
-   facts. */
-.team .hero .lede { max-width: 60ch; }
-.team .hero .kicker { color: var(--orange-l); }
+/* The team page, as the deck's team slide: a white title over a warm glow,
+   two rows of five portraits on the deck's gradient with the top corner
+   bitten out, the founder half as large again in the middle of the first
+   row and raised above it; then three facts.
+
+   The slide's tile is 151 px with a 20 px radius and a 45 px bite, so the
+   radius is 13% of the tile and the bite 30%: both are set in container
+   units so every tile, whatever its width, keeps the slide's proportions. */
+.team .hero { padding-block: clamp(40px, 7vw, 88px) clamp(16px, 3vw, 36px); }
+/* one line on a wide screen, as on the slide */
+.team .hero h1 { font-weight: 600; letter-spacing: -0.02em; font-size: clamp(1.9rem, 3.6vw, 3.4rem); }
+/* the slide's glow: warm, centred, behind the title */
+.team.gl-glow::before {
+  background:
+    radial-gradient(52% 46% at 50% 0%, rgba(255, 110, 30, 0.34), transparent 70%),
+    radial-gradient(70% 40% at 50% 30%, rgba(190, 70, 60, 0.14), transparent 70%);
+}
 
 /* ---- the deck ---- */
 .tm-deck {
@@ -11,8 +23,8 @@
   padding: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  column-gap: clamp(14px, 2.4vw, 32px);
-  row-gap: clamp(28px, 4vw, 48px);
+  column-gap: clamp(20px, 5.6vw, 76px);
+  row-gap: clamp(28px, 3vw, 40px);
   align-items: start;
   text-align: start;
 }
@@ -20,15 +32,13 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  /* the portrait is a square at the column's width; the founder's is wider
-     than its column and the row makes room for it */
-  --tile: 100%;
+  container-type: inline-size;
 }
-.tm-tile.founder { --tile: 128%; margin-top: -8%; z-index: 1; }
-.tm-tile.founder .tm-photo { width: var(--tile); margin-inline-start: -14%; }
 .tm-photo {
-  width: var(--tile);
+  width: 100%;
   aspect-ratio: 1;
+  --notch: 30cqw;
+  border-radius: 13cqw;
   background: linear-gradient(160deg, #d9482c, #ff8a3d 55%, #c8415a);
   box-shadow: 0 30px 60px -36px rgba(255, 95, 0, 0.7);
   transition: transform 0.4s var(--ease);
@@ -36,40 +46,52 @@
 .tm-tile:hover .tm-photo { transform: translateY(-4px); }
 .tm-photo img { object-position: 50% 18%; }
 
+/* the founder: 1.5 tiles wide, raised a third of a tile above the row */
+.tm-tile.founder { z-index: 1; margin-top: -34%; }
+.tm-tile.founder .tm-photo {
+  width: 148%;
+  margin-inline-start: -24%;
+  aspect-ratio: 224 / 227;
+  --notch: 44cqw;
+  border-radius: 19cqw;
+}
+
 .tm-name {
-  margin: 18px 0 0;
-  font-size: 1rem;
+  margin: 30px 0 0;
+  font-size: 0.98rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--ink);
   line-height: 1.25;
 }
-.tm-tile.founder .tm-name { font-size: 1.15rem; margin-top: 22px; }
+.tm-tile.founder .tm-name { font-size: 1.12rem; }
 .tm-role {
-  margin: 4px 0 0;
-  font-size: 0.72rem;
+  margin: 3px 0 0;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ink-2);
+  color: var(--ink);
 }
 .tm-line {
-  margin: 10px 0 0;
-  color: var(--ink-3);
-  font-size: 0.84rem;
-  line-height: 1.55;
+  margin: 14px 0 0;
+  color: var(--ink-2);
+  font-size: 0.8rem;
+  line-height: 1.6;
 }
 
 @media (max-width: 1100px) {
-  .tm-tile.founder { --tile: 118%; margin-top: -5%; }
-  .tm-tile.founder .tm-photo { margin-inline-start: -9%; }
+  .tm-deck { column-gap: clamp(16px, 3.5vw, 40px); }
+  .tm-tile.founder { margin-top: -22%; }
+  .tm-tile.founder .tm-photo { width: 134%; margin-inline-start: -17%; }
 }
 @media (max-width: 760px) {
-  .tm-deck { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; row-gap: 28px; }
+  .tm-deck { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; row-gap: 32px; }
   /* on a phone the founder leads, at full width */
-  .tm-tile.founder { order: -1; grid-column: 1 / -1; --tile: 100%; margin-top: 0; }
-  .tm-tile.founder .tm-photo { width: 100%; margin-inline-start: 0; aspect-ratio: 4 / 3; }
+  .tm-tile.founder { order: -1; grid-column: 1 / -1; margin-top: 0; }
+  .tm-tile.founder .tm-photo { width: 100%; margin-inline-start: 0; aspect-ratio: 4 / 3; --notch: 22cqw; border-radius: 9cqw; }
   .tm-photo img { object-position: 50% 22%; }
+  .tm-name { margin-top: 18px; }
 }
 
 /* ---- the facts ---- */
@@ -82,4 +104,3 @@
 /* ---- right to left (Arabic) ---- */
 /* Arabic letters must stay joined: no tracking on the small caps labels. */
 html[dir="rtl"] .tm-role { letter-spacing: 0; }
-html[dir="rtl"] .tm-tile.founder .tm-photo { margin-inline-start: -14%; }
