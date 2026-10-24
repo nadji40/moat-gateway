@@ -21,9 +21,9 @@ const FLOW: FlowStep[] = [
   { method: 'GET', path: () => '/v1/limits', init: () => ({}) },
   { method: 'GET', path: () => '/v1/tests', init: () => ({}) },
   { method: 'POST', path: () => '/v1/sandbox', init: () => ({ method: 'POST' }), keep: j => ({ id: String(j.id ?? '') }) },
-  { method: 'POST', path: s => `/v1/sandbox/${s.id}/intent`, init: () => post({ text: 'Pay the Northwind Cloud Co invoice INV-4471 for 480 USD.' }) },
-  { method: 'POST', path: s => `/v1/sandbox/${s.id}/authorization`, init: () => post({ payee: 'Northwind Cloud Co', amount: '480', currency: 'USD' }), keep: j => ({ auth: String(j.authorization_id ?? '') }) },
-  { method: 'POST', path: s => `/v1/sandbox/${s.id}/pay`, init: s => post({ payee: 'Northwind Cloud Co', amount: 480, currency: 'USD', authorization_id: s.auth }) },
+  { method: 'POST', path: s => `/v1/sandbox/${s.id}/intent`, init: () => post({ text: 'Pay the Al Noor Supplies invoice INV-4471 for 480 SAR.' }) },
+  { method: 'POST', path: s => `/v1/sandbox/${s.id}/authorization`, init: () => post({ payee: 'Al Noor Supplies', amount: '480', currency: 'SAR' }), keep: j => ({ auth: String(j.authorization_id ?? '') }) },
+  { method: 'POST', path: s => `/v1/sandbox/${s.id}/pay`, init: s => post({ payee: 'Al Noor Supplies', amount: 480, currency: 'SAR', authorization_id: s.auth }) },
   { method: 'GET', path: s => `/v1/sandbox/${s.id}/evidence`, init: () => ({}) },
   { method: 'DELETE', path: s => `/v1/sandbox/${s.id}`, init: () => ({ method: 'DELETE' }) },
 ]

@@ -10,7 +10,7 @@ import { L } from '../../../i18n'
  */
 export default function HowItWorks() {
   return (
-    <section id="how" className="tight gl-glow">
+    <section id="how" className="tight">
       <div className="head">
         <h2>{L('Three answers: under a millisecond', 'ثلاث إجابات: في أقل من ثانية')}</h2>
       </div>

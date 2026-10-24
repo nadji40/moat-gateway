@@ -170,7 +170,7 @@ export default function SecurityFeatures() {
 
   const current = FEATURES[active]!
   return (
-    <section id="checks" className="tight gl-glow" ref={section}>
+    <section id="checks" className="tight" ref={section}>
       <div className="head">
         <h2>{L('What it checks', 'ما الذي يتحقق منه')}</h2>
       </div>

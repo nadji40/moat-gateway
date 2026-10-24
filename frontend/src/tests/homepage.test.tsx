@@ -56,12 +56,10 @@ describe('approved homepage integration', () => {
       ...original.querySelectorAll(selector)
     ];
 
-    // The approved page had a sandbox section (#api). It now lives on the
-    // documentation page, so the homepage is one section shorter.
     // The sandbox section (#api) moved to the docs; the numbers section
-    // (#numbers) and the MCP section (#fit) were removed, and the numbers
-    // section's two links now sit under #checks.
-    const kept = approved.filter(node => !['api', 'numbers', 'fit'].includes(node.id)).map(node => {
+    // (#numbers), the MCP section (#fit) and the traced attack (#problem)
+    // were removed, and the numbers section's two links now sit under #checks.
+    const kept = approved.filter(node => !['api', 'numbers', 'fit', 'problem'].includes(node.id)).map(node => {
       // The hero's subtitle was removed on purpose; the rest of its copy stays.
       const copy = node.cloneNode(true) as Element;
       copy.querySelector('header.hero .lede, .lede')?.remove();
@@ -76,18 +74,15 @@ describe('approved homepage integration', () => {
       copy.querySelector('#fit .rails, .rails')?.remove();
       return copy;
     });
-    expect(kept).toHaveLength(6);
-    expect(sections).toHaveLength(6);
+    expect(kept).toHaveLength(5);
+    expect(sections).toHaveLength(5);
 
     expect(sections.map(node => node.id)).toEqual(
       kept.map(node => node.id)
     );
 
     sections.forEach((node, index) => {
-      if (node.id === 'problem') {
-        // Redesigned as a trace of the attack; its heading is what must hold.
-        expect(node.querySelector('h2')?.textContent).toBe(kept[index].querySelector('h2')?.textContent);
-      } else if (node.tagName !== 'FOOTER') {
+      if (node.tagName !== 'FOOTER') {
         // The two links moved from #numbers into #checks; where they sit on the
         // page is checked with the other links below.
         const rendered = node.cloneNode(true) as Element;

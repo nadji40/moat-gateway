@@ -1,5 +1,4 @@
 import Hero from './components/Hero'
-import ProblemExample from './components/ProblemExample'
 import HowItWorks from './components/HowItWorks'
 import SecurityFeatures from './components/SecurityFeatures'
 import ClosingCTA from './components/ClosingCTA'
@@ -10,7 +9,6 @@ export default function Home() {
     <>
       <div className="wrap">
         <Hero />
-        <ProblemExample />
         <HowItWorks />
         <SecurityFeatures />
         <ClosingCTA />

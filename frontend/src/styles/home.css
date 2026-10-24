@@ -10,84 +10,6 @@
 /* Section descriptions */
 .head p { font-size: 1.0625rem; line-height: 1.6; }
 
-/* ── Worked example (#problem): one attack, traced ──────────────────── */
-.trace { position: relative; text-align: start; }
-.tr-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; position: relative; }
-/* the line the four steps sit on, filling as they light up */
-/* From the first badge's centre to the last one's: four equal columns with
-   16px gaps put the last badge's centre 25% - 28px from the far edge. */
-.tr-line { position: absolute; top: 15px; inset-inline-start: 16px; inset-inline-end: calc(25% - 28px); height: 2px; background: rgba(255,255,255,.08); border-radius: 2px; overflow: hidden; }
-.tr-line > span { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left;
-  background: linear-gradient(90deg, var(--orange) 0%, var(--orange) 70%, var(--red-l) 100%);
-  transition: transform 1.6s var(--ease) .1s; }
-html[dir="rtl"] .tr-line > span { transform-origin: right; background: linear-gradient(270deg, var(--orange) 0%, var(--orange) 70%, var(--red-l) 100%); }
-.trace.on .tr-line > span { transform: scaleX(1); }
-
-.tr-step { display: flex; flex-direction: column; gap: 14px; min-width: 0;
-  opacity: .25; transform: translateY(10px); transition: opacity .6s var(--ease), transform .6s var(--ease);
-  transition-delay: calc(var(--i) * .38s); }
-.trace.on .tr-step { opacity: 1; transform: none; }
-.tr-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; font-size: .82rem; font-weight: 700; color: var(--ink-2); }
-.tr-n { position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none;
-  font: 800 .82rem var(--font); color: var(--ink); background: #111114; border: 1px solid var(--line-2); box-shadow: 0 0 0 5px var(--bg); }
-.trace.on .tr-step .tr-n { border-color: rgba(255,138,76,.55); color: var(--orange-l); }
-.tr-n.moat { color: var(--red-l); }
-.tr-n.moat svg { width: 18px; height: 18px; }
-.trace.on .tr-step:last-child .tr-n { border-color: rgba(255,77,94,.6); background: #2A0C10; }
-
-.tr-card { border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
-.tr-note { display: flex; align-items: center; gap: 7px; font-size: .78rem; color: var(--ink-3); margin-top: auto; }
-.tr-note svg { width: 14px; height: 14px; flex: none; }
-.tr-note.bad { color: var(--red-l); }
-mark { background: none; color: inherit; }
-
-/* 1: a chat message */
-.tr-chat { display: flex; gap: 10px; align-items: flex-start; }
-.tr-avatar { width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center; color: var(--ink-2); background: rgba(255,255,255,.07); }
-.tr-avatar svg { width: 16px; height: 16px; }
-.tr-bubble { padding: 10px 13px; border-radius: 14px; border-start-start-radius: 4px; background: rgba(255,95,0,.12); border: 1px solid rgba(255,95,0,.25);
-  color: var(--ink); font-size: .95rem; font-weight: 600; line-height: 1.5; }
-.tr-bubble mark { color: var(--orange-l); font-weight: 800; }
-
-/* 2: a page in a browser, one line of it planted */
-.tr-browser { border-radius: 11px; border: 1px solid var(--line); overflow: hidden; background: rgba(255,255,255,.025); }
-.tr-bar { display: flex; align-items: center; gap: 5px; padding: 7px 9px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.035); direction: ltr; }
-.tr-bar i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.18); }
-.tr-bar span { margin-left: 6px; font: 600 .68rem var(--mono); color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tr-page { padding: 10px; display: flex; flex-direction: column; gap: 7px; }
-.tr-sk { display: block; height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); }
-.tr-sk.short { width: 60%; }
-.tr-inj { margin: 2px 0 0; padding: 8px 10px; border-radius: 8px; font-size: .84rem; font-weight: 600; line-height: 1.45; color: var(--ink);
-  background: rgba(235,0,27,.1); border: 1px dashed rgba(255,77,94,.55); }
-.tr-inj mark { color: var(--red-l); font-weight: 800; }
-
-/* 3: the payment, as a slip */
-.tr-slip { margin: 0; display: grid; gap: 0; border-radius: 11px; border: 1px solid var(--line); overflow: hidden; }
-.tr-slip > div { display: flex; justify-content: space-between; gap: 10px; padding: 9px 11px; font-size: .84rem; }
-.tr-slip > div + div { border-top: 1px solid var(--line); }
-.tr-slip dt { color: var(--ink-3); font-weight: 600; }
-.tr-slip dd { margin: 0; color: var(--ink); font-weight: 700; text-align: end; }
-.tr-slip dd.bad { color: var(--red-l); }
-.tr-slip dd.mono { font-family: var(--mono); }
-
-/* 4: the verdict */
-.tr-verdict { border-color: rgba(255,77,94,.4); background: radial-gradient(120% 90% at 50% 0%, rgba(235,0,27,.14), rgba(255,255,255,.02)); }
-.tr-stamp { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px;
-  font-weight: 800; font-size: 1.05rem; color: var(--red-l); background: rgba(235,0,27,.14); border: 1.5px solid rgba(255,77,94,.6);
-  transform: scale(.6) rotate(-6deg); opacity: 0; transition: transform .5s cubic-bezier(.3,1.6,.5,1) 1.45s, opacity .3s 1.45s; }
-.tr-stamp svg { width: 16px; height: 16px; }
-.trace.on .tr-stamp { transform: rotate(-2deg); opacity: 1; }
-.tr-why { color: var(--ink); font-weight: 700; font-size: .95rem; line-height: 1.45; }
-
-@media (max-width: 980px) {
-  .tr-steps { grid-template-columns: 1fr 1fr; }
-  .tr-line { display: none; }
-}
-@media (max-width: 560px) { .tr-steps { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) {
-  .tr-step, .tr-stamp, .tr-line > span { transition: none; }
-}
-
 /* ── Verdict cards (#how) ───────────────────────────────────────────── */
 .verdict3 {
   display: grid;
@@ -109,8 +31,6 @@ mark { background: none; color: inherit; }
 .vcard.v-allow { --v: var(--green-l); --vt: rgba(46,209,122,.12); --vb: rgba(46,209,122,.45); --vg: rgba(46,209,122,.35); animation: vc-allow 18s infinite; }
 .vcard.v-hold { --v: var(--yellow-l); --vt: rgba(255,184,77,.12); --vb: rgba(255,184,77,.45); --vg: rgba(247,158,27,.32); animation: vc-hold 18s infinite; }
 .vcard.v-deny { --v: var(--red-l); --vt: rgba(255,77,94,.12); --vb: rgba(255,77,94,.45); --vg: rgba(235,0,27,.32); animation: vc-deny 18s infinite; }
-/* a thin line of the verdict's colour along the top */
-.vcard::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--v); opacity: .55; }
 .vc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .vc-ic { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; flex: none;
   color: var(--v); background: var(--vt); border: 1px solid var(--vb); }
@@ -124,7 +44,7 @@ mark { background: none; color: inherit; }
 .vc-out { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: var(--v); }
 .vc-out svg { width: 14px; height: 14px; flex: none; }
 
-.vcard.v-allow, .vcard.v-hold, .vcard.v-deny { border-color: var(--vb); box-shadow: 0 22px 50px -26px var(--vg); }
+.vcard.v-allow, .vcard.v-hold, .vcard.v-deny { border-color: var(--vb); }
 
 /* In step with the diagram above, which plays the three cases on one 18 s
    loop: allowed first, then refused, then held and approved. Each card is
@@ -321,12 +241,10 @@ html[dir="rtl"] .more svg { transform: scaleX(-1); }
   background: rgba(255,95,0,.1); border: 1px solid rgba(255,95,0,.22); transition: color .5s, background .5s, border-color .5s;
 }
 .chk-card .ic svg { width: 19px; height: 19px; }
-.chk-card.is-active { opacity: 1; transform: scale(1.06); border-color: rgba(255,138,76,.55);
-  box-shadow: 0 0 0 1px rgba(255,138,76,.22), 0 26px 60px -26px rgba(255,95,0,.6); }
+.chk-card.is-active { opacity: 1; transform: scale(1.06); border-color: rgba(255,138,76,.55); }
 .chk-card.is-active .ic { animation: chk-pulse 1s ease-in-out infinite; }
 .chk-card.is-passed .ic { color: var(--green-l); background: rgba(46,209,122,.1); border-color: rgba(46,209,122,.28); animation: none; }
-.chk-card.is-active.is-passed { border-color: rgba(46,209,122,.6);
-  box-shadow: 0 0 0 1px rgba(46,209,122,.22), 0 26px 60px -26px rgba(46,209,122,.5); }
+.chk-card.is-active.is-passed { border-color: rgba(46,209,122,.6); }
 @keyframes chk-pulse { 50% { box-shadow: 0 0 0 7px rgba(255,95,0,.12); } }
 .chk-badge {
   position: absolute; top: 14px; inset-inline-end: 14px; width: 28px; height: 28px; border-radius: 50%;
@@ -399,15 +317,6 @@ html[dir="rtl"] .chk-more .more + .more { margin-right: 0; }
   .home-hero-bg { top: -100px; background-position: center 30%; }
 }
 
-/* The traced attack: the step numbers are the deck's rings. */
-.tr-n {
-  background: rgba(255, 95, 0, .06);
-  border: 1.5px solid rgba(255, 138, 76, .42);
-  box-shadow: 0 0 0 5px var(--bg), 0 0 18px -4px rgba(255, 95, 0, .55);
-}
-.tr-step .tr-head { color: var(--ink); }
-.tr-card.gl-card { gap: 12px; }
-
 /* The three answers: the diagram sits on the status page's board. */
 .home-flowboard {
   padding: 28px clamp(18px, 4vw, 44px) 18px;
@@ -417,11 +326,11 @@ html[dir="rtl"] .chk-more .more + .more { margin-right: 0; }
     linear-gradient(90deg, rgba(255, 255, 255, .03) 1px, transparent 1px);
   background-size: 28px 28px;
 }
-.vcard.gl-card { border-radius: 18px; }
+.vcard.gl-card, .vcard.gl-card:hover { border-radius: 18px; box-shadow: none; }
 
 /* The checks: the payment pill takes the deck's rim. */
 .chk-pay { border-color: rgba(255, 138, 76, .42); background: rgba(255, 95, 0, .05); }
-.chk-card.gl-card { border-radius: 18px; }
+.chk-card.gl-card, .chk-card.gl-card:hover { border-radius: 18px; box-shadow: none; }
 
 /* The closing band: the deck's last slide. */
 .home-band {
@@ -457,13 +366,3 @@ html[dir="rtl"] .home-band-cta svg { transform: scaleX(-1); }
   .home-band-title { max-width: none; }
 }
 
-/* The haze behind a section spreads to the viewport's edges and past the
-   section's top and bottom, so no box edge shows where it stops. */
-#problem.gl-glow::before,
-#how.gl-glow::before,
-#checks.gl-glow::before {
-  inset: -12% calc(50% - 50vw);
-  background:
-    radial-gradient(42% 46% at 22% 30%, rgba(255, 95, 0, .16), transparent 70%),
-    radial-gradient(36% 40% at 80% 60%, rgba(200, 65, 90, .13), transparent 70%);
-}

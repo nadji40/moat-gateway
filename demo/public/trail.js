@@ -18,6 +18,9 @@
 
 (() => {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  // The trail follows a pointer that hovers. A finger only touches, and what
+  // it leaves behind reads as smoke, so a touch screen gets no trail.
+  if (matchMedia("(hover: none)").matches) return;
 
   const canvas = document.createElement("canvas");
   canvas.className = "trailfx";

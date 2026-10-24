@@ -133,14 +133,14 @@ S=$(curl -s -XPOST ${base}/v1/sandbox | jq -r .id)
 
 # what the user asked for
 curl -s -XPOST ${base}/v1/sandbox/$S/intent ${H} \\
-  -d '{"text":"Pay the Northwind Cloud Co invoice INV-4471 for 480 USD."}'
+  -d '{"text":"Pay the Al Noor Supplies invoice INV-4471 for 480 SAR."}'
 
 # what an approver signed off
 A=$(curl -s -XPOST ${base}/v1/sandbox/$S/authorization ${H} \\
-  -d '{"payee":"Northwind Cloud Co","amount":"480","currency":"USD"}')
+  -d '{"payee":"Al Noor Supplies","amount":"480","currency":"SAR"}')
 
 # now try to pay someone else with that approval
-P=$(echo "$A" | jq -c '{payee:"Nova Studio",amount:480,currency:"USD",authorization_id,invoice_id}')
+P=$(echo "$A" | jq -c '{payee:"Nova Studio",amount:480,currency:"SAR",authorization_id,invoice_id}')
 curl -s -XPOST ${base}/v1/sandbox/$S/pay ${H} -d "$P"
 
 # the signed record of why
@@ -180,7 +180,7 @@ curl -s -XDELETE ${base}/v1/sandbox/$S`}</Code>
             <Code lang="http">{`POST /v1/session/{id}/intent
 authorization: Bearer YOUR_APPROVER_KEY
 
-{ "text": "Pay the Northwind Cloud Co invoice INV-4471 for 480 USD." }`}</Code>
+{ "text": "Pay the Al Noor Supplies invoice INV-4471 for 480 SAR." }`}</Code>
             <p>{L('Send the words, the fields, or both. Fields are the strongest: a checkout or a form that already knows what was confirmed sends it exactly.', 'أرسل النص، أو الحقول، أو كليهما. الحقول هي الأقوى: صفحة الدفع أو النموذج الذي يعرف مسبقًا ما تم تأكيده يرسله كما هو تمامًا.')}</p>
             <Code lang="json">{`{
   "text": "Non pagare Orbit Labs Srl, paga 480 euro a Vega Cloud Srl, fattura 2024-17",
@@ -195,7 +195,7 @@ authorization: Bearer YOUR_APPROVER_KEY
 }`}</Code>
             <p>{L('Text sent alone is read by a small language model beside the gateway. Every value it returns is checked against the message before it counts: a payee must be written there, an amount must be a number the message contains, a currency must be backed by a code or an unambiguous sign. What fails a check is dropped and reported, so a misreading costs a confirmation, never a payment. The reply says who read it:', 'النص المرسل وحده يقرؤه نموذج لغوي صغير بجوار البوابة. وكل قيمة يعيدها تُطابَق مع الرسالة قبل أن تُحتسب: يجب أن يكون المستفيد مكتوبًا فيها، وأن يكون المبلغ رقمًا واردًا فيها، وأن تستند العملة إلى رمز أو علامة لا لبس فيها. ما يفشل في التحقق يُسقَط ويُبلَّغ عنه، فالقراءة الخاطئة تكلّف تأكيدًا، لا دفعة. ويبيّن الرد من قرأ النص:')}</p>
             <Code lang="json">{`{ "session": "s_…", "turn": 1, "read_by": "model",
-  "fields": { "pay": ["Northwind Cloud Co"], "amounts": ["480"], "currencies": ["USD"], "references": ["INV-4471"] },
+  "fields": { "pay": ["Al Noor Supplies"], "amounts": ["480"], "currencies": ["SAR"], "references": ["INV-4471"] },
   "dropped": [] }`}</Code>
             <p>{L(<><code>read_by</code> is <code>caller</code> when you sent fields, <code>model</code> when the reader read the text, and <code>rules</code> when the model was unavailable and the gateway's own rules read it instead. A client that needs the model checks this value.</>, <>تكون قيمة <code>read_by</code> هي <code>caller</code> حين ترسل الحقول، و<code>model</code> حين يقرأ القارئ النص، و<code>rules</code> حين لا يكون النموذج متاحًا فتقرؤه قواعد البوابة نفسها بدلًا منه. والعميل الذي يحتاج إلى النموذج يتحقق من هذه القيمة.</>)}</p>
           </section>
@@ -207,7 +207,7 @@ authorization: Bearer YOUR_APPROVER_KEY
 authorization: Bearer YOUR_APPROVER_KEY
 
 { "authorization_id": "auth-1", "invoice_id": "INV-4471",
-  "payee": "Northwind Cloud Co", "amount": "480", "currency": "USD",
+  "payee": "Al Noor Supplies", "amount": "480", "currency": "SAR",
   "expires_at": "2030-01-01T00:00:00Z" }`}</Code>
             <p>{L(<>One approval is one payment. Using it again, for another payee or the same one, is refused. Splitting a payment into pieces does not help: payments without an approval also meet a session total. An approval can be cancelled with <code>POST /v1/session/{'{id}'}/authorizations/{'{authorization_id}'}/cancel</code>.</>, <>الموافقة الواحدة لدفعة واحدة. واستخدامها مرة أخرى، لمستفيد آخر أو للمستفيد نفسه، مرفوض. ولا يفيد تقسيم الدفعة إلى أجزاء: فالدفعات التي بلا موافقة تخضع أيضًا لإجمالي الجلسة. ويمكن إلغاء الموافقة عبر <code>POST /v1/session/{'{id}'}/authorizations/{'{authorization_id}'}/cancel</code>.</>)}</p>
           </section>
