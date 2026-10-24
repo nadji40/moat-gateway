@@ -1,4 +1,5 @@
 import { L } from '../../../i18n'
+import { Card } from '../../../components/ui/glass/card'
 
 /**
  * HowItWorks — the animated flow diagram and three verdict cards.
@@ -17,7 +18,7 @@ export default function HowItWorks() {
 
       {/* Flow diagram — aria-hidden because the verdict cards below
           provide the same information in a readable form */}
-      <div className="flowart gl-board home-flowboard" aria-hidden="true">
+      <Card material="clear" tint="rgba(255, 135, 55, 0.10)" className="flowart home-flowboard" aria-hidden="true">
         <svg viewBox="0 0 460 104" xmlns="http://www.w3.org/2000/svg">
           <style>{`
             .a-line{fill:none;stroke:var(--ink-3);stroke-width:2}
@@ -154,14 +155,14 @@ export default function HowItWorks() {
             <path d="M400.2 34 l2.6 2.6 4.4 -4.8" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </g>
         </svg>
-      </div>
+      </Card>
 
       {/* Verdict cards: one case at a time, the one the diagram above is
           playing (the same 18 s loop: allowed, then refused, then held and
           approved). All three stay in the page for screen readers; the
           example rows are illustration and are hidden from them. */}
       <div className="verdict3">
-        <article className="vcard glass gl-card v-allow">
+        <Card material="clear" tint="rgba(46, 209, 122, 0.16)" className="vcard v-allow">
           <div className="vc-top">
             <span className="vc-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M8 12.3l2.7 2.7L16 9.6" /></svg>
@@ -177,8 +178,8 @@ export default function HowItWorks() {
               {L('Paid', 'مدفوعة')}
             </span>
           </div>
-        </article>
-        <article className="vcard glass gl-card v-hold">
+        </Card>
+        <Card material="clear" tint="rgba(255, 184, 77, 0.16)" className="vcard v-hold">
           <div className="vc-top">
             <span className="vc-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M10 9v6M14 9v6" /></svg>
@@ -194,8 +195,8 @@ export default function HowItWorks() {
               {L('Waits for a person', 'بانتظار شخص')}
             </span>
           </div>
-        </article>
-        <article className="vcard glass gl-card v-deny">
+        </Card>
+        <Card material="clear" tint="rgba(255, 77, 94, 0.16)" className="vcard v-deny">
           <div className="vc-top">
             <span className="vc-ic" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
@@ -211,7 +212,7 @@ export default function HowItWorks() {
               {L('Stopped', 'أُوقفت')}
             </span>
           </div>
-        </article>
+        </Card>
       </div>
     </section>
   )

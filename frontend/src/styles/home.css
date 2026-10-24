@@ -318,23 +318,29 @@ html[dir="rtl"] .chk-more .more + .more { margin-right: 0; }
 }
 
 /* The three answers: the diagram sits on the status page's board. */
-.home-flowboard {
+.tight .home-flowboard {
   padding: 28px clamp(18px, 4vw, 44px) 18px;
+  border-radius: 28px;
   margin-bottom: 34px;
   background-image:
     linear-gradient(rgba(255, 255, 255, .03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, .03) 1px, transparent 1px);
   background-size: 28px 28px;
 }
-.vcard.gl-card, .vcard.gl-card:hover { border-radius: 18px; box-shadow: none; }
+/* The cards are glass Cards (components/ui/glass): the engine draws the
+   surface, so there is no rim or shadow of our own, and the Card's own
+   flex/gap/padding utilities give way to the layout below. */
+.verdict3 .vcard { gap: 14px; padding: 22px 20px 20px; border-radius: 18px; box-shadow: none; }
 
 /* The checks: the payment pill takes the deck's rim. */
 .chk-pay { border-color: rgba(255, 138, 76, .42); background: rgba(255, 95, 0, .05); }
-.chk-card.gl-card, .chk-card.gl-card:hover { border-radius: 18px; box-shadow: none; }
+.chk-track .chk-card { gap: 10px; padding: 22px 20px; border-radius: 18px; box-shadow: none; }
 
 /* The closing band: the deck's last slide. */
-.home-band {
+.tight .home-band {
+  display: block;
   text-align: start;
+  border-radius: 28px;
   padding: clamp(40px, 7vw, 76px) clamp(24px, 6vw, 72px);
   background:
     radial-gradient(60% 80% at 100% 50%, rgba(200, 65, 90, .22), transparent 70%),

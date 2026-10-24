@@ -1,4 +1,5 @@
 import { L } from '../../../i18n'
+import { Card } from '../../../components/ui/glass/card'
 
 /**
  * ClosingCTA — the "Put Moat in front of your agent" band.
@@ -9,7 +10,7 @@ import { L } from '../../../i18n'
 export default function ClosingCTA() {
   return (
     <section className="tight">
-      <div className="band glass gl-board home-band">
+      <Card material="clear" tint="rgba(200, 65, 90, 0.16)" className="band home-band">
         {/* The deck's last slide: the person with the tablet, on the far
             side, fading into the board. Decoration only. */}
         <div className="home-band-art" aria-hidden="true" />
@@ -25,7 +26,7 @@ export default function ClosingCTA() {
             {L('Open a workspace', 'افتح مساحة عمل')}
           </a>
         </div>
-      </div>
+      </Card>
     </section>
   )
 }

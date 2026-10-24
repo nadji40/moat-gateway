@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { L } from '../../../i18n'
+import { Card } from '../../../components/ui/glass/card'
 
 interface Feature {
   icon: React.ReactNode
@@ -192,17 +193,19 @@ export default function SecurityFeatures() {
         <div className="chk-view" ref={view}>
           <div className={`chk-track${done ? ' all-ok' : ''}`} ref={track} style={{ transform: `translateX(${shift}px)` }}>
             {FEATURES.map((f, i) => (
-              <article
+              <Card
+                material="clear"
+                tint="rgba(255, 135, 55, 0.12)"
                 key={f.title}
                 ref={(el) => { cards.current[i] = el }}
-                className={`chk-card glass gl-card${i === active && !done ? ' is-active' : ''}${passed(i) ? ' is-passed' : ''}`}
+                className={`chk-card${i === active && !done ? ' is-active' : ''}${passed(i) ? ' is-passed' : ''}`}
                 data-d={Math.min(Math.abs(i - active), 3)}
               >
                 <span className="chk-badge" aria-hidden="true">{CHECK}</span>
                 <div className="ic">{f.icon}</div>
                 <h3>{L(f.title, f.titleAr)}</h3>
                 <p>{L(f.description, f.descriptionAr)}</p>
-              </article>
+              </Card>
             ))}
           </div>
         </div>
