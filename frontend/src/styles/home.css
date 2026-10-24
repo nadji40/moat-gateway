@@ -336,6 +336,24 @@ html[dir="rtl"] .chk-more .more + .more { margin-right: 0; }
 .chk-pay { border-color: rgba(255, 138, 76, .42); background: rgba(255, 95, 0, .05); }
 .chk-track .chk-card { gap: 10px; padding: 22px 20px; border-radius: 18px; box-shadow: none; }
 
+/* The demo video: a glass frame around a 16:9 player. */
+.tight .home-video {
+  display: block;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: clamp(8px, 1.4vw, 14px);
+  border-radius: 26px;
+  box-shadow: none;
+}
+.home-video-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #050505;
+}
+.home-video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
 /* The closing band: the deck's last slide. */
 .tight .home-band {
   display: block;

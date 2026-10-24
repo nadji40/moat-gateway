@@ -17,7 +17,13 @@ Every payment an agent tries to make is compared with what the user actually ask
 [![Security policy](https://img.shields.io/badge/security-policy-1f6feb)](https://github.com/nadji40/moat-gateway/security/policy)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-lightgrey)](LICENSE.md)
 
-[Try it](#try-it-in-two-minutes) · [The problem](#the-problem) · [What Moat does](#what-moat-does) · [Numbers](#the-numbers) · [How it is built](#how-it-is-built) · [Run it locally](#run-it-locally) · [Team](#team) · [Security](#security)
+[Watch the demo](https://youtu.be/oI3rZ2wh-NU) · [Try it](#try-it-in-two-minutes) · [The problem](#the-problem) · [What Moat does](#what-moat-does) · [Numbers](#the-numbers) · [How it is built](#how-it-is-built) · [Run it locally](#run-it-locally) · [Team](#team) · [Security](#security)
+
+<br>
+
+<a href="https://youtu.be/oI3rZ2wh-NU" title="Watch the Moat demo on YouTube"><img src="docs/assets/demo-thumbnail.jpg" width="720" alt="Watch the Moat demo on YouTube (3:32)"></a>
+
+<sub>The demo, 3:32: setup, attacks refused in the Playground, a live MCP session, and the numbers.</sub>
 
 </div>
 

@@ -1,6 +1,7 @@
 import Hero from './components/Hero'
 import HowItWorks from './components/HowItWorks'
 import SecurityFeatures from './components/SecurityFeatures'
+import DemoVideo from './components/DemoVideo'
 import ClosingCTA from './components/ClosingCTA'
 import Footer from '../../components/layout/Footer'
 import { LiquidGlassProvider } from '../../components/ui/liquid/liquid-glass-provider'
@@ -17,6 +18,7 @@ export default function Home() {
         <Hero />
         <HowItWorks />
         <SecurityFeatures />
+        <DemoVideo />
         <ClosingCTA />
       </div>
       <Footer />
