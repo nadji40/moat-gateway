@@ -17,7 +17,7 @@ Every payment an agent tries to make is compared with what the user actually ask
 [![Security policy](https://img.shields.io/badge/security-policy-1f6feb)](https://github.com/nadji40/moat-gateway/security/policy)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-lightgrey)](LICENSE.md)
 
-[Watch the demo](https://youtu.be/oI3rZ2wh-NU) · [Try it](#try-it-in-two-minutes) · [The problem](#the-problem) · [What Moat does](#what-moat-does) · [Numbers](#the-numbers) · [How it is built](#how-it-is-built) · [Run it locally](#run-it-locally) · [Team](#team) · [Security](#security)
+[Watch the demo](https://youtu.be/oI3rZ2wh-NU) · [Try it](#try-it-in-two-minutes) · [The problem](#the-problem) · [Who has it](#who-has-this-problem) · [What Moat does](#what-moat-does) · [Numbers](#the-numbers) · [How it is built](#how-it-is-built) · [Run it locally](#run-it-locally) · [Team](#team) · [What happens next](#what-happens-next) · [Security](#security)
 
 <br>
 
@@ -68,6 +68,30 @@ for hidden instructions and still paid the inflated invoice and the lookalike
 supplier. Nothing on those pages is an instruction to distrust; the page is
 simply wrong, and only something that holds the user's actual request can
 see the difference.
+
+## Who has this problem
+
+The problem was not picked from a trend piece. The team's market and
+regulatory research during the programme, and the founder's own
+conversations with people who run payment flows, put us in front of two
+groups who want this now:
+
+- **Operators of digital products in Algeria**: subscriptions, mobile top-ups,
+  digital goods. They already use agents to sell and fulfil, because their
+  customers expect an answer in seconds, and they want the agent to pay
+  suppliers at the same speed without a person approving each payment. They
+  are also the quickest to say what one payment to the wrong party would cost
+  them. These are the first pilot candidates: small volumes, a capped limit,
+  local rails, and a founder they can call.
+- **Agentic trading and treasury, worldwide**: agents that move funds on
+  chain or between accounts at machine pace. The need already exists; the
+  moment an agent can transfer, something has to hold it to what was
+  approved. Moat's EVM and Solana rails and the on-chain co-signer
+  ([ADR 0010](docs/adr/0010-on-chain-co-signer.md)) are built for this.
+
+Both groups share the same constraint: speed is the point of using an agent,
+so the check has to be invisible. Moat adds under two milliseconds per
+payment (see [the numbers](#the-numbers)).
 
 ## What Moat does
 
@@ -231,10 +255,38 @@ the programme.
 
 ## Honest status
 
-- Payments move through **Stripe in test mode** and on **public testnets** only. No real money has moved through Moat yet.
-- The card and bank rails are measured against mocks and the Stripe sandbox; the bank adapter is a reference implementation behind a provider contract, not a live bank.
-- Policies are YAML files edited by hand; there is no policy editor in the dashboard yet.
+**The dashboard does not move real money, on purpose.** Everything a judge
+or a visitor can do on the live site runs through Stripe in test mode and on
+public testnets. No real money has moved through Moat yet. The policy engine,
+the evidence chain, the intent reader, the four rails and their provider
+connections are complete and tested; what keeps real money out is a
+decision, not missing code:
+
+| Rail | What is built | What real money needs |
+|---|---|---|
+| Card (Stripe) | the adapter, exercised against Stripe's sandbox in the arena's card runs | live keys and a merchant agreement; no code change |
+| EVM and Solana | the co-signer and the policy gate, on Base Sepolia and Solana devnet | mainnet endpoints and a funded signer; a configuration change |
+| Bank transfer | a reference adapter behind the provider contract | one integration with a bank or payment provider in the pilot's country |
+
+Real money starts with the first pilot, under a capped limit, after the
+compliance review from our research and an external security review.
+
+Also not done yet:
+
+- Policies are YAML files edited by hand; there is no policy editor in the dashboard.
 - The intent reader is one model call per request; its accuracy across Arabic dialects is being measured, not yet published.
+
+## What happens next
+
+The next three months, in order:
+
+1. **First pilot in Algeria.** One digital-products operator, its agent paying real suppliers through Moat under a capped limit, Stripe in live mode, the founder on call. This measures what the arena cannot: real invoices and real mistakes.
+2. **A policy editor in the dashboard**, so the pilot's finance person sets payees, limits and currencies without touching YAML.
+3. **One live bank rail**, through a provider in the pilot's country. The adapter contract exists; this is one integration.
+4. **Publish the intent reader's accuracy across Arabic dialects**, with the test set.
+5. **Chain rails on mainnet** with the co-signer, for the trading use case, behind the same policy engine.
+6. **An external security review** before any uncapped real-money use, alongside the team's own weekly attacks.
+7. **Commercial terms for pilots.** The noncommercial licence stays for everyone else; see below.
 
 ## Security
 
@@ -252,3 +304,9 @@ and share Moat for any noncommercial purpose: personal use, research,
 education, charities, public bodies. Using it commercially, including inside
 a product or service that makes money, needs a separate licence from the
 copyright holder; write to license@moatgateway.dpdns.org.
+
+Why noncommercial, for now: the whole codebase is public so that the
+Thirduni judges, and anyone else, can read and run all of it. The
+noncommercial licence makes sure that while it is, nobody can take it and
+sell it. It is not the business model. Pilots get written commercial terms,
+and the licence will be revisited after the programme.
