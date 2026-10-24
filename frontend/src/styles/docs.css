@@ -26,7 +26,7 @@
 .docs-nav a {
   position: relative;
   display: block;
-  padding: 8px 12px 8px 16px;
+  padding: 8px 12px;
   border-radius: 10px;
   font-size: .875rem;
   font-weight: 600;
@@ -34,26 +34,8 @@
   text-decoration: none;
   transition: color .18s, background .18s, box-shadow .18s;
 }
-/* a thin warm tick the current section lights */
-.docs-nav a::before {
-  content: "";
-  position: absolute;
-  inset-inline-start: 5px;
-  top: 50%;
-  width: 3px;
-  height: 0;
-  border-radius: 3px;
-  background: var(--orange);
-  transform: translateY(-50%);
-  transition: height .2s var(--ease);
-}
 .docs-nav a:hover, .docs-nav a:focus-visible { color: var(--ink); background: rgba(255,255,255,.05); outline: none; }
-.docs-nav a[aria-current] {
-  color: var(--orange-l);
-  background: rgba(255, 95, 0, .10);
-  box-shadow: inset 0 0 0 1px rgba(255, 138, 76, .22), 0 0 22px -8px rgba(255, 95, 0, .7);
-}
-.docs-nav a[aria-current]::before { height: 60%; box-shadow: 0 0 8px var(--orange); }
+.docs-nav a[aria-current] { color: var(--orange-l); background: rgba(255, 95, 0, .10); }
 
 @media (max-width: 900px) {
   .docs {
@@ -80,7 +62,6 @@
     background: rgba(255,255,255,.04);
     padding: 7px 12px;
   }
-  .docs-nav a::before { display: none; }
 }
 
 /* ---- the article ---- */
@@ -196,7 +177,6 @@
  * sides set above are mirrored. Code blocks and their copy bar stay left to right. */
 html[dir="rtl"] .docs { text-align: right; }
 html[dir="rtl"] .docs-k { margin: 4px 12px 10px 0; }
-html[dir="rtl"] .docs-nav a { padding: 8px 16px 8px 12px; }
 html[dir="rtl"] .tbl th, html[dir="rtl"] .tbl td { text-align: right; }
 html[dir="rtl"] .docs-body .codebar { direction: ltr; }
 html[dir="rtl"] .docs-body h2::before { order: 0; }
