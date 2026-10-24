@@ -245,4 +245,4 @@ Moat is a security product, so it is reviewed like one.
 and share Moat for any noncommercial purpose: personal use, research,
 education, charities, public bodies. Using it commercially, including inside
 a product or service that makes money, needs a separate licence from the
-copyright holder; write to nadjisabri@gmail.com.
+copyright holder; write to license@moatgateway.dpdns.org.

@@ -3,7 +3,7 @@ Required Notice: Copyright Khentit Nadji Sabri (https://moatgateway.dpdns.org)
 Moat is licensed under the PolyForm Noncommercial License 1.0.0. You may use,
 change and share it for any noncommercial purpose, as the terms below set out.
 Commercial use needs a separate licence from the copyright holder: write to
-nadjisabri@gmail.com.
+license@moatgateway.dpdns.org.
 
 # PolyForm Noncommercial License 1.0.0
 
