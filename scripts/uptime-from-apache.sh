@@ -27,7 +27,7 @@ tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 
 # Fields: vhost client - - [dd/Mon/yyyy:HH:MM:SS +0000] "req" status ...
-awk -v generated="$(date -u +%FT%TZ)" -v log="$log" '
+awk -v generated="$(date -u +%FT%TZ)" -v logfile="$log" '
 BEGIN {
   split("Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec", names, " ")
   for (i = 1; i <= 12; i++) month[names[i]] = sprintf("%02d", i)
@@ -45,7 +45,7 @@ BEGIN {
 }
 END {
   n = asorti(requests, days)
-  printf "{\n  \"source\": \"apache access log\",\n  \"log\": \"%s\",\n  \"generated\": \"%s\",\n  \"days\": {\n", log, generated
+  printf "{\n  \"source\": \"apache access log\",\n  \"log\": \"%s\",\n  \"generated\": \"%s\",\n  \"days\": {\n", logfile, generated
   for (i = 1; i <= n; i++) {
     d = days[i]
     printf "    \"%s\": { \"requests\": %d, \"errors\": %d, \"minutesDown\": %d }%s\n",
