@@ -524,7 +524,7 @@
   background: var(--s2);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
-  font-family: Inter, "Ubuntu", sans-serif;
+  font-family: var(--font);
   font-size: 14px; line-height: 20px; font-weight: 500;
   color: var(--t1);
   white-space: nowrap;
@@ -793,7 +793,7 @@
   border-radius: 10px;
 }
 .shell .asset-chip img { width: 24px; height: 24px; }
-.shell .asset-chip .sym { font-family: Inter, "Ubuntu", sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--t1); }
+.shell .asset-chip .sym { font-family: var(--font); font-size: 14px; line-height: 20px; font-weight: 500; color: var(--t1); }
 /* approved readout block (off-chain): head→rows 20, rows 15 apart, label→value 10 */
 .shell .readout { display: flex; flex-direction: column; gap: 15px; }
 .shell .readout-row { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -888,7 +888,7 @@
   border-radius: 10px;
   display: flex; align-items: center;
 }
-.shell .search-field input { width: 100%; height: 100%; font-family: Inter, "Ubuntu", sans-serif; font-size: 16px; line-height: 24px; }
+.shell .search-field input { width: 100%; height: 100%; font-family: var(--font); font-size: 16px; line-height: 24px; }
 .shell .search-field input::placeholder { color: var(--t2); font-weight: 400; }
 /* verdicts table column plan — badge | payee (110-180) | amount
    (72-100) | rail (55-70) | why (200-534) | when 80px right-aligned;
@@ -1006,7 +1006,7 @@
 .shell .pg-columns .currency-row button[aria-checked=true] .sym { color: #252525; }
 /* the asset chip's mark is a raw svg from playground.js's simulator */
 .shell .asset-chip svg { width: 24px; height: 24px; fill: #fff; flex-shrink: 0; }
-.shell .asset-chip .dim { font-family: Inter, "Ubuntu", sans-serif; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--t1); }
+.shell .asset-chip .dim { font-family: var(--font); font-size: 14px; line-height: 20px; font-weight: 500; color: var(--t1); }
 /* approved readout is the <dl> playground.js (re)draws, so the
    design's readout-row voice rides the dt/dd pair */
 .shell #mandate { margin: 0; display: flex; flex-direction: column; gap: 15px; }
