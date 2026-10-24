@@ -206,7 +206,7 @@ Built by a team of ten for Thirduni Cohort 1, October 2026.
 
 | Name | Role | What they actually did |
 |---|---|---|
-| **Khentit Nadji Sabri** | Founder, lead engineer | Started Moat. The gateway, the policy engine, the evidence chain, the intent reader, the four rails, the arena runner and analysis, the Stripe sandbox, and the server it runs on |
+| **Nadji Sabri Khentit** | Founder, lead engineer | Started Moat. The gateway, the policy engine, the evidence chain, the intent reader, the four rails, the arena runner and analysis, the Stripe sandbox, and the server it runs on |
 | **Khawla Hammouda** | Front-end engineer | The React site: homepage, compare page and docs styling (PRs #1, #3) |
 | **Rayan Yasser Ouanoughi** | Design and front-end | The React dashboard and its redesign, including the phone layout (PR #5) |
 | **Adam Belkadi** | Security engineer | Keys, permissions, workspace isolation and the dashboard's access model |

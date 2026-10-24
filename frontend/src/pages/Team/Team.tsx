@@ -24,7 +24,7 @@ export const members: Member[] = [
   { first: 'Meriem Sara', rest: 'Aounallah', role: 'Language data', roleAr: 'بيانات اللغة',
     line: 'Arabic dialects, names and currencies, so Moat understands what people actually write.',
     lineAr: 'اللهجات العربية والأسماء والعملات، ليفهم Moat ما يكتبه الناس فعلًا.', photo: '/team/deck/meriem.jpg' },
-  { first: 'Khentit', rest: 'Nadji Sabri', role: 'Founder & general manager', roleAr: 'المؤسس والمدير العام',
+  { first: 'Nadji Sabri', rest: 'Khentit', role: 'Founder & general manager', roleAr: 'المؤسس والمدير العام',
     line: 'Started Moat. Builds the gateway, the policy engine and the infrastructure it runs on.',
     lineAr: 'أسّس Moat. يبني البوابة ومحرّك السياسات والبنية التحتية التي تعمل عليها.', photo: '/team/deck/nadji.jpg', founder: true },
   { first: 'Dhoha', rest: 'Boumediene', role: 'Policy data', roleAr: 'بيانات السياسات',
