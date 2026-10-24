@@ -1988,7 +1988,7 @@ mod tests {
                 seen += 1;
             }
         }
-        assert_eq!(seen, 16);
+        assert_eq!(seen, 17);
     }
 
     /// A page can name a trusted supplier and an amount. That is not the user

@@ -55,21 +55,5 @@ velocity:
   max_amount_per_session: 1000
   on_exceed: deny
 
-# The caps above are in US dollars; a payment in another currency is valued
-# in dollars before it meets them, at the pilot policy's rates. A currency
-# with no rate here fails the caps rather than passing them.
-fx:
-  base: USD
-  rates:
-    EUR: 1.133
-    SAR: 0.2667
-    AED: 0.2723
-    QAR: 0.2747
-    OMR: 2.601
-    BHD: 2.66
-    KWD: 3.258
-    EGP: 0.0202
-    DZD: 0.00747
-
 # What step_up degrades to when the host has told Moat no human is present.
 no_human_available: deny

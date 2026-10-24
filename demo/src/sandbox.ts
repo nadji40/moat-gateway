@@ -288,7 +288,7 @@ async function spawn(cfg: SandboxConfig): Promise<Live> {
       "  - name: stripe",
       "    transport: stdio",
       '    command: ["node", "--import", "tsx", "mock-stripe/src/server.ts"]',
-      `policy: ${join(cfg.repo, "policies", "default.yaml").split("\\").join("/")}`,
+      `policy: ${join(cfg.repo, "policies", "sandbox.yaml").split("\\").join("/")}`,
       `evidence: ${evidencePath.split("\\").join("/")}`,
       // Its own key directory, not the arena's. The arena's evidence key is
       // readable only by whoever created it, and a service running as

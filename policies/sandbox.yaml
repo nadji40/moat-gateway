@@ -1,0 +1,79 @@
+# The public sandbox's policy: the default policy with exchange rates, so the
+# try-it page and the documentation's examples can pay in riyals and still
+# meet the dollar caps. The default policy itself stays without rates; the
+# core's tests read it as the fixture for a policy that values nothing.
+version: 1
+
+payment_tools:
+  - server: "*"
+    tool: "pay"
+  - server: "stripe"
+    tool: "create_payment"
+
+# Tools that move no money. A tool in neither list is refused and hidden
+# from the agent, so a server that grows a new way to pay cannot pay around
+# Moat.
+non_payment_tools:
+  - server: "stripe"
+    tool: "list_payments"
+  - server: "stripe"
+    tool: "inspect_accounts"
+  - server: "web"
+    tool: "fetch"
+
+fields:
+  payee:    { args: ["payee", "recipient", "destination", "to"] }
+  amount:   { args: ["amount", "total", "value"] }
+  currency: { args: ["currency"] }
+
+allowlist:
+  payees:
+    - "Acme Cloud Ltd"
+    - "Monitoring Pro Inc"
+
+rules:
+  - id: payee-provenance
+    when: field == payee
+    require_source: [User, Allowlist]
+    on_fail: step_up
+    message: "payee did not come from the user or the allowlist"
+
+  - id: amount-cap
+    when: field == amount
+    max: 500
+    on_fail: deny
+    message: "amount exceeds cap"
+
+  - id: amount-provenance
+    when: field == amount
+    # Prices legitimately come from the pages the agent read, so ToolResult is
+    # allowed here even though it is untrusted for the payee.
+    require_source: [User, Allowlist, ToolResult]
+    on_fail: step_up
+
+velocity:
+  max_calls_per_session: 5
+  max_calls_per_minute: 3
+  # Payments without an approval are also capped in total: the same amount
+  # split into pieces under the per-payment cap stops adding up here.
+  max_amount_per_session: 1000
+  on_exceed: deny
+
+# The caps above are in US dollars; a payment in another currency is valued
+# in dollars before it meets them, at the pilot policy's rates. A currency
+# with no rate here fails the caps rather than passing them.
+fx:
+  base: USD
+  rates:
+    EUR: 1.133
+    SAR: 0.2667
+    AED: 0.2723
+    QAR: 0.2747
+    OMR: 2.601
+    BHD: 2.66
+    KWD: 3.258
+    EGP: 0.0202
+    DZD: 0.00747
+
+# What step_up degrades to when the host has told Moat no human is present.
+no_human_available: deny
