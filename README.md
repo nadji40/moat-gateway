@@ -17,7 +17,7 @@ Every payment an agent tries to make is compared with what the user actually ask
 [![Security policy](https://img.shields.io/badge/security-policy-1f6feb)](https://github.com/nadji40/moat-gateway/security/policy)
 [![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-lightgrey)](LICENSE.md)
 
-[Watch the demo](https://youtu.be/oI3rZ2wh-NU) · [Try it](#try-it-in-two-minutes) · [The problem](#the-problem) · [Who has it](#who-has-this-problem) · [What Moat does](#what-moat-does) · [Numbers](#the-numbers) · [How it is built](#how-it-is-built) · [Run it locally](#run-it-locally) · [Team](#team) · [What happens next](#what-happens-next) · [Security](#security)
+[Watch the demo](https://youtu.be/oI3rZ2wh-NU) · [Try it](#try-it-in-two-minutes) · [The problem](#the-problem) · [Who has it](#who-has-this-problem) · [What Moat does](#what-moat-does) · [Numbers](#the-numbers) · [How it is built](#how-it-is-built) · [Run it locally](#run-it-locally) · [Team](#team) · [Security](#security)
 
 <br>
 
@@ -275,19 +275,6 @@ Also not done yet:
 
 - Policies are YAML files edited by hand; there is no policy editor in the dashboard.
 - The intent reader is one model call per request; its accuracy across Arabic dialects is being measured, not yet published.
-
-## What happens next
-
-The next three months, in order:
-
-1. **First pilot in Algeria.** One digital-products operator, its agent paying real suppliers through Moat under a capped limit, Stripe in live mode, the founder on call. This measures what the arena cannot: real invoices and real mistakes.
-2. **A policy editor in the dashboard**, so the pilot's finance person sets payees, limits and currencies without touching YAML.
-3. **One live bank rail**, through a provider in the pilot's country. The adapter contract exists; this is one integration.
-4. **Publish the intent reader's accuracy across Arabic dialects**, with the test set.
-5. **Chain rails on mainnet** with the co-signer, for the trading use case, behind the same policy engine.
-6. **An external security review** before any uncapped real-money use, alongside the team's own weekly attacks.
-7. **Commercial terms for pilots.** The noncommercial licence stays for everyone else; see below.
-
 ## Security
 
 Moat is a security product, so it is reviewed like one.
