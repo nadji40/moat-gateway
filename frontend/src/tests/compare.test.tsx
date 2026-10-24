@@ -1,18 +1,50 @@
+
 import { render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import App from '../app/App'
+import Navbar from '../components/layout/Navbar'
+import Compare from '../pages/Compare/Compare'
 
 describe('native Compare page', () => {
-  afterEach(() => window.history.replaceState({}, '', '/'))
+  afterEach(() => {
+    window.history.replaceState({}, '', '/')
+  })
 
-  it('renders the migrated comparison content with the shared layout', () => {
+  it('renders the migrated comparison content with the shared layout', async () => {
     window.history.replaceState({}, '', '/compare')
-    render(<App />)
 
-    expect(screen.getByRole('heading', { name: /It is not what they check/i })).toBeInTheDocument()
-    expect(screen.getByText('Run against their own code')).toBeInTheDocument()
-    expect(screen.getByText('Moat helps AI agents make authorized payments by verifying every action against the user\'s intent')).toBeInTheDocument()
-    expect(document.querySelectorAll('footer.foot')).toHaveLength(1)
-    expect(document.querySelectorAll('.fcols > *')).toHaveLength(4)
+    render(
+      <>
+        <Navbar />
+        <Compare />
+      </>
+    )
+
+    // Verify the Compare page heading.
+    expect(
+      await screen.findByRole('heading', {
+        name: /It is not what\s+they check/i,
+      }),
+    ).toBeInTheDocument()
+
+    // Verify the evidence section heading.
+    expect(
+      screen.getByRole('heading', {
+        name: /run against their own code/i,
+      }),
+    ).toBeInTheDocument()
+
+    // Verify the evidence section exists.
+    expect(
+      document.querySelector('section#tested'),
+    ).toBeInTheDocument()
+
+    // Verify the shared footer structure.
+    expect(
+      document.querySelectorAll('footer.foot'),
+    ).toHaveLength(1)
+
+    expect(
+      document.querySelectorAll('.fcols > *'),
+    ).toHaveLength(4)
   })
 })

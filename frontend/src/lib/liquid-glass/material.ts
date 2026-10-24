@@ -1,6 +1,5 @@
 import type * as React from "react"
-import { cn } from '../../lib/utils'
-
+import { cn } from "@/lib/utils"
 
 /* Liquid glass material: turns a role + material into the CSS classes (see the .lg layer in
    app/globals.css) and the data-glass attributes the WebGL engine picks up. */

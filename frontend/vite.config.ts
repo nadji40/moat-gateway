@@ -2,14 +2,19 @@ import { resolve } from 'node:path'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import path from 'node:path'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'MOAT_')
   const target = env.MOAT_BACKEND_ORIGIN || 'http://127.0.0.1:8787'
   // Keep legacy documents and their requests on this origin, preserving the
   // shared navigation's localStorage auth state. No legacy page is rebuilt.
-  const proxy = {
-    '^/(v1|mcp)(/|$)': { target },
-    '^/(dashboard|tests|status)(\\.html)?(\\?|$)': { target },
+const proxy = {
+  '^/(v1|mcp)(/|$)': {
+    target,
+    changeOrigin: true,
+  },
+    '^/(dashboard|tests)(\\.html)?(\\?|$)': { target },
+'^/status\\.html(\\?|$)': { target },
     '^/((app|footer)\\.(css|js)|playground\\.js|trail\\.js)(\\?|$)': { target },
   }
 
@@ -24,10 +29,18 @@ export default defineConfig(({ mode }) => {
           compare: resolve(process.cwd(), 'compare/index.html'),
           docs: resolve(process.cwd(), 'docs/index.html'),
           team: resolve(process.cwd(), 'team/index.html'),
+          status: resolve(process.cwd(), 'status/index.html'),
         },
       },
     },
     server: { host: '127.0.0.1', port: 5174, strictPort: true, proxy },
     preview: { host: '127.0.0.1', port: 4174, strictPort: true, proxy },
+
+resolve: {
+  alias: {
+    '@': path.resolve(import.meta.dirname, './src'),
+  },
+},
+
   }
 })
