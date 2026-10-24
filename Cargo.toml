@@ -11,7 +11,8 @@ members = [
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
-repository = "https://github.com/nadji40/moat"
+repository = "https://github.com/nadji40/moat-gateway"
+license = "PolyForm-Noncommercial-1.0.0"
 
 [workspace.lints.rust]
 missing_docs = "warn"

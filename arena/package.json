@@ -1,6 +1,7 @@
 {
   "name": "moat-arena",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "version": "0.1.0",
   "description": "Mock marketplace, mock payment server, attack corpus and task runner for Moat.",
   "type": "module",

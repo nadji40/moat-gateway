@@ -1,6 +1,7 @@
 {
   "name": "@moat/demo",
   "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
   "version": "0.1.0",
   "description": "The public try-it page: a live gateway, real verdicts, and a real transaction on Base Sepolia.",
   "type": "module",

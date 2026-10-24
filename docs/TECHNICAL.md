@@ -1810,5 +1810,6 @@ cd arena && pnpm install && pnpm typecheck && pnpm test
 
 ## License
 
-Not settled. This repository is private and nothing in it is published under a
-licence yet.
+[PolyForm Noncommercial 1.0.0](../LICENSE.md): free to use, change and share for
+any noncommercial purpose; commercial use needs a licence from the copyright
+holder.

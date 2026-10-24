@@ -15,7 +15,7 @@ Every payment an agent tries to make is compared with what the user actually ask
 [![Attacks](https://img.shields.io/badge/attacks%20paid%20through%20Moat-0%20%2F%20380-FF5F00)](#the-numbers)
 [![Rails](https://img.shields.io/badge/rails-card%20%C2%B7%20bank%20%C2%B7%20EVM%20%C2%B7%20Solana-2A2724)](#the-numbers)
 [![Security policy](https://img.shields.io/badge/security-policy-1f6feb)](https://github.com/nadji40/moat-gateway/security/policy)
-[![License](https://img.shields.io/badge/license-pending-lightgrey)](#license)
+[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-lightgrey)](LICENSE.md)
 
 [Try it](#try-it-in-two-minutes) · [The problem](#the-problem) · [What Moat does](#what-moat-does) · [Numbers](#the-numbers) · [How it is built](#how-it-is-built) · [Run it locally](#run-it-locally) · [Team](#team) · [Security](#security)
 
@@ -241,4 +241,8 @@ Moat is a security product, so it is reviewed like one.
 
 ## License
 
-Not settled yet. The code is public to be read and judged; a licence will be chosen before anything is published for reuse.
+[PolyForm Noncommercial 1.0.0](LICENSE.md). You are free to read, run, change
+and share Moat for any noncommercial purpose: personal use, research,
+education, charities, public bodies. Using it commercially, including inside
+a product or service that makes money, needs a separate licence from the
+copyright holder; write to nadjisabri@gmail.com.
