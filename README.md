@@ -235,7 +235,7 @@ the programme.
 Moat is a security product, so it is reviewed like one.
 
 - **Report a vulnerability:** [security policy](https://github.com/nadji40/moat-gateway/security/policy) ([SECURITY.md](SECURITY.md)). Please do not open a public issue.
-- **Published advisories:** [github.com/nadji40/moat-gateway/security/advisories](https://github.com/nadji40/moat-gateway/security/advisories).
+- **Security advisories:** [github.com/nadji40/moat-gateway/security/advisories](https://github.com/nadji40/moat-gateway/security/advisories). Findings from the team's own attacks on Moat are written up there, with the fix that closed each one.
 - **No secrets in the repository.** Provider keys come from the environment; `.env*`, `keys/` and evidence logs are ignored by git. A pull request that adds one is closed and the key is treated as burned.
 - **Claims match evidence.** A change to what Moat catches or lets through ships with the arena run that shows it. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
