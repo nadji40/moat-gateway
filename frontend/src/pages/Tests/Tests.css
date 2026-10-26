@@ -763,6 +763,8 @@ html[dir="rtl"] .tests-progress{left:auto;right:0}
   position: relative;
   isolation: isolate;
   background: transparent;
+  /* The glows sit past both edges; without this the phone page scrolls sideways. */
+  overflow-x: clip;
 }
 
 .tests-page::before,
