@@ -51,7 +51,14 @@ function FlowArt() {
         <g className="c-leg" style={{ '--dx': '84px', '--dy': '0px', animationDelay: '1.3s' } as CSSProperties}><rect x="256" y="59" width="16" height="8" rx="4" fill="var(--green-l)" /></g>
         <g className="c-leg" style={{ '--dx': '126px', '--dy': '-28px', animationDelay: '6s' } as CSSProperties}><rect x="64" y="88" width="16" height="8" rx="4" fill="var(--ink-2)" /></g>
         <g className="c-leg" style={{ '--dx': '-100px', '--dy': '23px', animationDelay: '7s' } as CSSProperties}><rect x="182" y="62" width="16" height="8" rx="4" fill="var(--red-l)" /></g>
-        <g transform="translate(175.28 18.37) scale(.3881)"><g className="c-gate" fill="none" stroke="var(--ink)" strokeWidth="10" strokeLinecap="round"><path d="M117 52.4A67 67 0 0 1 202.7 141.2" /><path d="M177.5 171.2A67 67 0 0 1 86.1 76.6" /></g></g>
+        <g transform="translate(175.28 18.37) scale(.3881)">
+          <g className="c-gate" fill="none" stroke="var(--ink)" strokeWidth="10" strokeLinecap="round">
+            <path d="M117 52.4A67 67 0 0 1 202.7 141.2" />
+            <path d="M177.5 171.2A67 67 0 0 1 86.1 76.6" />
+            <circle cx="99.7" cy="62.2" r="12" fill="var(--ink)" stroke="none" />
+            <circle cx="192.3" cy="158.1" r="12" fill="var(--ink)" stroke="none" />
+          </g>
+        </g>
         <g className="c-no"><circle cx="230" cy="63" r="9" fill="var(--red-l)" /><path d="m226.4 59.4 7.2 7.2m0-7.2-7.2 7.2" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" /></g>
         <g className="c-paid"><circle cx="404" cy="45" r="8.5" fill="var(--green-l)" /><path d="m400.2 45 2.6 2.6 4.4-4.8" fill="none" stroke="#000" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></g>
       </svg>
@@ -114,6 +121,8 @@ export default function Compare() {
         'اختُبرت عبر محاولات الدفع الـ 380 نفسها'
       )}
     </h2>
+    <p className="compare-section-subtitle">{L('A like-for-like benchmark across 380 payment attempts.', 'مقارنة متكافئة عبر 380 محاولة دفع.')}</p>
+
 
     <span
       className="compare-security-flow-rule"
@@ -143,6 +152,8 @@ export default function Compare() {
         'شُغّلت على شيفرتها نفسها'
       )}
     </h2>
+    <p className="compare-section-subtitle">{L('Real tests executed against the original implementations.', 'اختبارات حقيقية شُغّلت على التطبيقات الأصلية.')}</p>
+
     <span
       className="compare-security-flow-rule"
       aria-hidden="true"

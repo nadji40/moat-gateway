@@ -953,9 +953,7 @@ const controller = new AbortController()
 
         </div>
 
-{/* Official Crenspire pagination — no extra wrapper or custom glass skin */}
 
-{/* Crenspire Pagination — one set of page buttons */}
 {pageCount > 1 && !loading && !error && (
   <Pagination className="status-pagination">
     <PaginationContent

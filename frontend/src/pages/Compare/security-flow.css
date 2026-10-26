@@ -253,3 +253,89 @@
     transition: none !important;
   }
 }
+
+/* Match the Status "Right now" title; override the earlier editorial label rules. */
+.compare-page .compare-security-flow .compare-security-flow-heading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin: 0 auto clamp(30px, 4vw, 44px);
+  text-align: center;
+}
+.compare-page .compare-security-flow .compare-security-flow-heading h2 {
+  flex: none;
+  width: min(100%, 1120px);
+  margin: 0 0 10px;
+  color: #f7f8fc;
+  font-size: clamp(2.5rem, 4.3vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -.055em;
+  line-height: 1.05;
+  text-transform: none;
+  text-wrap: balance;
+}
+.compare-page .compare-security-flow .compare-security-flow-heading .compare-section-subtitle {
+  margin: 0;
+  max-width: 780px;
+  color: #a9bdd0;
+  font-size: clamp(.88rem, 1.3vw, 1.05rem);
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.5;
+  text-align: center;
+}
+/* Old inline side rules and the redundant amber subheading are not shown. */
+.compare-page .compare-security-flow .compare-security-flow-heading > .compare-security-flow-rule,
+.compare-page .compare-security-flow .compare-security-flow-intro {
+  display: none;
+}
+@media (max-width: 700px) {
+  .compare-page .compare-security-flow .compare-security-flow-heading h2 {
+    font-size: clamp(2.1rem, 8vw, 3rem);
+    letter-spacing: -.055em;
+    line-height: 1.08;
+  }
+}
+
+/* Status / Right Now section divider — above the title, not beside it. */
+.compare-page .compare-security-flow .compare-security-flow-heading {
+  position: relative;
+  padding-top: clamp(34px, 4vw, 54px);
+  margin-bottom: clamp(26px, 3.5vw, 42px);
+}
+.compare-page .compare-security-flow .compare-security-flow-heading::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,132,30,.65) 20%, rgba(255,255,255,.22) 50%, rgba(255,132,30,.65) 80%, transparent 100%);
+  pointer-events: none;
+}
+.compare-page .compare-security-flow .compare-security-flow-heading h2 {
+  font-size: clamp(2.5rem, 4.3vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -.055em;
+  line-height: 1.05;
+}
+@media (max-width: 700px) {
+  .compare-page .compare-security-flow .compare-security-flow-heading h2 {
+    font-size: clamp(2.1rem, 8vw, 3rem);
+  }
+}
+
+/* Only the verdict text and SVG glyphs use orange.
+   Keep the original panel, icon tile backgrounds and borders. */
+.compare-page .compare-security-flow-result-copy strong,
+.compare-page .compare-security-flow-result-icon,
+.compare-page .compare-security-flow-card-mandate .compare-security-flow-result-icon {
+  color: #ff9b47;
+}
+.compare-page .compare-security-flow-result-icon svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+}

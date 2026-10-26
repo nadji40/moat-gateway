@@ -1,0 +1,830 @@
+/* Ubuntu typography — scoped to MOAT Tests only. */
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap');
+
+.tests-page,
+.tests-page button,
+.tests-page input,
+.tests-page textarea,
+.tests-page select {
+  font-family: 'Ubuntu', sans-serif;
+}
+
+/* Preserve the technical monospace readings and code. */
+.tests-page .tests-mono,
+.tests-page .tests-ms,
+.tests-page .tests-reasons code,
+.tests-page .tests-summary--radial .tests-summary-copy strong {
+  font-family: var(--mono, monospace);
+}
+
+.tests-page { text-align:left; min-height:75vh; padding-bottom:90px }
+
+html[dir="rtl"] .tests-page { text-align:right }
+
+.tests-hero { padding-block:75px 52px; text-align:center }
+
+.tests-hero h1 { max-width:850px; margin:10px auto 20px }
+
+.tests-hero .lede { max-width:650px; margin:0 auto; color:var(--ink-2) }
+
+.tests-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-top:28px }
+
+.tests-actions .btn { display:inline-flex; align-items:center; gap:9px; cursor:pointer }
+
+.tests-actions .btn:disabled { opacity:.55; cursor:wait }
+
+.tests-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; align-items:stretch }
+
+.tests-card { padding:24px; gap:17px; min-width:0; min-height:330px; border-radius:22px; }
+
+.tests-card-header { display:flex; gap:15px; align-items:flex-start }
+
+.tests-icon { flex:0 0 44px; width:44px; height:44px; border-radius:14px; display:grid; place-items:center; background:rgba(255,255,255,.065); color:var(--orange-l) }
+
+.tests-family-control .tests-icon {color:var(--green-l)}
+
+.tests-family-provenance .tests-icon {color:var(--red-l)}
+
+.tests-family-mandate .tests-icon {color:var(--yellow-l)}
+
+.tests-family-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.13em; color:var(--ink-3); font-weight:700 }
+
+.tests-card h2 { font-size:1.12rem; line-height:1.3; margin:8px 0 }
+
+.tests-card-header p { font-size:.875rem; color:var(--ink-2); line-height:1.55 }
+
+.tests-scenario { font-size:.84rem; color:var(--ink-2) }
+
+.tests-scenario summary { cursor:pointer; font-weight:700; color:var(--ink); width:fit-content; }
+
+.tests-scenario dl { margin:16px 0 0; }
+
+.tests-scenario dt { font-weight:700; margin-top:13px; color:var(--ink-3) }
+
+.tests-scenario dd { margin:5px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+
+.tests-quote { border-inline-start:2px solid var(--line-2); padding-inline-start:12px }
+
+.tests-mono,.tests-ms { font-family:var(--mono); font-size:.8rem }
+
+.tests-note { margin:16px 0 0; line-height:1.6 }
+
+.tests-reasons { overflow-wrap:anywhere; font-size:.8rem; color:var(--ink-2); line-height:1.65 }
+
+.tests-reasons code { color:var(--orange-l) }
+
+.tests-error { padding:12px; font-size:.85rem; color:var(--red-l); overflow-wrap:anywhere }
+
+.tests-card-footer { margin-top:auto; display:flex; align-items:center; gap:12px; min-height:36px }
+
+.tests-pill { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:1px solid var(--line); border-radius:100px; font-size:.75rem; font-weight:700 }
+
+.tests-allow { color:var(--green-l) }.tests-deny { color:var(--red-l) }.tests-step_up { color:var(--yellow-l) }
+
+.tests-ms { color:var(--ink-3); margin-inline-start:auto }
+
+.tests-run { cursor:pointer; margin-inline-start:auto; border:1px solid var(--line-2); background:rgba(255,255,255,.07); border-radius:11px; color:var(--ink); height:36px; width:38px; display:grid; place-items:center }
+
+.tests-ms + .tests-run { margin-inline-start:0 }
+
+.tests-run:disabled { opacity:.55; cursor:wait }
+
+.tests-run:hover:not(:disabled) { background:rgba(255,255,255,.15) }
+
+.tests-spin {animation:tests-spin 1s linear infinite}@keyframes tests-spin {to{transform:rotate(360deg)}}
+
+.tests-summary { display:flex; flex-direction:row; justify-content:space-around; align-items:center; flex-wrap:wrap; padding:25px; gap:20px; margin-bottom:26px; border-radius:20px; position:relative; overflow:hidden }
+
+.tests-summary>div:not(.tests-progress) { display:grid; gap:3px; text-align:center }
+
+.tests-summary strong { font-family:var(--mono); font-size:1.5rem }.tests-summary small,.tests-summary-caption { font-size:.73rem; color:var(--ink-2) }.tests-bad { color:var(--red-l) }
+
+.tests-progress {position:absolute;top:0;left:0;height:3px;background:#ff7415;transition:width .25s}
+
+html[dir="rtl"] .tests-progress{left:auto;right:0}
+
+@media(max-width:1000px){.tests-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+@media(max-width:670px){.tests-grid{grid-template-columns:1fr}.tests-hero{padding-block:52px 35px}.tests-card{min-height:0}}
+
+
+
+
+
+/* Tests cards: reuse the real liquid-glass material and visual vocabulary
+
+   of the Status page, without touching the suite data or actions. */
+
+.tests-page .tests-card {
+
+  position: relative;
+
+  isolation: isolate;
+
+  border: 1px solid rgba(223, 230, 241, .18);
+
+  border-radius: 19px;
+
+  background: linear-gradient(120deg, rgba(18,24,32,.75), rgba(8,11,16,.70));
+
+  box-shadow: inset 0 1px rgba(255,255,255,.12);
+
+  padding: 22px;
+
+  transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease;
+
+}
+
+.tests-page .tests-card[data-glass-live] {
+
+  background: transparent !important;
+
+  border-color: transparent !important;
+
+  box-shadow: none !important;
+
+}
+
+.tests-page .tests-card:hover {
+
+  transform: translateY(-3px);
+
+  border-color: rgba(235,243,251,.44);
+
+}
+
+.tests-page .tests-card:focus-within {
+
+  outline: 2px solid rgba(224,231,238,.7);
+
+  outline-offset: 2px;
+
+}
+
+.tests-page .tests-icon {
+
+  flex: 0 0 52px;
+
+  width: 52px;
+
+  height: 52px;
+
+  border-radius: 14px;
+
+  background: rgba(0,107,73,.21);
+
+  border: 1px solid rgba(0,235,162,.25);
+
+  color: #00e5a3;
+
+}
+
+.tests-page .tests-family-provenance .tests-icon {
+
+  background: rgba(125,20,40,.2);
+
+  border-color: rgba(250,95,113,.28);
+
+  color: #ff5367;
+
+}
+
+.tests-page .tests-family-mandate .tests-icon {
+
+  background: rgba(129,86,41,.2);
+
+  border-color: rgba(255,159,26,.3);
+
+  color: #ff9f1a;
+
+}
+
+.tests-page .tests-family-replay .tests-icon {
+
+  background: rgba(40,76,125,.22);
+
+  border-color: rgba(110,172,255,.25);
+
+  color: #8dbdff;
+
+}
+
+.tests-page .tests-family-control .tests-icon {
+
+  background: rgba(0,107,73,.21);
+
+  border-color: rgba(0,235,162,.25);
+
+  color: #00e5a3;
+
+}
+
+.tests-page .tests-icon svg { filter: drop-shadow(0 0 7px currentColor); }
+
+.tests-page .tests-family-label { color:#b4bfcd; }
+
+.tests-page .tests-card h2 { color:#f4f7fa; }
+
+.tests-page .tests-card-header p { color:#a9b5c5; }
+
+.tests-page .tests-run {
+
+  border:1px solid rgba(255,255,255,.16);
+
+  background:rgba(35,41,49,.45);
+
+  border-radius:12px;
+
+  transition:background .2s ease,transform .2s ease;
+
+}
+
+.tests-page .tests-run:hover:not(:disabled) {
+
+  transform:translateY(-1px);
+
+  background:rgba(35,41,49,.8);
+
+}
+
+@media (prefers-reduced-motion:reduce) {
+
+  .tests-page .tests-card, .tests-page .tests-run { transition:none; }
+
+  .tests-page .tests-card:hover, .tests-page .tests-run:hover:not(:disabled) { transform:none; }
+
+}
+
+
+
+/* HERO — original MOAT typography, sizing, colors and buttons.
+
+   Shared site typography remains the source of truth. */
+
+
+
+/* Keep the dashboard result strip visually connected to the nine attacks.
+
+   shared.css uses \`section { padding-block: var(--sec) }\`, which otherwise
+
+   inserts a large blank zone INSIDE the Tests grid. */
+
+.tests-page .tests-grid {
+
+  padding-block: 0;
+
+  margin-block: 0;
+
+}
+
+.tests-page .tests-summary {
+
+  margin: 0 0 18px;
+
+  padding: 22px 24px;
+
+  min-height: 116px;
+
+  border: 1px solid rgba(223, 230, 241, .18);
+
+  border-radius: 19px;
+
+  background: linear-gradient(120deg, rgba(18,24,32,.75), rgba(8,11,16,.70));
+
+  box-shadow: inset 0 1px rgba(255,255,255,.12);
+
+}
+
+.tests-page .tests-summary[data-glass-live] {
+
+  background: transparent !important;
+
+  border-color: transparent !important;
+
+  box-shadow: none !important;
+
+}
+
+.tests-page .tests-summary strong {
+
+  color: #f4f7fa;
+
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+
+}
+
+.tests-page .tests-summary small,
+
+.tests-page .tests-summary-caption { color: #a9b5c5; font-size: .82rem; }
+
+.tests-page .tests-summary .tests-progress { z-index: 1; }
+
+@media (max-width: 670px) {
+
+  .tests-page .tests-summary { padding: 18px 14px; gap: 18px; margin-bottom: 16px; }
+
+}
+
+
+
+/* OPTION 3 — RADIAL PROGRESS. Only the suite summary is redesigned. */
+
+.tests-page .tests-summary.tests-summary--radial {
+
+  --radial-green: #00e5a3;
+
+  --radial-red: #ff536e;
+
+  --radial-amber: #ffb33e;
+
+  --radial-blue: #79aeff;
+
+  position: relative;
+
+  isolation: isolate;
+
+  display: block;
+
+  width: 100%;
+
+  min-height: 152px;
+
+  margin: 0 0 18px;
+
+  padding: 26px 20px 22px;
+
+  border-radius: 24px;
+
+  overflow: hidden;
+
+  background: linear-gradient(112deg, rgba(20,27,30,.65), rgba(8,12,18,.82));
+
+  border: 1px solid rgba(220,232,242,.2);
+
+  box-shadow: inset 0 1px rgba(255,255,255,.1), 0 14px 38px rgba(0,0,0,.22);
+
+}
+
+.tests-page .tests-summary--radial[data-glass-live] {
+
+  background: transparent !important;
+
+  border-color: transparent !important;
+
+  box-shadow: none !important;
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-rail {
+
+  position: absolute;
+
+  inset: 0 0 auto;
+
+  height: 4px;
+
+  z-index: 3;
+
+  background: rgba(255, 116, 21, .22);
+
+  opacity: .5;
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-rail-fill {
+
+  position: absolute;
+
+  left: 0;
+
+  top: 0;
+
+  height: 100%;
+
+  max-width: 100%;
+
+  background: #ff7415;
+
+  box-shadow: 0 0 10px rgba(255,116,21,.8), 0 0 22px rgba(255,116,21,.35);
+
+  transition: width .4s ease;
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-metrics {
+
+  position: relative;
+
+  z-index: 2;
+
+  display: grid;
+
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+
+  align-items: stretch;
+
+  width: 100%;
+
+  gap: 0;
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-metric {
+
+  --accent: var(--radial-green);
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: clamp(11px, 1.65vw, 24px);
+
+  min-width: 0;
+
+  min-height: 96px;
+
+  padding: 10px clamp(9px, 1.5vw, 22px);
+
+  border-inline-end: 1px solid rgba(199,222,236,.17);
+
+  text-align: start;
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-metric:last-child { border-inline-end: 0; }
+
+.tests-page .tests-summary--radial .metric-threat { --accent: var(--radial-red); }
+
+.tests-page .tests-summary--radial .metric-time { --accent: var(--radial-amber); }
+
+.tests-page .tests-summary--radial .metric-signed { --accent: var(--radial-blue); }
+
+.tests-page .tests-summary--radial .tests-summary-orbit {
+
+  display: grid;
+
+  place-items: center;
+
+  position: relative;
+
+  flex: 0 0 72px;
+
+  width: 72px;
+
+  height: 72px;
+
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+
+  border-radius: 50%;
+
+  background: radial-gradient(circle at 35% 25%, rgba(255,255,255,.1), transparent 47%),
+
+              radial-gradient(circle, color-mix(in srgb, var(--accent) 18%, transparent), rgba(7,12,18,.48) 72%);
+
+  color: var(--accent);
+
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 16%, transparent), inset 0 0 16px rgba(0,0,0,.35);
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-orbit::after {
+
+  content: '';
+
+  position: absolute;
+
+  inset: -7px;
+
+  border-radius: 50%;
+
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+
+  border-left-color: transparent;
+
+  border-bottom-color: transparent;
+
+  pointer-events: none;
+
+}
+
+.tests-page .tests-summary--radial.is-running .tests-summary-orbit::after { animation: tests-orbit-spin 3s linear infinite; }
+
+@keyframes tests-orbit-spin { to { transform: rotate(360deg); } }
+
+.tests-page .tests-summary--radial .tests-summary-copy {
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: flex-start;
+
+  min-width: 0;
+
+  gap: 6px;
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-copy strong {
+
+  color: #f7f9ff;
+
+  font-family: var(--mono);
+
+  font-size: clamp(1.18rem, 2.25vw, 1.9rem);
+
+  font-weight: 800;
+
+  letter-spacing: -.035em;
+
+  line-height: 1.1;
+
+  white-space: nowrap;
+
+}
+
+.tests-page .tests-summary--radial .tests-summary-copy .tests-bad { color: var(--radial-red); }
+
+.tests-page .tests-summary--radial .tests-summary-copy small,
+
+.tests-page .tests-summary--radial .tests-summary-signed {
+
+  font-size: clamp(.72rem, .9vw, .86rem);
+
+  color: #b8c4d0;
+
+  font-weight: 550;
+
+  line-height: 1.35;
+
+}
+
+@media (max-width: 1100px) {
+
+  .tests-page .tests-summary--radial .tests-summary-orbit { flex-basis: 55px; width: 55px; height: 55px; }
+
+  .tests-page .tests-summary--radial .tests-summary-metric { gap: 11px; padding-inline: 9px; }
+
+}
+
+@media (max-width: 780px) {
+
+  .tests-page .tests-summary--radial .tests-summary-metrics { grid-template-columns: repeat(2, minmax(0,1fr)); row-gap: 10px; }
+
+  .tests-page .tests-summary--radial .tests-summary-metric:nth-child(2) { border-inline-end: 0; }
+
+  .tests-page .tests-summary--radial .tests-summary-metric { justify-content: flex-start; }
+
+}
+
+@media (max-width: 420px) {
+
+  .tests-page .tests-summary--radial .tests-summary-orbit { flex-basis: 42px; width:42px; height:42px; }
+
+  .tests-page .tests-summary--radial .tests-summary-orbit svg { width: 20px; height: 20px; }
+
+  .tests-page .tests-summary.tests-summary--radial { padding-inline: 10px; }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .tests-page .tests-summary--radial.is-running .tests-summary-orbit::after { animation: none; }
+
+  .tests-page .tests-summary--radial .tests-summary-rail-fill { transition: none; }
+
+}
+
+
+
+
+
+/* RESULT-TINTED LIQUID GLASS CARDS
+
+   Dark charcoal base, with a restrained decision-colored glow.
+
+   The native liquid-glass renderer remains active and unobstructed. */
+
+.tests-page .tests-card {
+
+  --result-rgb: 100, 115, 131;
+
+  background:
+
+    radial-gradient(ellipse at 100% 0%, rgba(var(--result-rgb), .16), transparent 64%),
+
+    linear-gradient(125deg, rgba(13, 16, 22, .94), rgba(4, 6, 10, .90));
+
+  border-color: rgba(var(--result-rgb), .25);
+
+}
+
+.tests-page .tests-card.tests-result-deny { --result-rgb: 255, 83, 103; }
+
+.tests-page .tests-card.tests-result-allow { --result-rgb: 0, 229, 163; }
+
+.tests-page .tests-card.tests-result-step_up { --result-rgb: 255, 159, 26; }
+
+.tests-page .tests-card.tests-result-pending { --result-rgb: 105, 121, 140; }
+
+
+
+/* Tint the visual glass *without* replacing its WebGL surface. */
+
+.tests-page .tests-card[data-glass-live] {
+
+  background: transparent !important;
+
+  border-color: transparent !important;
+
+  box-shadow: none !important;
+
+}
+
+.tests-page .tests-card::before {
+
+  content: '';
+
+  position: absolute;
+
+  z-index: 0;
+
+  inset: 1px;
+
+  pointer-events: none;
+
+  border-radius: inherit;
+
+  background:
+
+    radial-gradient(ellipse at 94% 8%, rgba(var(--result-rgb), .18), transparent 60%),
+
+    linear-gradient(135deg, rgba(5, 7, 12, .34), rgba(0, 0, 0, .52));
+
+  opacity: .86;
+
+}
+
+.tests-page .tests-card > * {
+
+  position: relative;
+
+  z-index: 1;
+
+}
+
+.tests-page .tests-card:hover::before {
+
+  background:
+
+    radial-gradient(ellipse at 94% 8%, rgba(var(--result-rgb), .25), transparent 64%),
+
+    linear-gradient(135deg, rgba(5, 7, 12, .34), rgba(0, 0, 0, .48));
+
+}
+
+/* No dot markers or pseudo-markers on the orange progress track. */
+
+.tests-page .tests-summary--radial .tests-summary-rail-node { display: none !important; }
+
+
+/* ==========================================================
+   STATUS-STYLE SUMMARY DIVIDERS
+   Pure visual change: preserve liquid glass and result states.
+   ========================================================== */
+.tests-page .tests-summary--radial .tests-summary-metric {
+  position: relative;
+  border-inline-end: 0;
+}
+
+.tests-page .tests-summary--radial .tests-summary-metric:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  inset-inline-end: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(157, 183, 192, 0.44) 42%,
+    rgba(157, 183, 192, 0.36) 58%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* The two-column view has no divider after each row. */
+@media (max-width: 780px) {
+  .tests-page .tests-summary--radial .tests-summary-metric:nth-child(2)::after {
+    display: none;
+  }
+}
+
+/* Status RightNow original MOAT loader, scoped to Tests buttons. */
+.tests-moat-spin-mark {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  flex: none;
+  vertical-align: -0.15em;
+}
+.tests-moat-spin-arcs {
+  transform-box: view-box;
+  transform-origin: 141px 115px;
+  animation: tests-moat-turn 1.6s linear infinite;
+}
+.tests-moat-spin-arc {
+  animation: tests-moat-breathe 1.6s ease-in-out infinite;
+}
+.tests-moat-spin-dots {
+  transform-box: view-box;
+  transform-origin: 141px 115px;
+  animation: tests-moat-turn 3.2s linear infinite reverse;
+}
+@keyframes tests-moat-turn { to { transform: rotate(360deg); } }
+@keyframes tests-moat-breathe {
+  0% { stroke-dasharray: 6 94; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 70 30; stroke-dashoffset: -20; }
+  100% { stroke-dasharray: 6 94; stroke-dashoffset: -100; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tests-moat-spin-arcs, .tests-moat-spin-arc, .tests-moat-spin-dots { animation: none; }
+}
+
+
+/* ==========================================================
+   TESTS — TWO MOVING ORANGE BACKGROUND GLOWS
+   Scoped to Tests only; keep the liquid-glass surfaces clear.
+   ========================================================== */
+.tests-page {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.tests-page::before,
+.tests-page::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  display: block;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at center,
+    rgba(255, 116, 21, .55) 0%,
+    rgba(255, 116, 21, .32) 24%,
+    rgba(255, 116, 21, .14) 52%,
+    rgba(255, 116, 21, .04) 74%,
+    transparent 100%);
+  filter: blur(46px);
+  will-change: transform, opacity;
+}
+
+/* Medium glow travelling from upper-left toward the center/right. */
+.tests-page::before {
+  width: clamp(280px, 37vw, 490px);
+  height: clamp(280px, 37vw, 490px);
+  top: 7%;
+  left: -9%;
+  animation: tests-orange-glow-one 27s ease-in-out infinite alternate;
+}
+
+/* Slightly smaller glow wandering through the lower half. */
+.tests-page::after {
+  width: clamp(240px, 30vw, 390px);
+  height: clamp(240px, 30vw, 390px);
+  top: 57%;
+  right: -7%;
+  animation: tests-orange-glow-two 32s ease-in-out infinite alternate;
+}
+
+@keyframes tests-orange-glow-one {
+  0%   { transform: translate3d(0, 0, 0) scale(.9); opacity: .6; }
+  32%  { transform: translate3d(42vw, 22vh, 0) scale(1.08); opacity: .92; }
+  67%  { transform: translate3d(65vw, 67vh, 0) scale(.96); opacity: .65; }
+  100% { transform: translate3d(18vw, 110vh, 0) scale(1.07); opacity: .85; }
+}
+
+@keyframes tests-orange-glow-two {
+  0%   { transform: translate3d(0, 0, 0) scale(1.02); opacity: .77; }
+  30%  { transform: translate3d(-35vw, -35vh, 0) scale(.92); opacity: .57; }
+  65%  { transform: translate3d(-61vw, 23vh, 0) scale(1.12); opacity: .9; }
+  100% { transform: translate3d(-15vw, -70vh, 0) scale(.95); opacity: .64; }
+}
+
+@media (max-width: 670px) {
+  .tests-page::before { width: 290px; height: 290px; left: -100px; }
+  .tests-page::after { width: 250px; height: 250px; right: -95px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tests-page::before,
+  .tests-page::after {
+    animation: none;
+    opacity: .38;
+    will-change: auto;
+  }
+}

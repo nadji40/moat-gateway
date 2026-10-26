@@ -8,13 +8,14 @@ const Compare = lazy(() => import('../pages/Compare/Compare'))
 const Team = lazy(() => import('../pages/Team/Team'))
 const Docs = lazy(() => import('../pages/Docs/Docs'))
 const Dashboard = lazy(() => import('../pages/Dashboard/Dashboard'))
-
+const Tests = lazy(() => import('../pages/Tests/Tests'))
 const pages: Record<string, ComponentType> = {
   '/compare': Compare,
   '/team': Team,
   '/docs': Docs,
   '/dashboard': Dashboard,
   '/status': Status,
+  '/tests': Tests, 
 }
 
 export default function App() {
