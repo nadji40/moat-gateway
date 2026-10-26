@@ -48,9 +48,11 @@ describe('approved homepage integration', () => {
 
     const selector = 'header.hero, section, footer';
 
+    // The demo video (#demo) was added after the approved page; it has no
+    // counterpart there to compare against.
     const sections = [
       ...container.querySelectorAll(selector)
-    ];
+    ].filter(node => node.id !== 'demo');
 
     const approved = [
       ...original.querySelectorAll(selector)
