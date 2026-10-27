@@ -40,7 +40,7 @@ import { Card } from '../../components/ui/glass/card'
 
 import { LiquidGlassProvider } from '../../components/ui/liquid/liquid-glass-provider'
 
-import './Status.css'
+import "../../styles/Status.css";
 
 type UptimeDay = {
 
