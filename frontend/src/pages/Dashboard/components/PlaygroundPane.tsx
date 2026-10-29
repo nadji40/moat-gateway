@@ -447,7 +447,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
                           >
                             <img
                               alt={cur}
-                              src={`/console-assets/currency/${cur.toLowerCase()}.svg`}
+                              src={`/console-assets/currency/${cur.toLowerCase()}.svg?v=sama`}
                             />
                           </button>
                         ))}
@@ -526,7 +526,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
                           >
                             <img
                               alt={cur}
-                              src={`/console-assets/currency/${cur.toLowerCase()}.svg`}
+                              src={`/console-assets/currency/${cur.toLowerCase()}.svg?v=sama`}
                             />
                           </button>
                         ))}
@@ -664,7 +664,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
                         >
                           <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <img
-                              src={`/console-assets/${chain.icon}.svg`}
+                              src={`/console-assets/${chain.icon}.svg?v=sama`}
                               width={16}
                               height={16}
                               alt=""
@@ -721,7 +721,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
                                 >
                                   <span className="opt-icon">
                                     <img
-                                      src={`/console-assets/${c.icon}.svg`}
+                                      src={`/console-assets/${c.icon}.svg?v=sama`}
                                       alt=""
                                     />
                                   </span>
@@ -751,7 +751,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
                       <div className="fgroup-label a0">{L('Asset', 'الأصل')}</div>
                       <div className="asset-chip" id="asset">
                         <img
-                          src={`/console-assets/${chain.icon}.svg`}
+                          src={`/console-assets/${chain.icon}.svg?v=sama`}
                           alt={chain.asset}
                         />
                         <span className="sym">{chain.asset}</span>
