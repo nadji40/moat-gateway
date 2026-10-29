@@ -449,10 +449,14 @@
   padding: 10px 16px;
 }
 .shell .btn-dark:hover { background: var(--red-hover); border-color: var(--red-line); }
-/* sign-out icon: arrow nudges left on hover — "exiting" the door */
+/* sign-out icon: the arrow leaves the door toward the reading direction and
+   nudges that way on hover. RTL mirrors the glyph (see the dir="rtl" rules),
+   so its hover keeps the mirror and nudges the other way. */
 .shell .sign-out img { transition: transform .22s ease; }
 .shell .sign-out:hover img,
-.shell .sign-out:focus-visible img { transform: translateX(-3px); }
+.shell .sign-out:focus-visible img { transform: translateX(3px); }
+html[dir="rtl"] .shell .sign-out:hover img,
+html[dir="rtl"] .shell .sign-out:focus-visible img { transform: scaleX(-1) translateX(3px); }
 .shell .btn-danger-outline {
   background: var(--red-hover);
   border: 1px solid var(--red-line);
