@@ -259,12 +259,12 @@ Built by a team of ten for Thirduni Cohort 1, October 2026.
 | Name | Role | What they actually did |
 |---|---|---|
 | **Nadji Sabri Khentit** | Founder, lead engineer | Started Moat. The gateway, the policy engine, the evidence chain, the intent reader, the four rails, the arena runner and analysis, the Stripe sandbox, and the server it runs on |
-| **Khawla Hammouda** | Front-end engineer | The React site: homepage, compare page and docs styling (PRs #1, #3) |
+| **Khawla Hammouda** | Front-end engineer | The React site: homepage, compare page and docs styling (PRs #1, #3), the Tests page (PR #7), and the responsive pass across Status, Docs and the footer, with the stylesheets reorganised (PR #8) |
 | **Rayan Yasser Ouanoughi** | Design and front-end | The React dashboard and its redesign, including the phone layout (PR #5) |
 | **Adam Belkadi** | Security engineer | Keys, permissions, workspace isolation and the dashboard's access model |
 | **Rofeida Imoussaine** | Security engineer | Attacks on the payment checks: the whitespace-folded payee names (PR #2) and the cross-session max-payments attack (PR #4), which found and led to a fix of a real gateway bug |
 | **Zahra Boucheta** | Data and ML | The intent reader evaluation: which model, which drafter depth is fastest on which hardware (`research/intent-reader`, co-author on 50b764d) |
-| **Redwan Benmoussa** | Adversarial data | The attack corpus and the refusal/reference-number cases the reader had to learn from his corpus (co-author on 267139f) |
+| **Redwan Benmoussa** | Adversarial data, outreach | The attack corpus and the refusal/reference-number cases the reader had to learn from his corpus (co-author on 267139f); and the outreach: reaching payment and fraud practitioners for proof-of-concept conversations and bringing their feedback back to the design |
 | **Dhoha Boumediene** | Policy data | The spending-limit and currency rules: one approval is one payment, split payments stop at the session total, every currency valued against the limit, over-precise amounts refused (co-author on dc4cbbf, cbf4f60, 36fa3b8, 6beec30, 1cfe8b7) |
 | **Meriem Sara Aounallah** | Language data | How Moat reads amounts and currencies the way people write them: a currency the user did not name is held, trailing zeros are not precision, a currency must be borne out by the message (co-author on 4a02c30, 3b15e7a, 36fa3b8, 1cfe8b7) |
 | **Mounya Hasni** | Research analyst | Regulation and market research: what the rules require, and who needs this |
@@ -299,10 +299,8 @@ decision, not missing code:
 Real money starts with the first pilot, under a capped limit, after the
 compliance review from our research and an external security review.
 
-Also not done yet:
-
-- Policies are YAML files edited by hand; there is no policy editor in the dashboard.
-- The intent reader is one model call per request; its accuracy across Arabic dialects is being measured, not yet published.
+Also not done yet: the intent reader is one model call per request, and its
+accuracy across Arabic dialects is being measured, not yet published.
 
 ## Jurisdictions
 
