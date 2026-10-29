@@ -81,13 +81,17 @@ groups who want this now:
   customers expect an answer in seconds, and they want the agent to pay
   suppliers at the same speed without a person approving each payment. They
   are also the quickest to say what one payment to the wrong party would cost
-  them. These are the first pilot candidates: small volumes, a capped limit,
-  local rails, and a founder they can call.
+  them. They are pilot candidates: small volumes, a capped limit, local
+  rails, and a founder they can call.
 - **Agentic trading and treasury, worldwide**: agents that move funds on
   chain or between accounts at machine pace. The need already exists; the
   moment an agent can transfer, something has to hold it to what was
   approved. Moat's EVM and Solana rails and the on-chain co-signer
   ([ADR 0010](docs/adr/0010-on-chain-co-signer.md)) are built for this.
+
+The first pilots are planned mainly in Saudi Arabia, where companies pay
+suppliers in riyals and across the Gulf; that is why the live site runs a
+riyal policy.
 
 Further out, the same failure shows up wherever an agent is allowed to pay.
 Each row is a group with the need today, the way it goes wrong for them, and
@@ -306,9 +310,9 @@ Moat is an Algerian team building for a global market. The gateway reads a
 request in whatever language it was written, values every currency against
 one limit, and sits in front of card, bank and chain rails wherever a
 licensed provider exists; nothing in the design is tied to one country. The
-first pilots are with operators in Algeria, where the team is, and the live
-site ships with a riyal policy and an Arabic interface beside the English
-one because that is the region nearest to us, not the limit of the product.
+first pilots are planned mainly in Saudi Arabia, which is why the live site
+ships with a riyal policy and an Arabic interface beside the English one.
+The team is in Algeria. Neither place is the limit of the product.
 
 What Moat is, legally, is narrow on purpose. It does not hold funds, does not
 move them, and is not a payment provider. It decides whether an agent's
@@ -364,8 +368,8 @@ education, charities, public bodies. Using it commercially, including inside
 a product or service that makes money, needs a separate licence from the
 copyright holder; write to license@moatgateway.dpdns.org.
 
-Why noncommercial, for now: the whole codebase is public so that the
-Thirduni judges, and anyone else, can read and run all of it. The
+Why noncommercial, for now: the whole codebase is public so that anyone
+can read and run all of it. The
 noncommercial licence makes sure that while it is, nobody can take it and
 sell it. It is not the business model. Pilots get written commercial terms,
 and the licence will be revisited after the programme.
