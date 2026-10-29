@@ -235,13 +235,18 @@ the intent API and the authenticated deployment are in
 
 ## Tech stack
 
-- **Gateway and core:** Rust (tokio, axum, tokio-postgres, ed25519-dalek, sha2, serde), PostgreSQL
-- **Arena, sandbox and adapters:** TypeScript on Node 22, pnpm workspaces, MCP SDK, OpenAI Agents SDK for the real-model runs, Stripe (test mode), Base Sepolia (EIP-712 guarded wallet), Solana devnet
-- **Dashboard and site:** React, Vite, Tailwind, Vitest; English and Arabic
-- **Intent reader:** Claude (Anthropic API) in production; Gemma on llama-server locally; any OpenAI-compatible API by config
-- **Analysis:** Python 3.11, Wilson intervals, run manifests committed beside the data
-- **Infrastructure:** systemd, nginx, certbot, GitHub Actions
-- **AI tools used to build it:** Claude Code throughout; Claude and GPT models as the agents under test
+Each choice, and why it won.
+
+- **Rust for the gateway and core** (tokio, axum, tokio-postgres, ed25519-dalek, sha2, serde). The check sits on the payment path, so it has to cost nothing: it adds 1.4 to 1.9 ms. A garbage-collected runtime pauses mid-request; Rust does not, and its compiler rules out the memory and data-race bugs that a program deciding whether money moves cannot afford. The same crate signs the evidence chain and talks to the database, so there is one language on the trusted path.
+- **PostgreSQL for everything that must survive a restart.** Workspaces, keys, approvals, the payment ledger and the evidence chain. "One approval pays once" is a transaction and a unique index, not a convention, and it has to hold through a crash or a repeated request. An embedded file database would do for one process on one machine, but a ledger that an auditor queries and several workspaces share belongs in a server database that payment and audit teams already know how to back up and inspect. Keys are stored as SHA-256 hashes only ([ADR 0007](docs/adr/0007-durable-tenant-state.md)).
+- **MCP as the protocol.** It is how Claude, OpenAI and Cursor agents already reach their tools, so Moat is one more MCP server the agent connects to, and the provider never knows it is there. A protocol of our own would have meant an adapter per agent framework ([ADR 0002](docs/adr/0002-mcp-protocol-handling.md)).
+- **Claude for the intent reader, Gemma as the local option.** Turning "pay Al Noor Supplies 480 SAR for invoice 1043" into payee, amount and currency, in whatever language and dialect the user wrote it, is the one job that needs a language model. Claude (Anthropic API) does it most accurately in production; Gemma on llama-server runs on the customer's own machine where the text must not leave it; any OpenAI-compatible API works by config. When the reader is unsure, the payment is held, never guessed.
+- **TypeScript on Node 22 for the arena, sandbox and adapters** (pnpm workspaces, MCP SDK, OpenAI Agents SDK for the real-model runs). The MCP SDK, the agent SDKs, Stripe's SDK and the chain libraries are all TypeScript-first, so the provider adapters and the attack corpus are written in the language the ecosystem is, and the same adapters drive the public sandbox.
+- **React, Vite, Tailwind and Vitest for the dashboard and site.** A single-page app with nothing to render on a server; Vite keeps the build fast, and the Vitest fixtures keep the approved pages from drifting. English and Arabic, because the first users write Arabic.
+- **Stripe test mode, Base Sepolia and Solana devnet as the test rails.** Stripe because it is the card rail most teams already hold keys for; the testnets because an agent that can sign a transfer is the clearest place to show a co-signer refusing it. All three are test networks: no real money has moved (see [Jurisdictions](#jurisdictions)).
+- **Python 3.11 for the analysis.** Wilson intervals over the arena runs, with the run manifests committed beside the data, so every number in this README can be recomputed.
+- **systemd, Apache httpd, certbot, GitHub Actions.** One binary and one database do not need an orchestrator, and a pilot that must run in-country fits on one machine the customer controls. CI runs the same `scripts/verify.sh` the pre-push hook runs.
+- **AI tools used to build it:** Claude Code throughout; Claude and GPT models as the agents under test.
 
 ## Team
 
@@ -294,6 +299,53 @@ Also not done yet:
 
 - Policies are YAML files edited by hand; there is no policy editor in the dashboard.
 - The intent reader is one model call per request; its accuracy across Arabic dialects is being measured, not yet published.
+
+## Jurisdictions
+
+Moat is an Algerian team building for the Arabic-speaking market first: the
+policy the live site runs is in riyals, the dashboard is in Arabic, the
+intent reader is measured on Arabic dialects, and the first pilots are with
+operators in Algeria, where the team is. The market we are building toward is
+the Gulf and the wider region, where a company pays suppliers in three
+currencies and expects its agents to answer in seconds.
+
+What Moat is, legally, is narrow on purpose. It does not hold funds, does not
+move them, and is not a payment provider. It decides whether an agent's
+payment request may reach a party that is licensed to move the money: Stripe,
+a bank, a payment company, a wallet the customer already holds. The regulated
+activity stays with the regulated party; Moat is a control the customer puts
+in front of it, and the customer's own obligations are unchanged.
+
+Three things follow from that, and they are built in rather than promised:
+
+- **Nothing is allowed that a person has not authorized.** That is the whole
+  product, and it does not depend on where the request comes from. A payment
+  that does not match an approval is refused in every jurisdiction alike.
+- **A rail that is not enabled is not reachable.** Each workspace's policy
+  lists the payment tools an agent may call; anything else is hidden from the
+  agent and refused as `unclassified-tool`, and a missing or broken policy
+  fails closed. A deployment in a country where a rail is not permitted does
+  not list it, and no agent can route around that.
+- **It runs where the data must stay.** Moat is one binary and one PostgreSQL
+  database. A customer can run it entirely on their own machines, in their own
+  country, under that country's rules; nothing has to pass through a server we
+  operate. The one outbound call, the intent reader's model, can be pointed at
+  a local model so the user's text never leaves the machine.
+
+On crypto specifically: the EVM and Solana rails exist because an agent that
+can sign a transfer is the clearest case of the problem, and the on-chain
+co-signer ([ADR 0010](docs/adr/0010-on-chain-co-signer.md)) is the strongest
+form of the check. Everything in this repository ran on Base Sepolia and
+Solana devnet: test networks, test tokens, no real asset. There is no token,
+no exchange and no custody in Moat, and those rails are enabled only where the
+customer's jurisdiction allows them. The product is about payments in general;
+cards and bank transfers are where most of the money, and most of the fraud,
+is ([ADR 0008](docs/adr/0008-settlement-rails.md)).
+
+None of this is a compliance certification. Each pilot starts with the
+regulatory review from the team's research for that country, and real money
+starts under a capped limit after it (see [Honest status](#honest-status)).
+
 ## Security
 
 Moat is a security product, so it is reviewed like one.
