@@ -242,7 +242,7 @@ Each choice, and why it won.
 - **MCP as the protocol.** It is how Claude, OpenAI and Cursor agents already reach their tools, so Moat is one more MCP server the agent connects to, and the provider never knows it is there. A protocol of our own would have meant an adapter per agent framework ([ADR 0002](docs/adr/0002-mcp-protocol-handling.md)).
 - **Claude for the intent reader, Gemma as the local option.** Turning "pay Al Noor Supplies 480 SAR for invoice 1043" into payee, amount and currency, in whatever language and dialect the user wrote it, is the one job that needs a language model. Claude (Anthropic API) does it most accurately in production; Gemma on llama-server runs on the customer's own machine where the text must not leave it; any OpenAI-compatible API works by config. When the reader is unsure, the payment is held, never guessed.
 - **TypeScript on Node 22 for the arena, sandbox and adapters** (pnpm workspaces, MCP SDK, OpenAI Agents SDK for the real-model runs). The MCP SDK, the agent SDKs, Stripe's SDK and the chain libraries are all TypeScript-first, so the provider adapters and the attack corpus are written in the language the ecosystem is, and the same adapters drive the public sandbox.
-- **React, Vite, Tailwind and Vitest for the dashboard and site.** A single-page app with nothing to render on a server; Vite keeps the build fast, and the Vitest fixtures keep the approved pages from drifting. English and Arabic, because the first users write Arabic.
+- **React, Vite, Tailwind and Vitest for the dashboard and site.** A single-page app with nothing to render on a server; Vite keeps the build fast, and the Vitest fixtures keep the approved pages from drifting. English and Arabic, with the right-to-left layout under test rather than bolted on.
 - **Stripe test mode, Base Sepolia and Solana devnet as the test rails.** Stripe because it is the card rail most teams already hold keys for; the testnets because an agent that can sign a transfer is the clearest place to show a co-signer refusing it. All three are test networks: no real money has moved (see [Jurisdictions](#jurisdictions)).
 - **Python 3.11 for the analysis.** Wilson intervals over the arena runs, with the run manifests committed beside the data, so every number in this README can be recomputed.
 - **systemd, Apache httpd, certbot, GitHub Actions.** One binary and one database do not need an orchestrator, and a pilot that must run in-country fits on one machine the customer controls. CI runs the same `scripts/verify.sh` the pre-push hook runs.
@@ -302,12 +302,13 @@ Also not done yet:
 
 ## Jurisdictions
 
-Moat is an Algerian team building for the Arabic-speaking market first: the
-policy the live site runs is in riyals, the dashboard is in Arabic, the
-intent reader is measured on Arabic dialects, and the first pilots are with
-operators in Algeria, where the team is. The market we are building toward is
-the Gulf and the wider region, where a company pays suppliers in three
-currencies and expects its agents to answer in seconds.
+Moat is an Algerian team building for a global market. The gateway reads a
+request in whatever language it was written, values every currency against
+one limit, and sits in front of card, bank and chain rails wherever a
+licensed provider exists; nothing in the design is tied to one country. The
+first pilots are with operators in Algeria, where the team is, and the live
+site ships with a riyal policy and an Arabic interface beside the English
+one because that is the region nearest to us, not the limit of the product.
 
 What Moat is, legally, is narrow on purpose. It does not hold funds, does not
 move them, and is not a payment provider. It decides whether an agent's
