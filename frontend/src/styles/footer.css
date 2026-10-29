@@ -1,10 +1,15 @@
 /* Shared footer layout used by React-managed pages. */
 footer.foot {
   padding-block: 48px 60px;
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  max-width: 100%;
+  overflow-x: clip;
 }
 footer.foot .wrap {
   gap: 28px;
   align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .fcols {
@@ -23,6 +28,7 @@ footer.foot .wrap {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-3);
+  overflow-wrap: anywhere;
 }
 .fcols a {
   display: block;
@@ -47,16 +53,18 @@ footer.foot .wrap {
   gap: 16px;
   min-width: 0;
 }
-.fbrand .mark { width: 36px; height: 36px; }
+.fbrand .mark { width: 36px; height: 36px; flex: none; }
 .fbrand p {
-  max-width: 34ch;
+  max-width: min(34ch, 100%);
   margin: 0;
   color: var(--ink-2);
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .footer-social {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
 }
@@ -64,6 +72,7 @@ footer.foot .wrap {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
+  flex: none;
   width: 42px;
   height: 42px;
   padding: 0 !important;
@@ -108,7 +117,9 @@ footer.foot .wrap {
   color: var(--ink-3);
   font-size: 0.8125rem;
 }
+.fbase > * { min-width: 0; overflow-wrap: anywhere; }
 
+/* ---- tablets and phones: 2 x 2 grid ---- */
 @media (max-width: 1024px) {
   .fcols {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -124,19 +135,19 @@ footer.foot .wrap {
     align-items: flex-start;
     text-align: left;
   }
-  .fbase > span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
 }
+
+/* ---- phones ---- */
 @media (max-width: 560px) {
+  footer.foot { padding-block: 36px 44px; padding-bottom: calc(44px + env(safe-area-inset-bottom, 0px)); }
   .fcols { gap: 24px 16px; }
-  .fbrand p { max-width: 25ch; }
+  .fbrand p { max-width: min(25ch, 100%); }
   .fbase { flex-direction: column; }
 }
+
 @media (max-width: 400px) {
   .fcols { gap: 22px 14px; }
-  .fbrand p { max-width: 22ch; }
+  .fbrand p { max-width: min(22ch, 100%); }
 }
 
 /* Right to left (Arabic). */

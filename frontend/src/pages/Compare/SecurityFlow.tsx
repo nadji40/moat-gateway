@@ -1,7 +1,7 @@
 import { Card } from '../../components/ui/glass/card'
 import { L } from '../../i18n'
 import { Play, ScanSearch, ShieldOff } from 'lucide-react'
-import './security-flow.css'
+import '../../styles/security-flow.css'
 
 type Kind = 'mandate' | 'classifier' | 'gateway'
 

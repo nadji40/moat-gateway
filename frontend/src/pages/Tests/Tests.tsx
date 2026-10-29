@@ -4,7 +4,7 @@ import { Card } from '../../components/ui/glass/card'
 import { LiquidGlassProvider } from '../../components/ui/liquid/liquid-glass-provider'
 import Footer from '../../components/layout/Footer'
 import { L } from '../../i18n'
-import './Tests.css'
+import '../../styles/Tests.css'
 
 /** Exact SVG geometry and timing from Status/RightNow.tsx. */
 function MoatWorkingMark() {

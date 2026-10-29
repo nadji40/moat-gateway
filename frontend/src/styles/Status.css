@@ -1997,3 +1997,272 @@ a[aria-disabled="true"] {
     margin-bottom: 20px;
   }
 }
+
+
+/* ==========================================================
+   STATUS — MOBILE VIEWPORT / HORIZONTAL OVERFLOW FIX
+   Keep horizontal scrolling ONLY inside the 30-day strip.
+   ========================================================== */
+@media (max-width: 900px) {
+  .status-pulse-page {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-inline: auto !important;
+    padding-inline: clamp(12px, 4vw, 22px) !important;
+    overflow-x: clip !important;
+  }
+  .status-pulse-page > .status-pulse-section,
+  .status-pulse-page > .rn-section,
+  .status-pulse-page .status-pulse-heading,
+  .status-pulse-page .op-board,
+  .status-pulse-page .op-board-top,
+  .status-pulse-page .op-strip-side,
+  .status-pulse-page .op-history,
+  .status-pulse-page .op-history-glass,
+  .status-pulse-page .rn-heading,
+  .status-pulse-page .rn-metrics {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  .status-pulse-page .status-pulse-heading {
+    margin-inline: auto !important;
+    padding-inline: 0 !important;
+    overflow-wrap: anywhere;
+  }
+  .status-pulse-page .status-pulse-heading h1 {
+    font-size: clamp(1.85rem, 8vw, 2.7rem) !important;
+    max-width: 100%;
+    text-wrap: balance;
+  }
+  .status-pulse-page .status-pulse-heading p {
+    max-width: 100%;
+    margin-inline: auto;
+    line-height: 1.45;
+    text-wrap: pretty;
+  }
+  .status-pulse-page .op-board {
+    margin-inline: 0 !important;
+    padding: clamp(12px, 3.5vw, 20px) !important;
+  }
+  .status-pulse-page .op-board > .op-window-shoulder {
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .status-pulse-page .op-window-card {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .status-pulse-page .op-window-copy strong {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    font-size: clamp(9px, 2.8vw, 11px) !important;
+  }
+  .status-pulse-page .op-window-shoulder > .op-key {
+    min-width: 0;
+    flex-wrap: wrap !important;
+    white-space: normal !important;
+    font-size: clamp(9px, 2.5vw, 11px);
+  }
+  .status-pulse-page .op-board-top {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 14px !important;
+  }
+  .status-pulse-page .op-gauge-shell {
+    width: 150px !important;
+    height: 150px !important;
+    flex: 0 0 150px !important;
+    max-width: 100%;
+  }
+  .status-pulse-page .op-strip-wrap {
+    box-sizing: border-box !important;
+    display: block;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .status-pulse-page .op-strip {
+    width: max-content;
+    min-width: 520px !important;
+  }
+  .status-pulse-page .op-strip-ends {
+    min-width: 0;
+    width: 100%;
+  }
+  .status-pulse-page .op-record {
+    grid-template-columns: 38px minmax(0, 1fr) max-content !important;
+    max-width: 100% !important;
+    column-gap: 8px !important;
+  }
+  .status-pulse-page .op-record-icon { grid-column: 1 !important; }
+  .status-pulse-page .op-record-date { grid-column: 2 !important; min-width: 0 !important; }
+  .status-pulse-page .op-record-value { grid-column: 3 !important; font-size: clamp(.84rem, 3.6vw, 1rem) !important; }
+  .status-pulse-page .op-record-date strong,
+  .status-pulse-page .op-record-date small { overflow-wrap: anywhere; }
+  .status-pulse-page nav.status-pagination {
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    justify-content: safe center !important;
+  }
+  .status-pulse-page .rn-section,
+  .status-pulse-page .rn-heading,
+  .status-pulse-page .rn-metrics,
+  .status-pulse-page .rn-panel,
+  .status-pulse-page .rn-endpoint {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+@media (max-width: 430px) {
+  .status-pulse-page { padding-inline: 12px !important; }
+  .status-pulse-page .op-board { padding: 12px 10px !important; }
+  .status-pulse-page .op-record { padding: 8px 7px !important; column-gap: 6px !important; }
+  .status-pulse-page .op-strip { min-width: 480px !important; }
+}
+/* Preserve the direction of the timeline and daily records in Arabic. */
+@media (max-width: 900px) {
+  .status-pulse-page[dir="rtl"] .op-record {
+    grid-template-columns: 38px minmax(0, 1fr) max-content !important;
+  }
+}
+
+
+/* STATUS — compact shoulder reporting window on tablets.
+   Preserve desktop composition; do not stack/reposition this card. */
+@media (min-width: 901px) and (max-width: 1199px) {
+  .status-pulse-page .op-board > .op-window-shoulder {
+    position: absolute !important;
+    top: 16px !important;
+    right: 16px !important;
+    bottom: auto !important;
+    left: auto !important;
+    width: 154px !important;
+    max-width: calc(100% - 32px) !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    gap: 5px !important;
+    transform: none !important;
+  }
+  .status-pulse-page .op-window-card {
+    width: 100% !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    padding: 4px 6px !important;
+    gap: 5px !important;
+    border-radius: 12px !important;
+  }
+  .status-pulse-page .op-window-icon {
+    width: 26px !important;
+    height: 26px !important;
+    flex-basis: 26px !important;
+    border-radius: 8px;
+  }
+  .status-pulse-page .op-window-icon svg { width: 15px; height: 15px; }
+  .status-pulse-page .op-window-copy { gap: 3px !important; }
+  .status-pulse-page .op-window-copy small {
+    font-size: 7px !important;
+    letter-spacing: 0 !important;
+  }
+  .status-pulse-page .op-window-copy strong {
+    font-size: 7px !important;
+    letter-spacing: -0.025em !important;
+  }
+  .status-pulse-page .op-window-shoulder > .op-key {
+    font-size: 8px !important;
+    gap: 4px !important;
+    justify-content: center !important;
+  }
+  .status-pulse-page[dir="rtl"] .op-board > .op-window-shoulder {
+    right: auto !important;
+    left: 16px !important;
+  }
+}
+
+
+/* ============================================================
+   iPad Mini / small-tablet refinements (701px–900px)
+   Fit all 30 timeline days and keep all three live metrics
+   aligned in one row. Desktop/mobile styling is untouched.
+   ============================================================ */
+@media (min-width: 701px) and (max-width: 900px) {
+  /* The timeline must fill the strip, not retain mobile's 520px width. */
+  .status-pulse-page .op-strip-side,
+  .status-pulse-page .op-strip-wrap {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .status-pulse-page .op-strip {
+    display: grid !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    grid-template-columns: repeat(30, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+  }
+  .status-pulse-page .op-day {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .status-pulse-page .op-strip-ends {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+
+}
+
+/* ============================================================
+   iPad Mini metrics — protect real glass/divider layers.
+   Only .rn-metric elements participate in three-across sizing.
+   Do NOT apply flex sizing to `.rn-metrics > *`: that also grabs
+   the original decorative divider / Crenspire layers.
+   ============================================================ */
+@media (min-width: 701px) and (max-width: 900px) {
+  .status-pulse-page .rn-section .rn-metrics {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    padding-inline: 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Size actual metric cards ONLY. Original separators untouched. */
+  .status-pulse-page .rn-section .rn-metrics > .rn-metric {
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 8px 7px !important;
+    box-sizing: border-box !important;
+  }
+
+  .status-pulse-page .rn-section .rn-metric strong {
+    font-size: clamp(0.78rem, 1.55vw, 1rem) !important;
+  }
+  .status-pulse-page .rn-section .rn-metric small {
+    font-size: clamp(0.58rem, 1vw, 0.72rem) !important;
+  }
+}

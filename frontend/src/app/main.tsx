@@ -9,7 +9,7 @@ import '../styles/docs.css'
 import '../styles/team.css'
 import '../styles/i18n.css'
 import '../styles/tailwind.css'
-import '../pages/Tests/Tests.css'
+import '../styles/Tests.css'
 import App from './App'
 import { applyDocumentLang } from '../i18n'
 

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Box, Play, RadioTower } from 'lucide-react'
 import { Card } from '../../components/ui/glass/card'
 import { L } from '../../i18n'
-import './RightNow.css'
+import '../../styles/RightNow.css'
 
 type Method = 'GET' | 'POST' | 'DELETE'
 type CheckState = 'up' | 'slow' | 'down' | null
