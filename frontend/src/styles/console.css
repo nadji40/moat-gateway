@@ -1055,7 +1055,9 @@ html[dir="rtl"] .shell .sign-out:focus-visible img { transform: scaleX(-1) trans
   .shell .signin-label, .shell .signin-mask, .shell .signin-name { display: none; }
   .shell .signin-card { align-items: center; padding: 10px 0; }
   .shell .surface { padding: 14px; }
-  .shell .usage-body { flex-direction: column-reverse; }
+  /* stacked, so stretch: flex-start would shrink the chart and the lists to
+     their content and leave them narrower than the stat cards above */
+  .shell .usage-body { flex-direction: column-reverse; align-items: stretch; }
   .shell .stat-rail { width: 100%; flex-direction: row; flex-wrap: wrap; }
   .shell .stat-rail .stat-card { flex: 1 1 120px; }
   .shell .usage-lists { flex-direction: column; }
@@ -1473,7 +1475,7 @@ html[lang="ar"] .shell { --mono: "Roboto Mono", "IBM Plex Sans Arabic", ui-monos
   .shell .tabbar-btn:focus-visible { outline: 2px solid #878282; outline-offset: -2px; }
 
   /* usage: four numbers as a 2x2 grid, then the chart, then the lists */
-  .shell .usage-body { flex-direction: column-reverse; gap: 14px; }
+  .shell .usage-body { flex-direction: column-reverse; align-items: stretch; gap: 14px; }
   .shell .stat-rail { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
   .shell .stat-rail .stat-card { flex: none; padding: 14px; }
   .shell .stat-card .num { font-size: 26px; }
