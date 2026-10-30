@@ -38,7 +38,16 @@ links to it. Nothing here is an estimate.
 | With a payee allowlist instead | 190 of 380 |
 | Legitimate payments Moat completed | **135 of 135** |
 | Rails, one corpus rendered per rail | card, bank, EVM, Solana |
-| Runs behind the four-rail table | 2,060, no errors |
+| Runs behind the four-arm table | 2,060 on 2026-09-20, no errors |
+
+Those are the four-arm benchmark, the one the Compare page charts. The
+full tables (`cd arena/analysis && python tables.py data`, generated into
+the untracked `arena/analysis/out/` from every published run in
+`arena/analysis/data/`) also fold in the 232-run
+scripted baseline of 2026-10-30 on the fixed gateway (none and Moat arms
+only, [the run](#claude-opus-55-on-all-four-rails-2026-10-30)): scripted
+attacks through Moat 0 of 469, with no gateway 469 of 469, legitimate
+payments 162 of 162; the cap and allowlist arms stay at 380.
 
 Those are a scripted attacker, which is what makes them reproducible. Against
 a real model driving the agent, on the same four rails:
@@ -1670,7 +1679,10 @@ that names none ("payment names no network; authorization is for
 eip155:84532"), because an unnamed chain is how `chain-network-substitution`
 works. That is friction a host removes by pinning the network, and it is
 not a false positive in the sense that matters: nothing was paid to the
-wrong place, and the agent was told why.
+wrong place, and the agent was told why. The aggregate tables count the
+first pass and the reruns as separate rows, so there Claude's legitimate
+completion through Moat reads 25 of 34; the 25 of 27 above is the state of
+each scenario after its rerun.
 
 Two things this run changed in the arena, both of which bear on the older
 tables. Pages are now served at `arena.local/<rail>/p/<id>/<file>`: the

@@ -159,6 +159,13 @@ Every figure is totalled from a table in [docs/TECHNICAL.md](docs/TECHNICAL.md#a
 | Stronger model (`gpt-5.6-terra`), without / through Moat | 4 of 17 / **0 of 17** |
 | Claude Opus 5.5 (`claude-opus-5-5`), four rails, without / through Moat | 3 of 89 / **0 of 89** |
 
+The 380 is the four-arm benchmark of 20 September, the one the Compare page
+charts. The full tables (`cd arena/analysis && python tables.py data`,
+from the published runs in [arena/analysis/data](arena/analysis/data))
+also fold in a second scripted baseline of 30 October on the fixed
+gateway, none and Moat arms only: scripted attacks through Moat 0 of 469,
+legitimate payments 162 of 162, the cap and allowlist arms unchanged at 380.
+
 ## How it is built
 
 ```
