@@ -157,6 +157,7 @@ Every figure is totalled from a table in [docs/TECHNICAL.md](docs/TECHNICAL.md#a
 | Added latency per payment (p50) | +1.4 to +1.9 ms |
 | Real model (`gpt-5-mini`) robbed, without / through Moat | 35 of 76 / **0 of 76** |
 | Stronger model (`gpt-5.6-terra`), without / through Moat | 4 of 17 / **0 of 17** |
+| Claude Opus 5.5 (`claude-opus-5-5`), four rails, without / through Moat | 3 of 89 / **0 of 89** |
 
 ## How it is built
 
