@@ -477,6 +477,23 @@ html[dir="rtl"] .shell .sign-out:focus-visible img { transform: scaleX(-1) trans
 .shell .btn-run:hover { background: var(--orange-hover); }
 .shell .btn-run .play { width: 24px; height: 24px; }
 .shell .btn-run .play path { fill: #fff; }
+/* Fields or free text: which telling of the scenario the tester writes. */
+.shell .pg-scenario { flex-wrap: wrap; row-gap: 10px; }
+.shell .pg-mode { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--s1); margin-inline-start: auto; }
+.shell .pg-mode button {
+  border: 0; border-radius: 999px; padding: 6px 12px; cursor: pointer;
+  font: 600 12.5px/1 var(--font); color: var(--t2); background: transparent;
+  transition: background .18s, color .18s;
+}
+.shell .pg-mode button[aria-pressed="true"] { background: var(--orange); color: #111; box-shadow: var(--bezel-orange); }
+.shell .pg-mode button:focus-visible { outline: 2px solid #878282; outline-offset: 2px; }
+/* A derived text is read, not written: a little dimmer, and no caret. */
+.shell .memo.derived { color: var(--t2); cursor: default; }
+.shell .memo.derived:focus { outline: none; box-shadow: none; }
+.shell .pg-note { margin: 6px 2px 0; font-size: 12px; line-height: 1.45; color: var(--t3, var(--t2)); text-align: center; }
+.shell .pg-fields input[readonly] { color: var(--t2); cursor: default; }
+.shell .currency-row[aria-disabled="true"] button:disabled { cursor: default; opacity: .55; }
+.shell .currency-row[aria-disabled="true"] button[aria-checked="true"]:disabled { opacity: 1; }
 /* While a payment is being evaluated the button stays orange and breathes,
    and the play glyph gives way to the Moat mark turning, so it reads as
    working rather than switched off. */
