@@ -26,26 +26,52 @@ The gateway sends one kind of message: a recovery key to a workspace's owner
 It hands the message to the server's own mail server, cPanel's Exim, over
 SMTP on loopback; Exim accepts relay from the machine itself, signs the
 message with the domain's DKIM key and delivers it from `72.62.47.83`, whose
-reverse record is the server's hostname. Receiving is separate and unchanged:
-Cloudflare Email Routing holds the zone's MX records and forwards the
-mailboxes, so `moatgateway.dpdns.org` is not a cPanel domain and gets no
-cPanel vhost.
+reverse record is the server's hostname.
 
 Exim signs with selector `default` and the key at
 `/var/cpanel/domain_keys/private/moatgateway.dpdns.org` (generated
-2026-10-30; the public half is beside it under `public/`). Receivers trust
-that signature, and the sending IP, through three records in the Cloudflare
-zone, all DNS-only (grey cloud):
+2026-10-30; the public half is beside it under `public/`).
 
-| Type | Name | Value |
-| --- | --- | --- |
-| TXT | `@` | `v=spf1 include:_spf.mx.cloudflare.net ip4:72.62.47.83 ~all`, replacing the existing SPF record, which lacked the `ip4` term |
-| TXT | `default._domainkey` | `v=DKIM1; k=rsa; p=` followed by the public key, printed by `grep -v -- ----- /var/cpanel/domain_keys/public/moatgateway.dpdns.org \| tr -d '\n'` |
-| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:<a mailbox Email Routing forwards>`; `p=quarantine` once the reports are clean |
+## Inbound mail
 
-The MX records stay Cloudflare's. Until the SPF and DKIM records exist the
-gateway sends anyway, and the message is more likely to land in spam than in
-the inbox; nothing else changes.
+Mail to the domain is received by the same Exim. On 2026-10-30
+`moatgateway.dpdns.org` was added to the `skylightchat` cPanel account as an
+addon domain (parked on `moatgateway.skylightchat.com`, document root
+`/home/skylightchat/moatgateway-mail`, unused), which is what makes Exim treat
+the domain as local. Cloudflare Email Routing is no longer used.
+
+The addon makes cPanel generate Apache vhosts for the names too. Those lose
+to the hand-written ones: `httpd.conf` includes `conf.d/*.conf` before its own
+vhosts, so `moat-domains.conf` is first for `moatgateway.dpdns.org` and
+`api.moatgateway.dpdns.org` on both ports (`httpd -S` shows which file each
+name resolves to). Do not remove the addon without reading this: it is also
+what receives the mail.
+
+Addresses, managed in cPanel → Email for the `skylightchat` account:
+
+| Address | Today |
+| --- | --- |
+| `license@moatgateway.dpdns.org` | forwarder to the founder's mailbox |
+| `security@moatgateway.dpdns.org` | forwarder to the founder's mailbox |
+| `no-reply@moatgateway.dpdns.org` | sender only; no mailbox, no forwarder |
+
+Mailboxes can be added there as well; IMAP and SMTP for them are on
+`srv1158265.hstgr.cloud`, whose certificate covers that name.
+
+## Mail DNS
+
+In the Cloudflare zone, all DNS-only (grey cloud):
+
+| Type | Name | Value | Status |
+| --- | --- | --- | --- |
+| MX | `@` | `srv1158265.hstgr.cloud`, priority 10 | receiving; **required** |
+| TXT | `@` | `v=spf1 ip4:72.62.47.83 ~all` (the `include:_spf.mx.cloudflare.net` from Email Routing can go) | sending |
+| TXT | `default._domainkey` | `v=DKIM1; k=rsa; p=` followed by the public key, printed by `grep -v -- ----- /var/cpanel/domain_keys/public/moatgateway.dpdns.org \| tr -d '\n'` | sending; in place 2026-10-30 |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:nadjisabri@gmail.com`; `p=quarantine` once the reports are clean | both; in place 2026-10-30 |
+
+cPanel also keeps its own zone for the domain, which nothing queries:
+Cloudflare's nameservers are authoritative, so the records above are the
+only ones that count.
 
 ## Routing
 
