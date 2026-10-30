@@ -169,34 +169,48 @@ pub struct Auth {
 }
 
 /// How the gateway sends mail. The one message it sends is a recovery key,
-/// and it goes through a transactional provider over HTTPS: a verified
-/// sending domain is what keeps that message out of spam.
+/// handed to the mail server on this machine over SMTP on loopback; that
+/// server signs it with the domain's DKIM key and delivers it.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Mail {
-    /// The provider. `resend` is the one implemented.
-    pub provider: MailProvider,
-    /// Environment variable holding the provider's API key. The key itself
-    /// never appears in this file.
-    #[serde(default = "default_mail_api_key_env")]
-    pub api_key_env: String,
     /// The From header, with or without a display name:
-    /// `Moat <no-reply@moatgateway.dpdns.org>`. Its domain must be one the
-    /// provider has verified, or the provider refuses the message.
+    /// `Moat <no-reply@moatgateway.dpdns.org>`. Its domain is the one whose
+    /// SPF and DKIM records vouch for this machine.
     pub from: String,
     /// Where the mail tells its reader to go and redeem the key.
     pub dashboard_url: String,
+    /// The mail server to hand messages to. Loopback only: the connection is
+    /// plain SMTP and carries nothing that should cross a network.
+    #[serde(default)]
+    pub smtp: Smtp,
 }
 
-/// Mail providers the gateway can speak to.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MailProvider {
-    Resend,
+/// Where the local mail server listens.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Smtp {
+    #[serde(default = "default_smtp_host")]
+    pub host: String,
+    #[serde(default = "default_smtp_port")]
+    pub port: u16,
 }
 
-fn default_mail_api_key_env() -> String {
-    "MOAT_MAIL_API_KEY".to_owned()
+impl Default for Smtp {
+    fn default() -> Self {
+        Smtp {
+            host: default_smtp_host(),
+            port: default_smtp_port(),
+        }
+    }
+}
+
+fn default_smtp_host() -> String {
+    "127.0.0.1".to_owned()
+}
+
+fn default_smtp_port() -> u16 {
+    25
 }
 
 /// Refuse a bind address off the loopback interface.
@@ -339,13 +353,15 @@ impl Config {
                 "mail needs durable storage: recovery keys live in the database"
             );
             anyhow::ensure!(
-                !mail.api_key_env.trim().is_empty(),
-                "mail.api_key_env must not be empty"
-            );
-            anyhow::ensure!(
                 mail.from.contains('@'),
                 "mail.from must be an address, optionally with a display name"
             );
+            anyhow::ensure!(
+                is_loopback(&mail.smtp.host),
+                "mail.smtp.host is {:?}; it must be loopback, because the connection is plain SMTP",
+                mail.smtp.host
+            );
+            anyhow::ensure!(mail.smtp.port > 0, "mail.smtp.port must be positive");
             anyhow::ensure!(
                 mail.dashboard_url.starts_with("https://")
                     || mail.dashboard_url.starts_with("http://"),

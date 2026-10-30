@@ -34,6 +34,7 @@ time = { version = "0.3.44", features = ["parsing", "formatting"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 hex = "0.4.3"
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "tokio1", "builder"] }
 
 [dev-dependencies]
 axum = "0.8.9"

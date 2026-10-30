@@ -22,9 +22,10 @@ auth:
   # provisions that key with scripts/provision-tenant.sh instead.
   self_signup: true
 # A lost admin key is mailed back as a single-use recovery key, to the address
-# the owner gave at signup. The API key is MOAT_MAIL_API_KEY in
-# /etc/moat/moat-db.env; with it unset the gateway starts and recovery is off.
+# the owner gave at signup. The message is handed to this machine's own mail
+# server (cPanel's Exim) on loopback, which signs it with the domain's DKIM
+# key under /var/cpanel/domain_keys/ and delivers it.
 mail:
-  provider: resend
   from: "Moat <no-reply@moatgateway.dpdns.org>"
   dashboard_url: https://moatgateway.dpdns.org/dashboard
+  smtp: { host: 127.0.0.1, port: 25 }

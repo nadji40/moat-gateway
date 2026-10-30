@@ -23,26 +23,29 @@ challenge path used for renewal.
 
 The gateway sends one kind of message: a recovery key to a workspace's owner
 (`mail:` in `moat.pilot.yaml`, [TECHNICAL.md](TECHNICAL.md#authenticated-pilot-deployment)).
-It is sent through Resend's HTTPS API, so the server runs no mail daemon and
-port 25 stays closed. Receiving is separate and unchanged: Cloudflare Email
-Routing holds the zone's MX records and forwards the mailboxes.
+It hands the message to the server's own mail server, cPanel's Exim, over
+SMTP on loopback; Exim accepts relay from the machine itself, signs the
+message with the domain's DKIM key and delivers it from `72.62.47.83`, whose
+reverse record is the server's hostname. Receiving is separate and unchanged:
+Cloudflare Email Routing holds the zone's MX records and forwards the
+mailboxes, so `moatgateway.dpdns.org` is not a cPanel domain and gets no
+cPanel vhost.
 
-Resend verifies the sending domain with records it issues when the domain is
-added in its dashboard. In the Cloudflare zone, all DNS-only (grey cloud):
+Exim signs with selector `default` and the key at
+`/var/cpanel/domain_keys/private/moatgateway.dpdns.org` (generated
+2026-10-30; the public half is beside it under `public/`). Receivers trust
+that signature, and the sending IP, through three records in the Cloudflare
+zone, all DNS-only (grey cloud):
 
-| Type | Name | Value | Purpose |
-| --- | --- | --- | --- |
-| TXT | `resend._domainkey` | `p=MIGf...` as issued by Resend | DKIM: signs every message |
-| MX | `send` | `feedback-smtp.<region>.amazonses.com`, priority 10, as issued | bounces for the return-path subdomain |
-| TXT | `send` | `v=spf1 include:amazonses.com ~all` | SPF for the return-path subdomain |
-| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:<a mailbox Email Routing forwards>` | DMARC, reporting only to start |
+| Type | Name | Value |
+| --- | --- | --- |
+| TXT | `@` | `v=spf1 include:_spf.mx.cloudflare.net ip4:72.62.47.83 ~all`, replacing the existing SPF record, which lacked the `ip4` term |
+| TXT | `default._domainkey` | `v=DKIM1; k=rsa; p=` followed by the public key, printed by `grep -v -- ----- /var/cpanel/domain_keys/public/moatgateway.dpdns.org \| tr -d '\n'` |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:<a mailbox Email Routing forwards>`; `p=quarantine` once the reports are clean |
 
-The apex keeps the records Email Routing set (its MX records and
-`v=spf1 include:_spf.mx.cloudflare.net ~all`); Resend's return path is the
-`send` subdomain, so the two do not meet. Once Resend shows the domain as
-verified, the API key goes in `/etc/moat/moat-db.env` as
-`MOAT_MAIL_API_KEY=re_...` and the gateway is restarted; until then it starts
-with recovery off and `/v1/recover` answers 503 saying so.
+The MX records stay Cloudflare's. Until the SPF and DKIM records exist the
+gateway sends anyway, and the message is more likely to land in spam than in
+the inbox; nothing else changes.
 
 ## Routing
 

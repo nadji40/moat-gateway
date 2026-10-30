@@ -1,25 +1,28 @@
 //! Outbound mail.
 //!
 //! The gateway sends exactly one kind of message: a recovery key to the
-//! address a workspace's owner gave at signup. It goes through a transactional
-//! mail provider over HTTPS rather than an SMTP server of our own, because a
-//! message from a fresh VPS address lands in spam and a message from a
-//! provider's verified domain does not. One provider is implemented; the
-//! request shape is small enough that a second is an afternoon.
+//! address a workspace's owner gave at signup. It hands the message to the
+//! mail server on this machine over plain SMTP on loopback; that server (cPanel's
+//! Exim on the pilot host) signs it with the domain's DKIM key and delivers
+//! it. Nothing here authenticates, because nothing here leaves the machine:
+//! the config refuses a host that is not loopback.
 //!
 //! What this module never does is log the key it sends, or the address it
 //! sends it to, at any level above debug.
 
-use anyhow::{Context, Result};
+use std::time::Duration;
 
-use crate::config::{Mail, MailProvider};
+use anyhow::{Context, Result};
+use lettre::message::header::ContentType;
+use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart};
+use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
+
+use crate::config::Mail;
 
 /// A configured sender. Built once at startup; `None` when recovery is off.
 pub struct Mailer {
-    client: reqwest::Client,
-    provider: MailProvider,
-    api_key: String,
-    from: String,
+    transport: AsyncSmtpTransport<Tokio1Executor>,
+    from: Mailbox,
     dashboard_url: String,
 }
 
@@ -27,30 +30,27 @@ impl Mailer {
     /// The sender the config asks for, or `None` with a reason in the log.
     ///
     /// No `mail` section means the deployment did not ask for recovery. A
-    /// section whose API key is not in the environment is a misconfiguration
-    /// worth a warning but not a refusal to start: every other part of the
-    /// gateway works without it, and the recovery endpoint says so itself.
+    /// `from` that does not parse as an address is a misconfiguration worth
+    /// a warning but not a refusal to start: every other part of the gateway
+    /// works without it, and the recovery endpoint says so itself.
     pub fn from_config(mail: Option<&Mail>) -> Option<Mailer> {
         let mail = mail?;
-        let api_key = match std::env::var(&mail.api_key_env) {
-            Ok(key) if !key.trim().is_empty() => key.trim().to_owned(),
-            _ => {
-                tracing::warn!(
-                    env = %mail.api_key_env,
-                    "mail is configured but its API key is not in the environment; admin-key recovery is off"
-                );
+        let from: Mailbox = match mail.from.parse() {
+            Ok(from) => from,
+            Err(error) => {
+                tracing::warn!(%error, "mail.from is not an address; admin-key recovery is off");
                 return None;
             }
         };
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(15))
-            .build()
-            .ok()?;
+        // Plain SMTP, which is why the config insists on a loopback host.
+        let transport =
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(mail.smtp.host.as_str())
+                .port(mail.smtp.port)
+                .timeout(Some(Duration::from_secs(15)))
+                .build();
         Some(Mailer {
-            client,
-            provider: mail.provider,
-            api_key,
-            from: mail.from.clone(),
+            transport,
+            from,
             dashboard_url: mail.dashboard_url.trim_end_matches('/').to_owned(),
         })
     }
@@ -67,6 +67,7 @@ impl Mailer {
         recovery_key: &str,
         expires_at: &str,
     ) -> Result<()> {
+        let to: Mailbox = to.parse().context("the owner address")?;
         let file = recovery_file(workspace, recovery_key, expires_at, &self.dashboard_url);
         let text = format!(
             "Somebody asked for a new admin key for the Moat workspace \"{workspace}\".\n\
@@ -83,32 +84,24 @@ impl Mailer {
              If you did not ask for this, ignore it: nothing changes until the key is used.\n",
             dashboard = self.dashboard_url,
         );
-        let body = serde_json::json!({
-            "from": self.from,
-            "to": [to],
-            "subject": format!("Your Moat recovery key for {workspace}"),
-            "text": text,
-            "attachments": [{
-                "filename": format!("moat-{workspace}-recovery-key.json"),
-                "content": base64(file.as_bytes()),
-            }],
-        });
-        let endpoint = match self.provider {
-            MailProvider::Resend => "https://api.resend.com/emails",
-        };
-        let response = self
-            .client
-            .post(endpoint)
-            .bearer_auth(&self.api_key)
-            .json(&body)
-            .send()
+        let attachment = Attachment::new(format!("moat-{workspace}-recovery-key.json")).body(
+            file,
+            ContentType::parse("application/json").context("attachment content type")?,
+        );
+        let message = Message::builder()
+            .from(self.from.clone())
+            .to(to)
+            .subject(format!("Your Moat recovery key for {workspace}"))
+            .multipart(
+                MultiPart::mixed()
+                    .singlepart(SinglePart::plain(text))
+                    .singlepart(attachment),
+            )
+            .context("building the recovery mail")?;
+        self.transport
+            .send(message)
             .await
-            .context("reaching the mail provider")?;
-        let status = response.status();
-        if !status.is_success() {
-            // The body may echo the address; the status is enough to act on.
-            anyhow::bail!("the mail provider answered {status}");
-        }
+            .context("handing the recovery mail to the mail server")?;
         tracing::info!(workspace, "recovery key mailed");
         Ok(())
     }
@@ -134,52 +127,9 @@ fn recovery_file(
     .unwrap_or_default()
 }
 
-/// Standard base64 with padding, for the attachment. Small enough to write
-/// here rather than take a dependency for one call.
-fn base64(bytes: &[u8]) -> String {
-    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b = [
-            chunk[0],
-            *chunk.get(1).unwrap_or(&0),
-            *chunk.get(2).unwrap_or(&0),
-        ];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
-        out.push(TABLE[(n >> 18) as usize & 63] as char);
-        out.push(TABLE[(n >> 12) as usize & 63] as char);
-        out.push(if chunk.len() > 1 {
-            TABLE[(n >> 6) as usize & 63] as char
-        } else {
-            '='
-        });
-        out.push(if chunk.len() > 2 {
-            TABLE[n as usize & 63] as char
-        } else {
-            '='
-        });
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn base64_matches_the_standard_vectors() {
-        for (input, want) in [
-            ("", ""),
-            ("f", "Zg=="),
-            ("fo", "Zm8="),
-            ("foo", "Zm9v"),
-            ("foob", "Zm9vYg=="),
-            ("fooba", "Zm9vYmE="),
-            ("foobar", "Zm9vYmFy"),
-        ] {
-            assert_eq!(base64(input.as_bytes()), want, "{input:?}");
-        }
-    }
 
     #[test]
     fn the_attachment_is_a_key_file_the_sign_in_form_can_read() {
@@ -196,5 +146,14 @@ mod tests {
             file.get("key").is_none(),
             "a recovery file must not look like an admin key file"
         );
+    }
+
+    #[test]
+    fn a_display_name_in_from_is_accepted_and_a_bare_word_is_not() {
+        assert!("Moat <no-reply@moatgateway.dpdns.org>"
+            .parse::<Mailbox>()
+            .is_ok());
+        assert!("no-reply@moatgateway.dpdns.org".parse::<Mailbox>().is_ok());
+        assert!("not an address".parse::<Mailbox>().is_err());
     }
 }

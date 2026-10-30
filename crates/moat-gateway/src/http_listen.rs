@@ -851,7 +851,7 @@ async fn recover(State(listener): State<Arc<Listener>>, body: Bytes) -> Response
     let Some(mailer) = listener.mailer.as_ref() else {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
-            "admin-key recovery is not enabled on this gateway: no mail provider is configured",
+            "admin-key recovery is not enabled on this gateway: mail is not configured",
         )
             .into_response();
     };

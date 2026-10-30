@@ -939,21 +939,23 @@ given at signup:
 
 Neither recovery call takes a bearer token: the caller has lost theirs. The
 recovery key is stored as its SHA-256, like every other credential. The mail
-itself goes through a transactional provider over HTTPS, configured as:
+itself is handed to the mail server on the same machine over SMTP on
+loopback, configured as:
 
 ```yaml
 mail:
-  provider: resend
   from: "Moat <no-reply@moatgateway.dpdns.org>"
   dashboard_url: https://moatgateway.dpdns.org/dashboard
+  smtp: { host: 127.0.0.1, port: 25 }   # the defaults; loopback is enforced
 ```
 
-with the provider's API key in `MOAT_MAIL_API_KEY` (the environment file the
-service already loads, `/etc/moat/moat-db.env`). The `from` domain has to be
-verified at the provider, which is a DKIM record and a sending subdomain in
-DNS; the Cloudflare mailboxes that receive for the domain are untouched by it.
-With no `mail` section, or the key absent from the environment, the gateway
-starts and `/v1/recover` answers 503 saying recovery is not enabled.
+No credential is involved: the connection never leaves the machine, and the
+config refuses a host that is not loopback. On the pilot host that server is
+cPanel's Exim, which signs the message with the domain's DKIM key and
+delivers it; the DNS that makes receivers trust it is in
+[public-hostnames.md](public-hostnames.md#outbound-mail). With no `mail`
+section the gateway starts and `/v1/recover` answers 503 saying recovery is
+not enabled.
 
 **Scopes** narrow a key inside its role. They can never widen one: the role is
 checked first and separately, so no scope reaches a surface the role does not
