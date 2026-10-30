@@ -76,9 +76,19 @@ describe('the dashboard', () => {
     expect(screen.getByRole('tab', { name: 'I have a key' })).toBeInTheDocument()
   })
 
+  it('opens on the playground, and a shared link opens its pane', async () => {
+    gateway()
+    const first = openDashboard()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Playground' })).toBeInTheDocument()
+    expect(document.querySelector('.tabbar [aria-current="page"]')!.textContent).toBe('Playground')
+    first.unmount()
+    openDashboard('#pane-verdicts')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Verdicts' })).toBeInTheDocument()
+  })
+
   it('counts every verdict from the gateway, not just the recent feed', async () => {
     gateway()
-    openDashboard()
+    openDashboard('#pane-usage')
     expect(await screen.findByRole('heading', { level: 1, name: 'Usage' })).toBeInTheDocument()
     await waitFor(() => expect(document.querySelector('#stat-total')!.textContent).toBe('1,234'))
     expect(document.querySelector('#stat-paid')!.textContent).toBe('1,000')
@@ -195,7 +205,7 @@ describe('the dashboard', () => {
 
   it('has a tab bar for phones that reaches every pane and says where you are', async () => {
     gateway()
-    openDashboard()
+    openDashboard('#pane-usage')
     await screen.findByRole('heading', { level: 1, name: 'Usage' })
     const tabbar = document.querySelector<HTMLElement>('.tabbar')!
     // Live keys (not revoked, not expired) and recent verdicts are counted.

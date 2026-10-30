@@ -33,10 +33,12 @@ const THEME = 'moat.ws.theme'
 const FOLDED = 'moat.ws.collapsed'
 const TOURED = 'moat.ws.toured'
 
-/** The pane named in the address, so a reload or a shared link lands there. */
+/** The pane named in the address, so a reload or a shared link lands there.
+ *  With none named, the playground: the first thing to do in a new workspace
+ *  is to watch a payment be refused. */
 function paneFromHash(): PaneId {
   const h = typeof location !== 'undefined' ? location.hash.slice(1) : ''
-  return (PANES as string[]).includes(h) ? (h as PaneId) : 'pane-usage'
+  return (PANES as string[]).includes(h) ? (h as PaneId) : 'pane-playground'
 }
 
 export default function Dashboard() {

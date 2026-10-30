@@ -1,4 +1,4 @@
-import { useState, useId, useRef } from 'react'
+import { useState, useId, useRef, useEffect } from 'react'
 import { L } from '../../../i18n'
 import { attempt, forgetPair, openSession } from '../playground'
 import { useThumb } from './bits'
@@ -76,6 +76,15 @@ interface PlaygroundPaneProps {
 export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
   const [activeTab, setActiveTab] = useState<'off' | 'on'>('off')
   const [verdicts, setVerdicts] = useState<VerdictItem[]>([])
+  const resultCol = useRef<HTMLDivElement | null>(null)
+
+  // The Attempt button sits at the foot of a long form and the newest verdict
+  // lands at the top of the column beside it, which on a desktop has scrolled
+  // out of view by the time the button is reached. Bring it back; "nearest"
+  // leaves the page alone when the verdict is already on screen.
+  useEffect(() => {
+    if (verdicts.length) resultCol.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' })
+  }, [verdicts.length])
 
   // Off chain states
   const [userIntent, setUserIntent] = useState(
@@ -801,7 +810,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
         </div>
 
         {/* Verdict Result column */}
-        <div className="result-col" id="verdicts">
+        <div className="result-col" id="verdicts" ref={resultCol}>
           <div className="panel-title" style={{ padding: '10px 0' }}>
             {L('Verdict', 'الأحكام')}
           </div>

@@ -19,6 +19,31 @@ Both hostnames support a Cloudflare proxy or direct DNS access. Use **Full
 certificate covering both names. HTTP redirects to HTTPS, except the ACME
 challenge path used for renewal.
 
+## Outbound mail
+
+The gateway sends one kind of message: a recovery key to a workspace's owner
+(`mail:` in `moat.pilot.yaml`, [TECHNICAL.md](TECHNICAL.md#authenticated-pilot-deployment)).
+It is sent through Resend's HTTPS API, so the server runs no mail daemon and
+port 25 stays closed. Receiving is separate and unchanged: Cloudflare Email
+Routing holds the zone's MX records and forwards the mailboxes.
+
+Resend verifies the sending domain with records it issues when the domain is
+added in its dashboard. In the Cloudflare zone, all DNS-only (grey cloud):
+
+| Type | Name | Value | Purpose |
+| --- | --- | --- | --- |
+| TXT | `resend._domainkey` | `p=MIGf...` as issued by Resend | DKIM: signs every message |
+| MX | `send` | `feedback-smtp.<region>.amazonses.com`, priority 10, as issued | bounces for the return-path subdomain |
+| TXT | `send` | `v=spf1 include:amazonses.com ~all` | SPF for the return-path subdomain |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:<a mailbox Email Routing forwards>` | DMARC, reporting only to start |
+
+The apex keeps the records Email Routing set (its MX records and
+`v=spf1 include:_spf.mx.cloudflare.net ~all`); Resend's return path is the
+`send` subdomain, so the two do not meet. Once Resend shows the domain as
+verified, the API key goes in `/etc/moat/moat-db.env` as
+`MOAT_MAIL_API_KEY=re_...` and the gateway is restarted; until then it starts
+with recovery off and `/v1/recover` answers 503 saying so.
+
 ## Routing
 
 Apache loads [`deploy/moat-domains.conf`](../deploy/moat-domains.conf) from
