@@ -11,7 +11,7 @@ export default function DemoVideo() {
       <Card material="clear" tint="rgba(255, 135, 55, 0.10)" className="home-video">
         <div className="home-video-frame">
           <iframe
-            src="https://www.youtube.com/embed/oI3rZ2wh-NU"
+            src="https://www.youtube.com/embed/ZGURyNnQBCs"
             title={L('Moat demo video', 'فيديو عرض Moat')}
             loading="lazy"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
