@@ -233,7 +233,7 @@ export default function AssistantPanel({ open, onClose, pane }: AssistantPanelPr
 
   if (!open) return null
   return (
-    <aside className="assistant" id="assistant" role="dialog" aria-label={L('Moat assistant', 'مساعد Moat')} dir={isAr() ? 'rtl' : 'ltr'}>
+    <aside className="assistant-panel" id="assistant" role="dialog" aria-label={L('Moat assistant', 'مساعد Moat')} dir={isAr() ? 'rtl' : 'ltr'}>
       <div className="assistant-head">
         <Bot size={20} strokeWidth={2} aria-hidden="true" />
         <div className="assistant-title">

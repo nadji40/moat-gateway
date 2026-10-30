@@ -534,7 +534,10 @@ html[dir="rtl"] .shell .sign-out:focus-visible img { transform: scaleX(-1) trans
 }
 .shell .assistant-fab-x:hover { color: var(--t1); background: var(--s2); }
 
-.shell .assistant {
+/* `assistant-panel`, not `assistant`: the replies in the log carry the class
+   `assistant` too, and a panel rule on that name would position every one of
+   them as a second panel. */
+.shell .assistant-panel {
   position: fixed; inset-inline-end: 22px; bottom: 22px; z-index: 61;
   width: min(400px, calc(100vw - 44px)); height: min(640px, calc(100vh - 44px));
   display: flex; flex-direction: column;
@@ -576,7 +579,7 @@ html[dir="rtl"] .shell .sign-out:focus-visible img { transform: scaleX(-1) trans
 @media (max-width: 720px) {
   /* above the tab bar */
   .shell .assistant-fab { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); inset-inline-end: 16px; }
-  .shell .assistant {
+  .shell .assistant-panel {
     inset-inline-end: 0; left: 0; right: 0; width: auto; border-radius: 18px 18px 0 0;
     bottom: calc(84px + env(safe-area-inset-bottom, 0px)); height: min(70vh, 560px);
   }
