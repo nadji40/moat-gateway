@@ -264,6 +264,78 @@ describe('the dashboard', () => {
     expect(screen.getByRole('status')).toHaveTextContent('shown once')
   })
 
+  it('creates a workspace with an owner email and offers the key as a file', async () => {
+    localStorage.removeItem('moat.admin')
+    const seen = gateway({
+      '/v1/signup': () => new Response(JSON.stringify({ id: 'key_1', secret: 'moat_first_secret', workspace: 'northwind' }), {
+        status: 201, headers: { 'content-type': 'application/json' },
+      }),
+    })
+    const saved: Blob[] = []
+    vi.stubGlobal('URL', Object.assign(URL, {
+      createObjectURL: vi.fn((blob: Blob) => { saved.push(blob); return 'blob:key' }),
+      revokeObjectURL: vi.fn(),
+    }))
+    openDashboard()
+    fireEvent.change(await screen.findByLabelText('Workspace id'), { target: { value: 'northwind' } })
+    fireEvent.change(screen.getByLabelText('Owner email, for recovering a lost key'), { target: { value: 'Owner@Northwind.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create workspace' }))
+    expect(await screen.findByText('moat_first_secret')).toBeInTheDocument()
+    const signup = seen.find((s) => s.url === '/v1/signup')
+    expect(signup?.body).toEqual({ id: 'northwind', name: 'northwind', email: 'Owner@Northwind.example' })
+    // The file carries the key and says which workspace it opens.
+    fireEvent.click(screen.getByRole('button', { name: 'Download as file' }))
+    expect(saved).toHaveLength(1)
+    // jsdom's Blob has no text(); FileReader is what it does have.
+    const text = await new Promise<string>((done) => {
+      const reader = new FileReader()
+      reader.onload = () => done(String(reader.result))
+      reader.readAsText(saved[0])
+    })
+    const file = JSON.parse(text)
+    expect(file).toMatchObject({ moat_key: 1, workspace: 'northwind', role: 'admin', key: 'moat_first_secret' })
+    expect(localStorage.getItem('moat.admin')).toBe('moat_first_secret')
+  })
+
+  it('signs in from a pasted key file as well as from a bare key', async () => {
+    localStorage.removeItem('moat.admin')
+    const seen = gateway()
+    openDashboard()
+    fireEvent.click(await screen.findByRole('tab', { name: 'I have a key' }))
+    const file = JSON.stringify({ moat_key: 1, workspace: 'northwind', role: 'admin', key: 'moat_from_file' })
+    fireEvent.change(screen.getByLabelText('Admin key'), { target: { value: file } })
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    await waitFor(() => expect(seen.some((s) => s.url === '/v1/keys' && s.auth === 'Bearer moat_from_file')).toBe(true))
+    expect(localStorage.getItem('moat.admin')).toBe('moat_from_file')
+  })
+
+  it('mails a recovery key, and trades it for a fresh admin key', async () => {
+    localStorage.removeItem('moat.admin')
+    const json = (body: unknown, status: number) =>
+      new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+    const seen = gateway({
+      '/v1/recover/redeem': () => json({ id: 'key_r', secret: 'moat_recovered_secret', workspace: 'northwind' }, 201),
+      '/v1/recover': () => json({ accepted: true, message: 'If that workspace has that owner address, a recovery key is on its way.' }, 202),
+    })
+    openDashboard()
+    fireEvent.click(await screen.findByRole('tab', { name: 'I have a key' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Lost your admin key?' }))
+    // The create form, hidden on the other slide, has a "Workspace id" too.
+    fireEvent.change(screen.getByLabelText('Workspace id', { selector: '#lost-id' }), { target: { value: 'northwind' } })
+    fireEvent.change(screen.getByLabelText('Owner email'), { target: { value: 'owner@northwind.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a recovery key' }))
+    // The gateway's own sentence, which is the same whether or not anything matched.
+    expect(await screen.findByText(/a recovery key is on its way/)).toBeInTheDocument()
+    expect(seen.find((s) => s.url === '/v1/recover')?.body).toEqual({ workspace: 'northwind', email: 'owner@northwind.example' })
+    // The mailed key goes in the same box as an admin key.
+    fireEvent.change(screen.getByLabelText('Admin key'), { target: { value: 'rk_from_the_mail' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }))
+    expect(await screen.findByText('moat_recovered_secret')).toBeInTheDocument()
+    expect(seen.find((s) => s.url === '/v1/recover/redeem')?.body).toEqual({ recovery_key: 'rk_from_the_mail' })
+    expect(seen.find((s) => s.url === '/v1/recover/redeem')?.auth).toBeUndefined()
+    expect(localStorage.getItem('moat.admin')).toBe('moat_recovered_secret')
+  })
+
   it('runs in Arabic, right to left', async () => {
     localStorage.setItem('moat.lang', 'ar')
     document.documentElement.dir = 'rtl'

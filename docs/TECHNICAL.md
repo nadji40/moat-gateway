@@ -925,6 +925,36 @@ reaches the endpoint that mints a replacement; the gateway answers 409. Rotate
 in the order that leaves a way back: mint the new admin key, authenticate with
 it, then revoke the old one.
 
+**A lost admin key.** A key is shown once, and the dashboard offers it as a
+small JSON file (`{"moat_key": 1, "workspace": ..., "role": "admin", "key":
+"moat_..."}`), which the sign-in form reads back, pasted or uploaded. For the
+case where the file is gone too, a workspace may carry its owner's address,
+given at signup:
+
+| | |
+|---|---|
+| `POST /v1/signup` | `{"id", "name", "email"?}`; the reply carries `workspace` beside the key |
+| `POST /v1/recover` | `{"workspace", "email"}`; answers 202 with the same sentence whether or not they match, so it reveals nothing. If they do, a single-use `rk_...` key is mailed, good for 30 minutes, at most three an hour per workspace |
+| `POST /v1/recover/redeem` | `{"recovery_key"}`; mints a new `admin` key, returned once with `workspace`, and **withdraws every previous admin key** of the workspace, since a lost key may be in somebody else's hands. One 401 covers unknown, spent and expired alike |
+
+Neither recovery call takes a bearer token: the caller has lost theirs. The
+recovery key is stored as its SHA-256, like every other credential. The mail
+itself goes through a transactional provider over HTTPS, configured as:
+
+```yaml
+mail:
+  provider: resend
+  from: "Moat <no-reply@moatgateway.dpdns.org>"
+  dashboard_url: https://moatgateway.dpdns.org/dashboard
+```
+
+with the provider's API key in `MOAT_MAIL_API_KEY` (the environment file the
+service already loads, `/etc/moat/moat-db.env`). The `from` domain has to be
+verified at the provider, which is a DKIM record and a sending subdomain in
+DNS; the Cloudflare mailboxes that receive for the domain are untouched by it.
+With no `mail` section, or the key absent from the environment, the gateway
+starts and `/v1/recover` answers 503 saying recovery is not enabled.
+
 **Scopes** narrow a key inside its role. They can never widen one: the role is
 checked first and separately, so no scope reaches a surface the role does not
 already open. An empty list means the whole role, which is what every key

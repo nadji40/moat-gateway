@@ -21,3 +21,10 @@ auth:
   # and its first admin key. A pilot for one named customer leaves this off and
   # provisions that key with scripts/provision-tenant.sh instead.
   self_signup: true
+# A lost admin key is mailed back as a single-use recovery key, to the address
+# the owner gave at signup. The API key is MOAT_MAIL_API_KEY in
+# /etc/moat/moat-db.env; with it unset the gateway starts and recovery is off.
+mail:
+  provider: resend
+  from: "Moat <no-reply@moatgateway.dpdns.org>"
+  dashboard_url: https://moatgateway.dpdns.org/dashboard

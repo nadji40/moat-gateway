@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { L } from '../../i18n'
-import { call, held, hold } from './api'
+import { call, held, hold, type KeyMeta } from './api'
 import Topbar from './components/Topbar'
 import Sidebar, { Tabbar } from './components/Sidebar'
 import UsagePane from './components/UsagePane'
@@ -43,6 +43,8 @@ export default function Dashboard() {
   const [authed, setAuthed] = useState(() => Boolean(held()))
   const [showMinted, setShowMinted] = useState(false)
   const [secret, setSecret] = useState('')
+  // What the shown secret is, for the file it can be saved as.
+  const [minted, setMinted] = useState<KeyMeta>({ label: 'key', role: 'admin' })
   const [activePane, setActivePane] = useState<PaneId>(paneFromHash)
   const [feed, setFeed] = useState<Verdict[]>([])
   const [keys, setKeys] = useState<ApiKey[]>([])
@@ -118,10 +120,38 @@ export default function Dashboard() {
     if (authed && !showMinted) void refresh()
   }, [authed, showMinted, refresh])
 
-  const handleCreate = async (id: string, name: string) => {
-    const out = await call<{ secret: string }>('/v1/signup', { method: 'POST', body: JSON.stringify({ id, name }) }, null)
+  const handleCreate = async (id: string, name: string, email: string) => {
+    const out = await call<{ secret: string; workspace?: string }>(
+      '/v1/signup',
+      { method: 'POST', body: JSON.stringify({ id, name, ...(email ? { email } : {}) }) },
+      null,
+    )
     hold(out.secret)
     setSecret(out.secret)
+    setMinted({ workspace: out.workspace ?? id, label: 'first admin key', role: 'admin' })
+    setShowMinted(true)
+    setAuthed(true)
+  }
+
+  // Neither recovery call carries a key: the caller has lost theirs.
+  const handleRecover = async (workspace: string, email: string) => {
+    const out = await call<{ message?: string }>(
+      '/v1/recover',
+      { method: 'POST', body: JSON.stringify({ workspace, email }) },
+      null,
+    )
+    return out.message || L('If that matches a workspace, a recovery key is on its way.', 'إذا طابق ذلك مساحة عمل، فمفتاح الاستعادة في طريقه إليك.')
+  }
+
+  const handleRedeem = async (recoveryKey: string) => {
+    const out = await call<{ secret: string; workspace?: string }>(
+      '/v1/recover/redeem',
+      { method: 'POST', body: JSON.stringify({ recovery_key: recoveryKey }) },
+      null,
+    )
+    hold(out.secret)
+    setSecret(out.secret)
+    setMinted({ ...(out.workspace ? { workspace: out.workspace } : {}), label: 'recovered admin key', role: 'admin' })
     setShowMinted(true)
     setAuthed(true)
   }
@@ -157,6 +187,7 @@ export default function Dashboard() {
       }),
     })
     setSecret(out.secret)
+    setMinted({ label, role })
     setShowMinted(true)
   }
 
@@ -188,7 +219,7 @@ export default function Dashboard() {
         backdrop="/glass-backdrop.svg"
         options={{ refraction: 16, dispersion: 0.035, frost: 8, liquid: false }}
       >
-        <GateSection onCreate={handleCreate} onSignin={handleSignin} />
+        <GateSection onCreate={handleCreate} onSignin={handleSignin} onRedeem={handleRedeem} onRecover={handleRecover} />
         <Footer />
       </LiquidGlassProvider>
     )
@@ -197,7 +228,7 @@ export default function Dashboard() {
   if (showMinted) {
     return (
       <>
-        <MintedSection secret={secret} onDone={() => setShowMinted(false)} />
+        <MintedSection secret={secret} {...minted} onDone={() => setShowMinted(false)} />
         <Footer />
       </>
     )

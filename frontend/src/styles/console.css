@@ -1774,3 +1774,19 @@ html[data-theme="light"] .shell .currency-row button:not([aria-checked="true"]) 
    give way to the swiper's row and the panel's header and body. */
 #gate .gate-swiper { flex-direction: row; gap: 4px; padding: 4px; }
 #gate .gate-panel { display: block; gap: 0; padding: 0; }
+/* Two buttons on one line where the panel offers two ways in; the minted
+   panel's copy / download / done row is the same shape. */
+#gate .row, #minted .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 100%; }
+#gate .row .btn { flex: 1 1 140px; max-width: none; }
+/* "Lost your admin key?": a sentence that opens a form, not a button that
+   competes with Log in. */
+#gate .linkish {
+  background: none; border: 0; padding: 4px 0 0; cursor: pointer;
+  font: inherit; font-size: .82rem; color: var(--ink-2);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+#gate .linkish:hover, #gate .linkish:focus-visible { color: var(--ink); outline: none; }
+#gate .lost {
+  display: grid; gap: 11px; width: 100%; justify-items: center;
+  padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--line);
+}

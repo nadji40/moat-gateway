@@ -30,6 +30,9 @@ const INTENT = process.env["MOAT_INTENT_URL"] ?? "http://127.0.0.1:7082";
 /** Exactly the paths the dashboard needs. Anything else is a 404. */
 function target(path: string, method: string): string | undefined {
   if (path === "/v1/signup" && method === "POST") return path;
+  // Getting back in without a key: the gateway mails a single-use one, then
+  // trades it for a new admin key. Both are for a caller holding nothing.
+  if ((path === "/v1/recover" || path === "/v1/recover/redeem") && method === "POST") return path;
   if (path === "/v1/keys" && (method === "GET" || method === "POST")) return path;
   if ((path === "/v1/usage" || path === "/v1/verdicts") && method === "GET") return path;
   if (/^\/v1\/keys\/[A-Za-z0-9_-]{1,64}$/.test(path) && method === "DELETE") return path;
@@ -38,22 +41,26 @@ function target(path: string, method: string): string | undefined {
 
 /** Signups per hour per caller. Generous for a person, useless for a script. */
 const SIGNUP_LIMIT = 3;
+/** Recovery mails per hour per caller. The gateway limits per workspace as
+ *  well; this one stops a caller spraying addresses at many workspaces. */
+const RECOVER_LIMIT = 5;
 const HOUR = 60 * 60 * 1000;
 const signups = new Map<string, number[]>();
+const recoveries = new Map<string, number[]>();
 
-function signupAllowed(who: string): boolean {
+function allowed(seen: Map<string, number[]>, who: string, limit: number): boolean {
   const now = Date.now();
-  const recent = (signups.get(who) ?? []).filter((at) => now - at < HOUR);
-  if (recent.length >= SIGNUP_LIMIT) {
-    signups.set(who, recent);
+  const recent = (seen.get(who) ?? []).filter((at) => now - at < HOUR);
+  if (recent.length >= limit) {
+    seen.set(who, recent);
     return false;
   }
   recent.push(now);
-  signups.set(who, recent);
+  seen.set(who, recent);
   // The map would otherwise grow for the life of the process.
-  if (signups.size > 5000) {
-    for (const [key, times] of signups) {
-      if (!times.some((at) => now - at < HOUR)) signups.delete(key);
+  if (seen.size > 5000) {
+    for (const [key, times] of seen) {
+      if (!times.some((at) => now - at < HOUR)) seen.delete(key);
     }
   }
   return true;
@@ -62,6 +69,8 @@ function signupAllowed(who: string): boolean {
 export function isControlPath(path: string): boolean {
   return (
     path === "/v1/signup" ||
+    path === "/v1/recover" ||
+    path === "/v1/recover/redeem" ||
     path === "/v1/keys" ||
     path === "/v1/usage" ||
     path === "/v1/verdicts" ||
@@ -85,9 +94,14 @@ export async function proxyControl(
   const forward = target(path, method);
   if (!forward) return false;
 
-  if (forward === "/v1/signup" && !signupAllowed(who)) {
+  if (forward === "/v1/signup" && !allowed(signups, who, SIGNUP_LIMIT)) {
     res.writeHead(429, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: `at most ${SIGNUP_LIMIT} workspaces an hour` }));
+    return true;
+  }
+  if (forward === "/v1/recover" && !allowed(recoveries, who, RECOVER_LIMIT)) {
+    res.writeHead(429, { "content-type": "application/json" });
+    res.end(JSON.stringify({ error: `at most ${RECOVER_LIMIT} recovery emails an hour` }));
     return true;
   }
 

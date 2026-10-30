@@ -123,6 +123,9 @@ struct Listener {
     /// Forgotten after the idle timeout, like everything else here.
     ended_sessions: Mutex<HashMap<String, Instant>>,
     default_session: Mutex<Option<Arc<Session>>>,
+    /// How a recovery key reaches a workspace's owner. `None` means the
+    /// deployment has no mail provider, and the recovery endpoint says so.
+    mailer: Option<crate::mail::Mailer>,
 }
 
 impl Listener {
@@ -574,12 +577,14 @@ async fn ready(State(listener): State<Arc<Listener>>) -> StatusCode {
 }
 
 fn listener(cfg: Config, shared: Arc<Shared>) -> Arc<Listener> {
+    let mailer = crate::mail::Mailer::from_config(cfg.mail.as_ref());
     Arc::new(Listener {
         cfg,
         shared,
         sessions: Mutex::new(HashMap::new()),
         ended_sessions: Mutex::new(HashMap::new()),
         default_session: Mutex::new(None),
+        mailer,
     })
 }
 
@@ -591,6 +596,8 @@ fn router_for(l: Arc<Listener>) -> Router {
         .route("/v1/keys", get(list_keys).post(create_key))
         .route("/v1/keys/{id}", axum::routing::delete(revoke_key))
         .route("/v1/signup", axum::routing::post(signup))
+        .route("/v1/recover", axum::routing::post(recover))
+        .route("/v1/recover/redeem", axum::routing::post(redeem_recovery))
         .route("/v1/usage", get(usage))
         .route("/v1/verdicts", get(verdicts))
         .with_state(l)
@@ -646,6 +653,38 @@ struct Signup {
     id: String,
     /// A display name for their own benefit.
     name: String,
+    /// Where a recovery key may be mailed if the admin key is lost. Optional:
+    /// a workspace without one has no way back in, and is told so.
+    #[serde(default)]
+    email: Option<String>,
+}
+
+/// An owner's address as the database stores it: trimmed, lowercased, and
+/// shaped like `name@domain.tld`. `Ok(None)` for an absent or blank address.
+///
+/// This is not a validator of deliverable addresses; the mail provider is.
+/// It refuses the shapes that are certainly not one, so a typo is caught at
+/// signup, the one moment the person is looking, rather than at recovery,
+/// when it is too late.
+fn owner_email(raw: Option<&str>) -> Result<Option<String>, &'static str> {
+    let Some(raw) = raw else { return Ok(None) };
+    let email = raw.trim().to_lowercase();
+    if email.is_empty() {
+        return Ok(None);
+    }
+    let shaped = email.len() <= 254
+        && !email.chars().any(char::is_whitespace)
+        && email.matches('@').count() == 1
+        && email.split_once('@').is_some_and(|(name, domain)| {
+            !name.is_empty()
+                && domain.contains('.')
+                && !domain.starts_with('.')
+                && !domain.ends_with('.')
+        });
+    if !shaped {
+        return Err("email must look like name@domain.tld");
+    }
+    Ok(Some(email))
 }
 
 /// Create a tenant and hand back its first `admin` key.
@@ -690,15 +729,30 @@ async fn signup(State(listener): State<Arc<Listener>>, body: Bytes) -> Response 
     if name.is_empty() || name.len() > 120 {
         return bad_request("name must be 1 to 120 characters");
     }
+    let email = match owner_email(request.email.as_deref()) {
+        Ok(email) => email,
+        Err(message) => return bad_request(message),
+    };
 
     let secret_bytes: [u8; 32] = rand::random();
     let secret = format!("moat_{}", moat_core::hash::sha256_hex(&secret_bytes));
     let hash = moat_core::hash::sha256_hex(secret.as_bytes());
 
-    match storage.create_tenant(&id, name, &hash).await {
+    match storage
+        .create_tenant(&id, name, &hash, email.as_deref())
+        .await
+    {
         Ok(Some(key)) => {
-            tracing::info!(tenant = %id, "tenant created through self-service signup");
-            (StatusCode::CREATED, axum::Json(MintedKey { key, secret })).into_response()
+            tracing::info!(tenant = %id, recoverable = email.is_some(), "tenant created through self-service signup");
+            (
+                StatusCode::CREATED,
+                axum::Json(MintedKey {
+                    key,
+                    secret,
+                    workspace: Some(id),
+                }),
+            )
+                .into_response()
         }
         Ok(None) => (
             StatusCode::CONFLICT,
@@ -763,6 +817,154 @@ struct MintedKey {
     key: crate::storage::ApiKey,
     /// Store this now; it is not recoverable afterwards.
     secret: String,
+    /// The workspace the key opens, when the caller did not already know it:
+    /// a signup, or a recovery. A key minted from inside a workspace omits it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    workspace: Option<String>,
+}
+
+// ---- getting back in ----
+//
+// Two calls a caller makes holding no credential, which is the point of them.
+// The first mails a single-use key to the address the workspace's owner gave
+// at signup; the second trades that key for a new admin key. Neither says
+// whether a workspace or an address exists: the first answers 202 either way,
+// and the second answers one 401 for an unknown, spent or expired key alike.
+
+/// What somebody who lost their admin key sends.
+#[derive(serde::Deserialize)]
+struct Recover {
+    /// The workspace id they signed up with.
+    workspace: String,
+    /// The owner address they gave then.
+    email: String,
+}
+
+/// How long a mailed recovery key stays good.
+const RECOVERY_TTL_MINUTES: i32 = 30;
+
+/// Mail a recovery key, if the workspace has that owner.
+async fn recover(State(listener): State<Arc<Listener>>, body: Bytes) -> Response {
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it has no workspaces");
+    };
+    let Some(mailer) = listener.mailer.as_ref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "admin-key recovery is not enabled on this gateway: no mail provider is configured",
+        )
+            .into_response();
+    };
+    let Ok(request) = serde_json::from_slice::<Recover>(&body) else {
+        return bad_request("body must be {\"workspace\": string, \"email\": string}");
+    };
+    let workspace = request.workspace.trim().to_lowercase();
+    let email = match owner_email(Some(&request.email)) {
+        Ok(Some(email)) => email,
+        Ok(None) => return bad_request("email is required"),
+        Err(message) => return bad_request(message),
+    };
+
+    // The same answer whether or not anything matched, decided up front so
+    // no branch below can drift into saying more.
+    let accepted = || {
+        (
+            StatusCode::ACCEPTED,
+            axum::Json(serde_json::json!({
+                "accepted": true,
+                "message": format!(
+                    "If that workspace has that owner address, a recovery key is on its way. \
+                     It works once, for {RECOVERY_TTL_MINUTES} minutes."
+                ),
+            })),
+        )
+            .into_response()
+    };
+
+    let tenant = match storage.tenant_with_owner(&workspace, &email).await {
+        Ok(Some(tenant)) => tenant,
+        Ok(None) => return accepted(),
+        Err(error) => return storage_unavailable(&error),
+    };
+
+    let secret_bytes: [u8; 32] = rand::random();
+    let recovery_key = format!("rk_{}", moat_core::hash::sha256_hex(&secret_bytes));
+    let hash = moat_core::hash::sha256_hex(recovery_key.as_bytes());
+    let expires_at = match storage
+        .create_recovery_token(&tenant, &hash, RECOVERY_TTL_MINUTES)
+        .await
+    {
+        Ok(Some(expires_at)) => expires_at,
+        Ok(None) => {
+            tracing::warn!(tenant = %tenant, "recovery requested more than three times in an hour; not sending");
+            return accepted();
+        }
+        Err(error) => return storage_unavailable(&error),
+    };
+
+    match mailer
+        .send_recovery(&email, &tenant, &recovery_key, &expires_at)
+        .await
+    {
+        Ok(()) => accepted(),
+        Err(error) => {
+            tracing::error!(tenant = %tenant, %error, "recovery email not sent");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "the recovery email could not be sent; try again in a minute",
+            )
+                .into_response()
+        }
+    }
+}
+
+/// What the owner sends back, from the mail.
+#[derive(serde::Deserialize)]
+struct Redeem {
+    recovery_key: String,
+}
+
+/// Trade a mailed recovery key for a new admin key.
+async fn redeem_recovery(State(listener): State<Arc<Listener>>, body: Bytes) -> Response {
+    let Some(storage) = listener.shared.storage() else {
+        return bad_request("this gateway has no durable storage, so it has no workspaces");
+    };
+    let Ok(request) = serde_json::from_slice::<Redeem>(&body) else {
+        return bad_request("body must be {\"recovery_key\": string}");
+    };
+    let refused = || {
+        (
+            StatusCode::UNAUTHORIZED,
+            "that recovery key is not valid, has expired, or was already used",
+        )
+            .into_response()
+    };
+    let recovery_key = request.recovery_key.trim();
+    if !recovery_key.starts_with("rk_") {
+        return refused();
+    }
+    let hash = moat_core::hash::sha256_hex(recovery_key.as_bytes());
+
+    let secret_bytes: [u8; 32] = rand::random();
+    let secret = format!("moat_{}", moat_core::hash::sha256_hex(&secret_bytes));
+    let new_hash = moat_core::hash::sha256_hex(secret.as_bytes());
+
+    match storage.redeem_recovery_token(&hash, &new_hash).await {
+        Ok(Some((tenant, key))) => {
+            tracing::info!(tenant = %tenant, key = %key.id, "admin key recovered; previous admin keys withdrawn");
+            (
+                StatusCode::CREATED,
+                axum::Json(MintedKey {
+                    key,
+                    secret,
+                    workspace: Some(tenant),
+                }),
+            )
+                .into_response()
+        }
+        Ok(None) => refused(),
+        Err(error) => storage_unavailable(&error),
+    }
 }
 
 /// A key as the control plane lists it: the record, plus whether it is the one
@@ -948,7 +1150,15 @@ async fn create_key(
     {
         Ok(key) => {
             tracing::info!(tenant = %tenant, key = %key.id, role = %key.access_role, scopes = %key.scopes.join(","), expires_at = ?key.expires_at, "key minted");
-            (StatusCode::CREATED, axum::Json(MintedKey { key, secret })).into_response()
+            (
+                StatusCode::CREATED,
+                axum::Json(MintedKey {
+                    key,
+                    secret,
+                    workspace: None,
+                }),
+            )
+                .into_response()
         }
         Err(error) => storage_unavailable(&error),
     }

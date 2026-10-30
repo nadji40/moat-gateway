@@ -5,6 +5,7 @@
 mod config;
 mod http_listen;
 mod intent_api;
+mod mail;
 mod proxy;
 mod state;
 mod storage;

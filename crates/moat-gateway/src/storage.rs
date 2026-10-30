@@ -516,16 +516,17 @@ impl DurableStore {
         id: &str,
         name: &str,
         key_hash: &str,
+        owner_email: Option<&str>,
     ) -> Result<Option<ApiKey>> {
         let mut client = self.pool.get().await.context("signup connection")?;
         let tx = client.transaction().await.context("signup transaction")?;
 
         let inserted = tx
             .query_opt(
-                "INSERT INTO moat.tenants (id, name) VALUES ($1, $2)
+                "INSERT INTO moat.tenants (id, name, owner_email) VALUES ($1, $2, $3)
                  ON CONFLICT (id) DO NOTHING
                  RETURNING id",
-                &[&id, &name],
+                &[&id, &name, &owner_email],
             )
             .await
             .context("creating tenant")?;
@@ -561,6 +562,110 @@ impl DurableStore {
         let key = ApiKey::from_row(&row);
         tx.commit().await.context("committing signup")?;
         Ok(Some(key))
+    }
+
+    /// The tenant a recovery key may be mailed for: `id` exists, is active,
+    /// and `email` is its owner's address. `None` otherwise, and the caller
+    /// answers the same way in both cases, so the endpoint tells a stranger
+    /// nothing about which workspaces exist or who owns them.
+    pub async fn tenant_with_owner(&self, id: &str, email: &str) -> Result<Option<String>> {
+        let client = self.pool.get().await.context("recovery connection")?;
+        let row = client
+            .query_opt(
+                "SELECT id FROM moat.tenants
+                 WHERE id = $1 AND active AND owner_email = lower($2)",
+                &[&id, &email],
+            )
+            .await
+            .context("looking up the workspace owner")?;
+        Ok(row.map(|r| r.get(0)))
+    }
+
+    /// Record a recovery token for `tenant_id`, good for `ttl_minutes`, and
+    /// return when it expires, RFC 3339.
+    ///
+    /// `None` when the tenant already had three issued in the last hour. A
+    /// lost key is a rare event; a stream of requests is somebody probing an
+    /// address, and the answer to that is to stop sending, quietly.
+    pub async fn create_recovery_token(
+        &self,
+        tenant_id: &str,
+        token_hash: &str,
+        ttl_minutes: i32,
+    ) -> Result<Option<String>> {
+        let client = self.pool.get().await.context("recovery connection")?;
+        let row = client
+            .query_opt(
+                "INSERT INTO moat.recovery_tokens (token_hash, tenant_id, expires_at)
+                 SELECT $1, $2, now() + make_interval(mins => $3)
+                 WHERE (SELECT count(*) FROM moat.recovery_tokens
+                        WHERE tenant_id = $2 AND created_at > now() - interval '1 hour') < 3
+                 RETURNING to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')",
+                &[&token_hash, &tenant_id, &ttl_minutes],
+            )
+            .await
+            .context("recording a recovery token")?;
+        Ok(row.map(|r| r.get(0)))
+    }
+
+    /// Spend a recovery token: mark it used, withdraw every admin key the
+    /// tenant has, and mint a new one, all in one transaction, so a failure
+    /// halfway leaves the old keys working or the new one, never neither.
+    ///
+    /// `None` when the token is unknown, already spent or expired. The caller
+    /// reports those as one thing: which of the three it was is exactly what
+    /// a guesser would like to learn.
+    pub async fn redeem_recovery_token(
+        &self,
+        token_hash: &str,
+        new_key_hash: &str,
+    ) -> Result<Option<(String, ApiKey)>> {
+        let mut client = self.pool.get().await.context("recovery connection")?;
+        let tx = client.transaction().await.context("recovery transaction")?;
+
+        let spent = tx
+            .query_opt(
+                "UPDATE moat.recovery_tokens
+                 SET consumed_at = now()
+                 WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > now()
+                 RETURNING tenant_id",
+                &[&token_hash],
+            )
+            .await
+            .context("spending the recovery token")?;
+        let Some(spent) = spent else {
+            return Ok(None);
+        };
+        let tenant_id: String = spent.get(0);
+
+        // The lost key may be in somebody else's hands. Every admin key goes,
+        // not only the one that was lost, because nothing says which that was.
+        tx.execute(
+            "UPDATE moat.api_keys
+             SET active = false, revoked_at = COALESCE(revoked_at, now())
+             WHERE tenant_id = $1 AND access_role = 'admin' AND active",
+            &[&tenant_id],
+        )
+        .await
+        .context("withdrawing the previous admin keys")?;
+
+        let row = tx
+            .query_one(
+                concat!(
+                    "INSERT INTO moat.api_keys
+                         (id, tenant_id, label, key_hash, access_role)
+                     VALUES ($1, $2, 'recovered admin key', $3, 'admin')
+                     RETURNING ",
+                    api_key_columns!()
+                ),
+                &[&new_key_id(), &tenant_id, &new_key_hash],
+            )
+            .await
+            .context("minting the recovered admin key")?;
+        // Built before the commit, for the same reason as in create_tenant.
+        let key = ApiKey::from_row(&row);
+        tx.commit().await.context("committing the recovery")?;
+        Ok(Some((tenant_id, key)))
     }
 
     /// Every key this tenant has, newest first, revoked ones included. A

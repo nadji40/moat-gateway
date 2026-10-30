@@ -49,6 +49,10 @@ pub struct Config {
     /// Bearer authentication for HTTP and the intent API.
     #[serde(default)]
     pub auth: Auth,
+    /// Outbound mail, for sending a recovery key to a workspace's owner.
+    /// Absent means recovery is off and the endpoint says so.
+    #[serde(default)]
+    pub mail: Option<Mail>,
 }
 
 /// Listen-side transport.
@@ -162,6 +166,37 @@ pub struct Auth {
     /// named customer stays that way.
     #[serde(default)]
     pub self_signup: bool,
+}
+
+/// How the gateway sends mail. The one message it sends is a recovery key,
+/// and it goes through a transactional provider over HTTPS: a verified
+/// sending domain is what keeps that message out of spam.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Mail {
+    /// The provider. `resend` is the one implemented.
+    pub provider: MailProvider,
+    /// Environment variable holding the provider's API key. The key itself
+    /// never appears in this file.
+    #[serde(default = "default_mail_api_key_env")]
+    pub api_key_env: String,
+    /// The From header, with or without a display name:
+    /// `Moat <no-reply@moatgateway.dpdns.org>`. Its domain must be one the
+    /// provider has verified, or the provider refuses the message.
+    pub from: String,
+    /// Where the mail tells its reader to go and redeem the key.
+    pub dashboard_url: String,
+}
+
+/// Mail providers the gateway can speak to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MailProvider {
+    Resend,
+}
+
+fn default_mail_api_key_env() -> String {
+    "MOAT_MAIL_API_KEY".to_owned()
 }
 
 /// Refuse a bind address off the loopback interface.
@@ -296,6 +331,25 @@ impl Config {
             anyhow::ensure!(
                 storage.max_connections > 0,
                 "storage.max_connections must be positive"
+            );
+        }
+        if let Some(mail) = &self.mail {
+            anyhow::ensure!(
+                self.storage.is_some(),
+                "mail needs durable storage: recovery keys live in the database"
+            );
+            anyhow::ensure!(
+                !mail.api_key_env.trim().is_empty(),
+                "mail.api_key_env must not be empty"
+            );
+            anyhow::ensure!(
+                mail.from.contains('@'),
+                "mail.from must be an address, optionally with a display name"
+            );
+            anyhow::ensure!(
+                mail.dashboard_url.starts_with("https://")
+                    || mail.dashboard_url.starts_with("http://"),
+                "mail.dashboard_url must be an http(s) URL"
             );
         }
         let mut seen = std::collections::HashSet::new();

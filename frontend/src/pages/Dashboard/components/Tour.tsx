@@ -46,11 +46,6 @@ const STEPS: Step[] = [
     text: L('Each decision with its reason. Open one for the evidence.', 'كل قرار مع سببه. افتح أيًّا منها لترى الأدلة.'),
   },
   {
-    target: '.collapse-btn', only: 'desktop',
-    title: L('More room', 'مساحة أكبر'),
-    text: L('Fold the sidebar to icons.', 'اطوِ الشريط الجانبي إلى أيقونات.'),
-  },
-  {
     target: '.topbar-actions',
     title: L('Language, theme, this tour', 'اللغة، والمظهر، وهذه الجولة'),
     text: L('Arabic or English, light or dark, and the tour again whenever you want it.', 'العربية أو الإنجليزية، فاتح أو داكن، والجولة متى شئت.'),
