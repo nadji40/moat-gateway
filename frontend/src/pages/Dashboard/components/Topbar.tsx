@@ -16,7 +16,6 @@ export default function Topbar({ onSignout, keyLabel, theme, onTheme, onTour }: 
     <header className="topbar">
       <a className="brand" href="/" aria-label={L('Moat home', 'الصفحة الرئيسية لـ Moat')}>
         <img src="/console-assets/moat-logo.svg" alt="" />
-        <span>Moat</span>
       </a>
       {keyLabel && (
         <span className="topbar-key" title={L('Signed in with', 'مسجّل الدخول باستخدام')}>

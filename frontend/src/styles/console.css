@@ -143,7 +143,6 @@
 .shell .brand { display: flex; align-items: center; gap: 10px; }
 /* 50px logo mark + "Moat" wordmark */
 .shell .brand img { width: 50px; height: 50px; }
-.shell .brand span { font-size: 23px; font-weight: 700; color: #A0A0A0; }
 /* wordmark reads secondary, not white — brand is quiet */
 .shell .app {
   flex: 1;
@@ -1071,7 +1070,6 @@ html[dir="rtl"] .shell .sign-out:focus-visible img { transform: scaleX(-1) trans
 /* ≤620px: small-phone trims — smaller wordmark, icon-only sign out,
    tighter title, rowlists wrap their cells */
 @media (max-width: 620px) {
-  .shell .brand span { font-size: 18px; }
   .shell .topbar .sign-out .signout-label { display: none; }
   .shell .page-title { font-size: 26px; }
   .shell .kgrid, .shell .vgrid { min-width: 760px; }
@@ -1419,7 +1417,6 @@ html[lang="ar"] .shell { --mono: "Roboto Mono", "IBM Plex Sans Arabic", ui-monos
     border-bottom: 1px solid var(--line-muted);
   }
   .shell .brand img { width: 34px; height: 34px; }
-  .shell .brand span { font-size: 18px; }
   .shell .topbar-key {
     display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1;
     font-family: var(--mono); font-size: 11px; color: var(--t2);
@@ -1729,7 +1726,6 @@ html[data-theme="light"] .shell {
 html[data-theme="light"] .shell .surface { box-shadow: 0 1px 2px rgba(0, 0, 0, .06); border-color: var(--line-strong); }
 html[data-theme="light"] .shell .panel,
 html[data-theme="light"] .shell .stat-card { border-color: var(--line-strong); box-shadow: none; }
-html[data-theme="light"] .shell .brand span { color: #3A3A40; }
 html[data-theme="light"] .shell .pg-columns .panel-title,
 html[data-theme="light"] .shell .readout-row .rt,
 html[data-theme="light"] .shell #mandate dd { color: var(--t1); }
