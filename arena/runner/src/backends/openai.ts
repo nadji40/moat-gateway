@@ -97,34 +97,37 @@ export class OpenAIBackend implements AgentBackend {
       );
     }
     const servers = buildServers(ctx);
-    for (const s of servers) await s.connect();
-    // The intent API only exists once the gateway process is up, which the
-    // connect() above guarantees.
-    await ctx.registerIntent(scenario.task);
-    const registeredMetadata = await ctx.registerAuthorization(scenario);
-    const paymentMetadata = metadataForScenario(scenario, registeredMetadata);
-    const input = inputFor(scenario, paymentMetadata);
-
-    // A defense arm puts a published prompt-injection defense in front of the
-    // agent and nothing else. The tool filter has to run before the servers
-    // are wrapped, because what it decides is which tools they advertise.
-    let instructions = INSTRUCTIONS;
-    if (ctx.defense) {
-      const keep =
-        ctx.defense === "tool-filter" ? await this.pickTools(servers, scenario.task) : undefined;
-      for (const server of servers) defend(server, ctx.defense, input, keep);
-      if (ctx.defense === "spotlight") instructions += SPOTLIGHT_PREAMBLE;
-    }
-
-    const agent = new Agent({
-      name: "purchasing-assistant",
-      instructions,
-      model: this.model,
-      mcpServers: servers,
-    });
-
     const trace: AgentTrace = { fetches: [], pays: [] };
+    // Everything after the first connect is inside the try, so a refused
+    // authorization still closes the gateway instead of leaving it holding
+    // the intent API's port for every later run.
     try {
+      for (const s of servers) await s.connect();
+      // The intent API only exists once the gateway process is up, which the
+      // connect() above guarantees.
+      await ctx.registerIntent(scenario.task);
+      const registeredMetadata = await ctx.registerAuthorization(scenario);
+      const paymentMetadata = metadataForScenario(scenario, registeredMetadata);
+      const input = inputFor(scenario, paymentMetadata);
+
+      // A defense arm puts a published prompt-injection defense in front of the
+      // agent and nothing else. The tool filter has to run before the servers
+      // are wrapped, because what it decides is which tools they advertise.
+      let instructions = INSTRUCTIONS;
+      if (ctx.defense) {
+        const keep =
+          ctx.defense === "tool-filter" ? await this.pickTools(servers, scenario.task) : undefined;
+        for (const server of servers) defend(server, ctx.defense, input, keep);
+        if (ctx.defense === "spotlight") instructions += SPOTLIGHT_PREAMBLE;
+      }
+
+      const agent = new Agent({
+        name: "purchasing-assistant",
+        instructions,
+        model: this.model,
+        mcpServers: servers,
+      });
+
       const result = await run(agent, input, { maxTurns: this.maxTurns });
       const payTool = railSpec(ctx.rail).tools.pay;
       for (const call of extractCalls(result)) {

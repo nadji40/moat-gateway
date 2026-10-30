@@ -12,13 +12,16 @@ export class NullBackend implements AgentBackend {
 
   async run(scenario: ArenaScenario, ctx: RunContext): Promise<AgentTrace> {
     const conn = await ctx.connect();
-    await ctx.registerIntent(scenario.task);
-    const registeredMetadata = await ctx.registerAuthorization(scenario);
-    const paymentMetadata = metadataForScenario(scenario, registeredMetadata);
-    const calls = scriptedCalls(scenario);
     const trace: AgentTrace = { fetches: [], pays: [] };
     let connClosed = false;
+    // Registration is inside the try: a refused authorization must still
+    // close the gateway, or it keeps the intent API's port and every later
+    // run's gateway fails to bind it.
     try {
+      await ctx.registerIntent(scenario.task);
+      const registeredMetadata = await ctx.registerAuthorization(scenario);
+      const paymentMetadata = metadataForScenario(scenario, registeredMetadata);
+      const calls = scriptedCalls(scenario);
       for (const page of scenario.pages) {
         const url = pageUrl(page, scenario.rail);
         const { ms } = await conn.tools.fetch(url);
