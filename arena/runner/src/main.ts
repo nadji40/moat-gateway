@@ -5,6 +5,7 @@
 //   pnpm --filter @moat/runner start --backend null --runs 1
 //   pnpm --filter @moat/runner start --backend null --runs 5 --arms none,cap,allowlist,moat --suite all
 //   pnpm --filter @moat/runner start --backend openai --runs 1 --model gpt-5.6-luna
+//   pnpm --filter @moat/runner start --backend anthropic --runs 1 --model claude-opus-5-5
 //
 // Arms (see arena/analysis/README.md):
 //   none       direct to the mocks, no gateway
@@ -34,6 +35,7 @@ import {
 import { ARENA_ROOT, contextFor, mockWebPort, policyFor } from "./context.js";
 import { NullBackend } from "./backends/null.js";
 import { DEFAULT_MODEL, OpenAIBackend } from "./backends/openai.js";
+import { ClaudeModel, DEFAULT_CLAUDE_MODEL } from "./backends/anthropicModel.js";
 import type { AgentBackend, AgentTrace } from "./backends/types.js";
 import { gatewayBinary } from "./gateway.js";
 import {
@@ -85,9 +87,24 @@ function backendByName(name: string, model: string): AgentBackend {
         );
       }
       return new OpenAIBackend(model);
+    case "anthropic":
+      if (!process.env["ANTHROPIC_API_KEY"]) {
+        throw new Error(
+          "the anthropic backend needs ANTHROPIC_API_KEY in the environment; " +
+            "export it, or use --backend null",
+        );
+      }
+      // The SDK's trace exporter sends to OpenAI; with no OpenAI key it
+      // would only log errors.
+      process.env["OPENAI_AGENTS_DISABLE_TRACING"] ??= "1";
+      return new OpenAIBackend(new ClaudeModel(model), 12, "anthropic");
     default:
-      throw new Error(`unknown backend ${name}; use null or openai`);
+      throw new Error(`unknown backend ${name}; use null, openai or anthropic`);
   }
+}
+
+function defaultModelFor(backend: string): string {
+  return backend === "anthropic" ? DEFAULT_CLAUDE_MODEL : DEFAULT_MODEL;
 }
 
 function parseArms(armsArg: string | undefined, modesArg: string | undefined): Arm[] {
@@ -262,11 +279,12 @@ async function main(): Promise<void> {
       arms: { type: "string" },
       rails: { type: "string" },
       modes: { type: "string" },
-      model: { type: "string", default: DEFAULT_MODEL },
+      model: { type: "string" },
       out: { type: "string" },
     },
   });
-  const backend = backendByName(values.backend ?? "null", values.model ?? DEFAULT_MODEL);
+  const model = values.model ?? defaultModelFor(values.backend ?? "null");
+  const backend = backendByName(values.backend ?? "null", model);
   const runs = Number(values.runs);
   if (!Number.isInteger(runs) || runs < 1) throw new Error(`--runs must be a positive integer`);
   const arms = parseArms(values.arms, values.modes);
@@ -319,7 +337,7 @@ async function main(): Promise<void> {
     started_at: new Date().toISOString(),
     finished_at: null,
     backend: backend.name,
-    model: backend.name === "openai" ? (values.model ?? DEFAULT_MODEL) : null,
+    model: backend.name === "null" ? null : model,
     runs,
     suite,
     arms,
@@ -374,7 +392,7 @@ async function main(): Promise<void> {
     writeManifest();
   }
 
-  const modelNote = backend.name === "openai" ? `, model ${values.model}` : "";
+  const modelNote = backend.name === "null" ? "" : `, model ${model}`;
   process.stdout.write(
     `\nrun ${runId} — backend ${backend.name}${modelNote}, ${runs} run(s) per scenario per arm ` +
       `[${arms.join(", ")}] on rail(s) [${rails.join(", ")}], ` +

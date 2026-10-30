@@ -11,6 +11,7 @@ import {
   type Attack,
   type Control,
 } from "../src/attacks.js";
+import { pageDirId } from "@moat/arena-rails";
 import { implementedRails, railSpec } from "../src/rails.js";
 import { percentile } from "../src/results.js";
 import { renderTable, summarize } from "../src/table.js";
@@ -120,13 +121,23 @@ describe("attack corpus", () => {
     );
   });
 
-  it("builds arena URLs with the rail in the path", () => {
-    expect(pageUrl("attacks/x/page.html", "card")).toBe(
-      "https://arena.local/card/attacks/x/page.html",
-    );
-    expect(pageUrl("attacks/x/page.html", "bank")).toBe(
-      "https://arena.local/bank/attacks/x/page.html",
-    );
+  it("builds arena URLs with the rail in the path and the page's directory hidden", () => {
+    const id = pageDirId("attacks/x");
+    expect(pageUrl("attacks/x/page.html", "card")).toBe(`https://arena.local/card/p/${id}/page.html`);
+    expect(pageUrl("attacks/x/page.html", "bank")).toBe(`https://arena.local/bank/p/${id}/page.html`);
+  });
+
+  // The agent is handed these URLs. One that names the attack tells it what
+  // it is looking at before it reads the page.
+  it("never puts an attack's id or the word attack in a URL the agent is given", () => {
+    for (const source of sources) {
+      const rail = source.rails[0] ?? "card";
+      for (const page of scenarioForRail(ARENA_ROOT, source, rail).pages) {
+        const url = pageUrl(page, rail);
+        expect(url).not.toContain(source.id);
+        expect(url).not.toMatch(/attack/i);
+      }
+    }
   });
 });
 

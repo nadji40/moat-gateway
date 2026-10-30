@@ -17,6 +17,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
+import { pageDirId } from "@moat/arena-rails";
 import {
   DEFAULT_RAIL,
   implementedRails,
@@ -423,6 +424,15 @@ function validatePages(arenaRoot: string, file: string, pages: string[]): void {
  * server renders it with that rail's values: the same invoice shows a card
  * account or an IBAN depending on who is asking.
  */
+/**
+ * The URL the agent is given for a page: the rail, then the page's directory
+ * as an opaque id (`pageDirId`), then the file name. The mock web server
+ * still answers the descriptive path, so runs recorded before the ids
+ * existed reproduce as they were.
+ */
 export function pageUrl(page: string, rail: Rail): string {
-  return `https://arena.local/${rail}/${page.replace(/^\/+/, "")}`;
+  const clean = page.replace(/^\/+/, "");
+  const slash = clean.lastIndexOf("/");
+  if (slash < 0) return `https://arena.local/${rail}/${clean}`;
+  return `https://arena.local/${rail}/p/${pageDirId(clean.slice(0, slash))}/${clean.slice(slash + 1)}`;
 }

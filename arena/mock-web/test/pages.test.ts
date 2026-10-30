@@ -2,6 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { pageDirId } from "@moat/arena-rails";
 import { PageStore } from "../src/pages.js";
 
 describe("PageStore", () => {
@@ -16,6 +17,13 @@ describe("PageStore", () => {
   writeFileSync(join(tmpdir(), "moat-pages-outside.txt"), "secret");
   const store = new PageStore(root);
   afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+  it("serves a page by its directory's opaque id, and 404s an id that names nothing", () => {
+    const p = store.fetch(`https://arena.local/card/p/${pageDirId("attacks/x")}/page.html`);
+    expect(p.status).toBe(200);
+    expect(p.body).toBe("<p>hi</p>");
+    expect(store.fetch("https://arena.local/card/p/000000000000/page.html").status).toBe(404);
+  });
 
   it("serves files under the root by URL path", () => {
     const p = store.fetch("https://arena.local/attacks/x/page.html");

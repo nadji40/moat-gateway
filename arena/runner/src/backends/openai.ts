@@ -80,11 +80,14 @@ interface SdkCall {
 }
 
 export class OpenAIBackend implements AgentBackend {
-  readonly name = "openai";
-
+  /**
+   * `name` is "anthropic" when `model` is a ClaudeModel: the agent loop is
+   * the same SDK either way, and only the model behind it differs.
+   */
   constructor(
     private readonly model: string | Model = DEFAULT_MODEL,
     private readonly maxTurns = 12,
+    readonly name: string = "openai",
   ) {}
 
   async run(scenario: ArenaScenario, ctx: RunContext): Promise<AgentTrace> {
@@ -131,7 +134,10 @@ export class OpenAIBackend implements AgentBackend {
       if (typeof final === "string") trace.final = final;
       const usage = collectUsage(result);
       if (usage) trace.tokens = usage;
-      trace.model = typeof this.model === "string" ? this.model : "custom";
+      trace.model =
+        typeof this.model === "string"
+          ? this.model
+          : ((this.model as { name?: string }).name ?? "custom");
     } finally {
       await Promise.allSettled(servers.map((s) => s.close()));
     }

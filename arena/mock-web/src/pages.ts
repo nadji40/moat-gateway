@@ -1,6 +1,12 @@
-import { readFileSync, statSync } from "node:fs";
-import { resolve, sep } from "node:path";
-import { renderForRail, splitRailPath, type Rail } from "@moat/arena-rails";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join, resolve, sep } from "node:path";
+import {
+  PAGE_ROOTS,
+  pageDirId,
+  renderForRail,
+  splitRailPath,
+  type Rail,
+} from "@moat/arena-rails";
 
 /** The host every arena URL uses. Anything else is "off the internet". */
 export const ARENA_HOST = "arena.local";
@@ -42,11 +48,42 @@ export class PageStore {
     if (parsed.hostname !== ARENA_HOST) return undefined;
     const decoded = decodeURIComponent(parsed.pathname);
     if (decoded.includes("\0")) return undefined;
-    const { rail, rest } = splitRailPath(decoded);
-    if (rest === "") return undefined;
+    const { rail, rest: named } = splitRailPath(decoded);
+    const rest = this.unhide(named);
+    if (rest === undefined || rest === "") return undefined;
     const full = resolve(this.root, rest);
     if (full !== this.root && !full.startsWith(this.root + sep)) return undefined;
     return { path: full, rail };
+  }
+
+  /**
+   * `p/<id>/<file>` back to the directory the id stands for (see
+   * `pageDirId`). Any other path is returned as it is, so a descriptive URL
+   * still resolves; an id that matches no directory is undefined, a 404.
+   */
+  private unhide(path: string): string | undefined {
+    const hidden = /^p\/([0-9a-f]{12})\/(.+)$/.exec(path);
+    if (!hidden) return path;
+    const dir = this.dirIds().get(hidden[1] ?? "");
+    return dir === undefined ? undefined : `${dir}/${hidden[2] ?? ""}`;
+  }
+
+  private ids?: Map<string, string>;
+
+  /** Every page directory's id, built once: each root in PAGE_ROOTS and its subdirectories. */
+  private dirIds(): Map<string, string> {
+    if (this.ids) return this.ids;
+    const ids = new Map<string, string>();
+    for (const top of PAGE_ROOTS) {
+      const base = join(this.root, top);
+      if (!existsSync(base)) continue;
+      ids.set(pageDirId(top), top);
+      for (const entry of readdirSync(base, { withFileTypes: true })) {
+        if (entry.isDirectory()) ids.set(pageDirId(`${top}/${entry.name}`), `${top}/${entry.name}`);
+      }
+    }
+    this.ids = ids;
+    return ids;
   }
 
   /** Kept for callers that only want the file. */

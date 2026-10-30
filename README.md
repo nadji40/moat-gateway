@@ -8,7 +8,6 @@
 
 Every payment an agent tries to make is compared with what the user actually asked for. The rest is refused.
 
-[![CI](https://img.shields.io/github/actions/workflow/status/nadji40/moat-gateway/ci.yml?branch=master&label=CI)](https://github.com/nadji40/moat-gateway/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/rust-stable-DEA584?logo=rust&logoColor=white)](rust-toolchain.toml)
 [![Node](https://img.shields.io/badge/node-%E2%89%A5%2022-339933?logo=node.js&logoColor=white)](arena/package.json)
 [![Live](https://img.shields.io/badge/live-moatgateway.dpdns.org-FF5F00)](https://moatgateway.dpdns.org)
@@ -92,6 +91,10 @@ groups who want this now:
 The first pilots are planned mainly in Saudi Arabia, where companies pay
 suppliers in riyals and across the Gulf; that is why the live site runs a
 riyal policy.
+
+Two practitioners from the payments industry reviewed the design in October
+2026, in a personal capacity. Their points, and what Moat does about each,
+are in [docs/external-feedback.md](docs/external-feedback.md).
 
 Further out, the same failure shows up wherever an agent is allowed to pay.
 Each row is a group with the need today, the way it goes wrong for them, and
@@ -268,13 +271,6 @@ Built by a team of ten for Thirduni Cohort 1, October 2026.
 | **Dhoha Boumediene** | Policy data | The spending-limit and currency rules: one approval is one payment, split payments stop at the session total, every currency valued against the limit, over-precise amounts refused (co-author on dc4cbbf, cbf4f60, 36fa3b8, 6beec30, 1cfe8b7) |
 | **Meriem Sara Aounallah** | Language data | How Moat reads amounts and currencies the way people write them: a currency the user did not name is held, trailing zeros are not precision, a currency must be borne out by the message (co-author on 4a02c30, 3b15e7a, 36fa3b8, 1cfe8b7) |
 | **Mounya Hasni** | Research analyst | Regulation and market research: what the rules require, and who needs this |
-
-Git history is the record. Team members' work landed either as their own
-pull requests or as `Co-authored-by:` trailers on the founder's commits:
-
-```bash
-git log --format='%an%n%(trailers:key=Co-authored-by,valueonly)' | sed '/^$/d' | sort | uniq -c
-```
 
 The gateway was started on 15 September 2026, before the cohort; the
 dashboard, the site, the added attacks, the intent-reader evaluation, the

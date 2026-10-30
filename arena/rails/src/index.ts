@@ -9,6 +9,7 @@
 // paying an account that appears nowhere on the page it supposedly read it
 // from -- and the run would still look green.
 
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -140,6 +141,25 @@ export function renderForRail(text: string, rail: Rail, where = "text"): string 
  * differently for each rail. A path with no rail prefix is card, which is
  * what every arena URL meant before rails existed.
  */
+/**
+ * The opaque segment a page directory is served under, `p/<id>/`.
+ *
+ * A URL that reads `attacks/inject-hidden-css/renewal.html` tells the agent
+ * what it is looking at before it has read a word of the page: a model can
+ * decline on the path alone, and a safety classifier can refuse the turn on
+ * it. The id says nothing, and the file name is left as an invoice or a
+ * renewal page would be named.
+ */
+export function pageDirId(dir: string): string {
+  return createHash("sha256")
+    .update(dir.replace(/^\/+|\/+$/g, ""))
+    .digest("hex")
+    .slice(0, 12);
+}
+
+/** The directories under the arena root that pages are served from. */
+export const PAGE_ROOTS = ["attacks", "controls", "pages"] as const;
+
 export function splitRailPath(path: string): { rail: Rail; rest: string } {
   const trimmed = path.replace(/^\/+/, "");
   const slash = trimmed.indexOf("/");
