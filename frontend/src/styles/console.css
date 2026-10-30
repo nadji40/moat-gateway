@@ -477,6 +477,27 @@ html[dir="rtl"] .shell .sign-out:focus-visible img { transform: scaleX(-1) trans
 .shell .btn-run:hover { background: var(--orange-hover); }
 .shell .btn-run .play { width: 24px; height: 24px; }
 .shell .btn-run .play path { fill: #fff; }
+/* While a payment is being evaluated the button stays orange and breathes,
+   and the play glyph gives way to the Moat mark turning, so it reads as
+   working rather than switched off. */
+.shell .btn-run.is-working { opacity: 1; cursor: progress; animation: pg-working-pulse 1.4s ease-in-out infinite; }
+.shell .pg-working-mark { width: 24px; height: 24px; flex: none; color: #fff; }
+.shell .pg-working-arcs { transform-box: view-box; transform-origin: 141px 115px; animation: pg-working-turn 1.6s linear infinite; }
+.shell .pg-working-arc { animation: pg-working-breathe 1.6s ease-in-out infinite; }
+.shell .pg-working-dots { transform-box: view-box; transform-origin: 141px 115px; animation: pg-working-turn 3.2s linear infinite reverse; }
+@keyframes pg-working-turn { to { transform: rotate(360deg); } }
+@keyframes pg-working-breathe {
+  0% { stroke-dasharray: 6 94; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 70 30; stroke-dashoffset: -20; }
+  100% { stroke-dasharray: 6 94; stroke-dashoffset: -100; }
+}
+@keyframes pg-working-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 95, 0, .45); }
+  50% { box-shadow: 0 0 0 7px rgba(255, 95, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell .btn-run.is-working, .shell .pg-working-arcs, .shell .pg-working-arc, .shell .pg-working-dots { animation: none; }
+}
 /* ------------------------------------------------------------
    Tables — DESIGN §5.12–5.13: #252525 shell, headers Ubuntu 18/500
    white, rows Roboto Mono 12/500 (#F4F4F6 primary / #A0A0A0 muted),

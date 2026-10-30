@@ -1,4 +1,22 @@
 import { useState, useId, useRef, useEffect } from 'react'
+
+/** The Moat mark at work: the arcs turn while a payment is being evaluated.
+ *  Same geometry and timing as the Tests page's running state. */
+function WorkingMark() {
+  return (
+    <svg className="pg-working-mark" viewBox="69 43 144 144" aria-hidden="true" focusable="false">
+      <g className="pg-working-arcs" fill="none" stroke="currentColor" strokeWidth="13" strokeLinecap="round">
+        <path className="pg-working-arc" pathLength="100" d="M117 52.4 A67 67 0 0 1 202.7 141.2" />
+        <path className="pg-working-arc" pathLength="100" d="M177.5 171.2 A67 67 0 0 1 86.1 76.6" />
+      </g>
+      <g className="pg-working-dots" fill="currentColor">
+        <circle cx="99.7" cy="62.2" r="12" />
+        <circle cx="192.3" cy="158.1" r="12" />
+      </g>
+      <path fill="currentColor" fillRule="evenodd" d="M110 90 H173 A7 7 0 0 1 180 97 V133 A7 7 0 0 1 173 140 H110 A7 7 0 0 1 103 133 V97 A7 7 0 0 1 110 90 Z M115 105 H123 A2 2 0 0 1 125 107 V112 A2 2 0 0 1 123 114 H115 A2 2 0 0 1 113 112 V107 A2 2 0 0 1 115 105 Z" />
+    </svg>
+  )
+}
 import { L } from '../../../i18n'
 import { attempt, forgetPair, openSession } from '../playground'
 import { useThumb } from './bits'
@@ -546,19 +564,24 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
               </div>
 
               <button
-                className="btn btn-run"
+                className={`btn btn-run${evaluating ? ' is-working' : ''}`}
                 id="attempt"
                 type="button"
                 disabled={evaluating}
+                aria-busy={evaluating}
                 onClick={handleAttemptOffChain}
               >
-                <svg className="play" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M9.13783 3.45878l-6.53285-3.26643c-1.19682-0.59841-2.60498 0.27188-2.60498 1.60997l0 6.17508c0 1.33809 1.40816 2.20838 2.60498 1.60997l6.53285-3.26643c1.17928-0.58964 1.17928-2.27253 0-2.86216z"
-                    transform="translate(7 7.11)"
-                    fill="#222222"
-                  />
-                </svg>
+                {evaluating ? (
+                  <WorkingMark />
+                ) : (
+                  <svg className="play" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M9.13783 3.45878l-6.53285-3.26643c-1.19682-0.59841-2.60498 0.27188-2.60498 1.60997l0 6.17508c0 1.33809 1.40816 2.20838 2.60498 1.60997l6.53285-3.26643c1.17928-0.58964 1.17928-2.27253 0-2.86216z"
+                      transform="translate(7 7.11)"
+                      fill="#222222"
+                    />
+                  </svg>
+                )}
                 <span>{evaluating ? L('Evaluating', 'جارٍ التقييم') : L('Attempt payment', 'جرّب الدفع')}</span>
               </button>
               {attemptStatus && <span className="hint" style={{ color: 'var(--red-l)' }}>{attemptStatus}</span>}
