@@ -265,7 +265,8 @@ Each choice, and why it won.
 
 ## Team
 
-Built by a team of ten for Thirduni Cohort 1, October 2026.
+Built from scratch by a team of ten during Thirduni Cohort 1, September to
+October 2026.
 
 | Name | Role | What they actually did |
 |---|---|---|
@@ -280,10 +281,11 @@ Built by a team of ten for Thirduni Cohort 1, October 2026.
 | **Meriem Sara Aounallah** | Language data | How Moat reads amounts and currencies the way people write them: a currency the user did not name is held, trailing zeros are not precision, a currency must be borne out by the message (co-author on 4a02c30, 3b15e7a, 36fa3b8, 1cfe8b7) |
 | **Mounya Hasni** | Research analyst | Regulation and market research: what the rules require, and who needs this |
 
-The gateway was started on 15 September 2026, before the cohort; the
-dashboard, the site, the added attacks, the intent-reader evaluation, the
-Arabic language work and the market research were built by the team during
-the programme.
+Everything here was built from scratch during Thirduni Cohort 1. The first
+commit is from 15 September 2026, and the gateway, the policy engine, the
+dashboard, the site, the attack corpus, the intent-reader evaluation, the
+Arabic language work and the market research all followed inside the
+programme.
 
 ## Honest status
 
