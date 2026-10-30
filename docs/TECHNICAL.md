@@ -957,6 +957,21 @@ delivers it; the DNS that makes receivers trust it is in
 section the gateway starts and `/v1/recover` answers 503 saying recovery is
 not enabled.
 
+**The assistant.** The dashboard has a chat, opened from a robot in the
+header or a floating one that can be dismissed, answered by Claude
+(`claude-sonnet-5-5`) through the website's server, `POST /v1/assistant`.
+The server forwards the caller's own admin bearer to the gateway to read
+their keys, usage and recent verdicts, so the model speaks only about the
+workspace that token opens and the server stores nothing; the answer is
+streamed back as server-sent events (`thinking`, `text`, `done`, `error`)
+and typed out in the panel. The system prompt is in
+[`demo/src/assistant.ts`](../demo/src/assistant.ts): what Moat is, how the
+panes work, how to guide a first tester, that no real money moves, and
+`support@moatgateway.dpdns.org` for a person. The Anthropic key is
+`MOAT_ASSISTANT_API_KEY` in `/etc/moat/moat-demo.env`; without it the
+endpoint answers 503 and the panel says so. Forty messages an hour per
+caller.
+
 **Scopes** narrow a key inside its role. They can never widen one: the role is
 checked first and separately, so no scope reaches a surface the role does not
 already open. An empty list means the whole role, which is what every key

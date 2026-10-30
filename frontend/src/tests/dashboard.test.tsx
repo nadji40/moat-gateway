@@ -395,6 +395,53 @@ describe('the dashboard', () => {
     expect((pay.body as { params: { arguments: Record<string, unknown> } }).params.arguments).toMatchObject({ payee: 'Zed Corp', amount: 520, currency: 'SAR' })
   })
 
+  it('answers in the assistant as the words arrive, after a thinking state, and sends the workspace key', async () => {
+    const sse = (events: [string, unknown][]) =>
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          const enc = new TextEncoder()
+          for (const [name, data] of events) controller.enqueue(enc.encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`))
+          controller.close()
+        },
+      })
+    const seen = gateway({
+      '/v1/assistant': () => new Response(sse([
+        ['thinking', {}],
+        ['text', { t: 'Open the **Playground** and press Attempt. ' }],
+        ['text', { t: 'No real money moves here.' }],
+        ['done', { stop: 'end_turn' }],
+      ]), { headers: { 'content-type': 'text/event-stream' } }),
+    })
+    openDashboard()
+    // The floating robot can be sent away; the header keeps the way in.
+    fireEvent.click(await screen.findByRole('button', { name: 'Hide this button; the assistant stays in the header' }))
+    expect(localStorage.getItem('moat.ws.assistant.fab')).toBe('gone')
+    expect(document.querySelector('#assistant-fab')).toBeNull()
+    // With the robot gone, the header's button is the one left with that name.
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the assistant' }))
+    const panel = await screen.findByRole('dialog', { name: 'Moat assistant' })
+    expect(within(panel).getByText(/no real money moves here/i)).toBeInTheDocument()
+    expect(within(panel).getByText('support@moatgateway.dpdns.org', { selector: 'a' })).toBeInTheDocument()
+
+    fireEvent.change(within(panel).getByLabelText('Your question'), { target: { value: 'How do I test?' } })
+    fireEvent.click(within(panel).getByRole('button', { name: 'Send' }))
+    // Thinking first, then the answer written out, bold and all. Finding the
+    // thinking state is the assertion: with a mocked stream it gives way to
+    // the first words within a tick, so it may be gone by the next line.
+    await within(panel).findByText('Thinking…')
+    // The panel is the same element throughout: streaming must not remount it.
+    const log = () => within(screen.getByRole('dialog', { name: 'Moat assistant' }))
+    expect(screen.getByRole('dialog', { name: 'Moat assistant' })).toBe(panel)
+    await waitFor(() => expect(log().getByText('Playground', { selector: 'strong' })).toBeInTheDocument(), { timeout: 3000 })
+    await waitFor(() => expect(log().getByText(/press Attempt\. No real money moves here\./)).toBeInTheDocument(), { timeout: 3000 })
+    expect(screen.getByRole('dialog', { name: 'Moat assistant' })).toBe(panel)
+    const ask = seen.find((s) => s.url === '/v1/assistant')!
+    expect(ask.auth).toBe('Bearer ' + ADMIN)
+    expect((ask.body as { messages: { role: string; content: string }[]; lang: string; pane: string })).toMatchObject({
+      lang: 'en', pane: 'pane-playground', messages: [{ role: 'user', content: 'How do I test?' }],
+    })
+  })
+
   it('runs in Arabic, right to left', async () => {
     localStorage.setItem('moat.lang', 'ar')
     document.documentElement.dir = 'rtl'

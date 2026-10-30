@@ -18,6 +18,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chainDemo, chainState } from "./chain.js";
 import { isControlPath, isIntentPath, isMcpPath, proxyControl, proxyIntent, proxyMcp } from "./control.js";
+import { handleAssistant, isAssistantPath } from "./assistant.js";
 import { startUptime, uptime } from "./uptime.js";
 import { runSuite, TESTS } from "./suite.js";
 import {
@@ -241,6 +242,13 @@ const server = createServer(async (req, res) => {
     if (path === "/v1/chain" && method === "POST") {
       const outcome = await chainDemo(caller(req.headers), url.searchParams.get("mode") ?? "approved");
       return json(res, outcome.status, outcome.body);
+    }
+
+    // The dashboard's assistant: the caller's own workspace, read with their
+    // token, and Claude's answer streamed back. Its own limiter, because a
+    // conversation is a different rate from a page load.
+    if (isAssistantPath(path) && method === "POST") {
+      return handleAssistant(req, res, await readBody(req), caller(req.headers));
     }
 
     // The dashboard's three calls, forwarded to the authenticated gateway.

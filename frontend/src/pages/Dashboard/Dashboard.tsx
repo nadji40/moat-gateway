@@ -13,6 +13,7 @@ import GateSection from './components/GateSection'
 import { LiquidGlassProvider } from '../../components/ui/liquid/liquid-glass-provider'
 import MintedSection from './components/MintedSection'
 import VerdictDrawer from './components/VerdictDrawer'
+import AssistantPanel, { AssistantLauncher } from './components/Assistant'
 import Footer from '../../components/layout/Footer'
 import type { Verdict, ApiKey, UsageData, PaneId } from './types'
 // The console's own styles travel with this page's chunk, so the other pages
@@ -57,6 +58,7 @@ export default function Dashboard() {
   const [theme, setTheme] = useState<Theme>(() => (pref.get(THEME) === 'light' ? 'light' : 'dark'))
   const [collapsed, setCollapsed] = useState(() => pref.get(FOLDED) === '1')
   const [touring, setTouring] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
 
   // The theme belongs to the workspace, so it is set while the workspace is
   // open and taken off again when it closes.
@@ -244,7 +246,8 @@ export default function Dashboard() {
     <>
       <div className="shell">
         <Topbar onSignout={handleSignout} keyLabel={keyLabel} theme={theme}
-          onTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} onTour={() => setTouring(true)} />
+          onTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))} onTour={() => setTouring(true)}
+          onAssistant={() => setAssistantOpen(true)} />
         <div className={`app ${collapsed ? 'collapsed' : ''}`}>
           <Sidebar
             activePane={activePane}
@@ -277,6 +280,8 @@ export default function Dashboard() {
         </div>
         <Tabbar activePane={activePane} onPaneChange={choosePane} keysCount={liveKeys} verdictsCount={feed.length} />
         {touring && <Tour onPane={choosePane} onClose={endTour} />}
+        <AssistantLauncher open={assistantOpen} onOpen={() => setAssistantOpen(true)} />
+        <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} pane={activePane} />
       </div>
 
       {drawerVerdict && (

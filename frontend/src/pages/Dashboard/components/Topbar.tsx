@@ -1,3 +1,4 @@
+import { Bot } from 'lucide-react'
 import { L, isAr, setLang } from '../../../i18n'
 
 interface TopbarProps {
@@ -5,13 +6,14 @@ interface TopbarProps {
   theme: 'dark' | 'light'
   onTheme: () => void
   onTour: () => void
+  onAssistant: () => void
   /** The signed-in key's label, shown here on a phone, where there is no sidebar. */
   keyLabel?: string
 }
 
 /** The workspace's own header. The site navigation is hidden while signed in,
  *  so the way home and the language switch live here. */
-export default function Topbar({ onSignout, keyLabel, theme, onTheme, onTour }: TopbarProps) {
+export default function Topbar({ onSignout, keyLabel, theme, onTheme, onTour, onAssistant }: TopbarProps) {
   return (
     <header className="topbar">
       <a className="brand" href="/" aria-label={L('Moat home', 'الصفحة الرئيسية لـ Moat')}>
@@ -24,6 +26,10 @@ export default function Topbar({ onSignout, keyLabel, theme, onTheme, onTour }: 
         </span>
       )}
       <div className="topbar-actions">
+        <button type="button" className="icon-btn assistant-btn" onClick={onAssistant}
+          aria-label={L('Ask the assistant', 'اسأل المساعد')} title={L('Assistant', 'المساعد')}>
+          <Bot size={20} strokeWidth={2} aria-hidden="true" />
+        </button>
         <button type="button" className="icon-btn tour-btn" onClick={onTour}
           aria-label={L('Show me around', 'جولة في لوحة التحكم')} title={L('Tour', 'جولة')}>
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">

@@ -21,6 +21,14 @@ if [[ -r /usr/local/apache/logs/moat-domains-access_log ]]; then
   bash ../scripts/uptime-from-apache.sh
 fi
 
+# The site's server has dependencies of its own (the assistant's Claude
+# client); a restart with a missing one fails at import and the site is down.
+printf '\n\033[1m--- demo dependencies\033[0m\n'
+(
+  cd ../demo
+  if command -v pnpm >/dev/null 2>&1; then pnpm install --frozen-lockfile; else corepack pnpm install --frozen-lockfile; fi
+)
+
 printf '\n\033[1m--- restart\033[0m\n'
 systemctl restart "$service"
 

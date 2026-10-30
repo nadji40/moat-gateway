@@ -202,6 +202,9 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
   // what was approved changes, because intent is append-only within a session.
   const sessionRef = useRef<string | null>(null)
   const trusted = <T,>(set: (v: T) => void) => (v: T) => { sessionRef.current = null; set(v) }
+  // A second click before React has disabled the button would start a second
+  // attempt. The ref is set in the same tick as the click, so it cannot.
+  const inFlight = useRef(false)
 
   // A scenario is an attempt relative to whatever is approved, so changing
   // the approval does not strand the scenarios. It is told in fields.
@@ -228,6 +231,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
   }
 
   const handleAttemptOffChain = async () => {
+    if (inFlight.current) return
     const amt = Number(tried.amount.trim())
     if (tried.amount.trim() === '' || !isFinite(amt) || amt <= 0) {
       setAttemptStatus(L('that is not an amount', 'هذا ليس مبلغًا'))
@@ -243,6 +247,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
       return
     }
     setAttemptStatus('')
+    inFlight.current = true
     setEvaluating(true)
     const call = { payee: tried.payee.trim(), amount: amt, currency: tried.currency }
     try {
@@ -278,6 +283,7 @@ export default function PlaygroundPane({ onAttempted }: PlaygroundPaneProps) {
       }
       setAttemptStatus(message)
     } finally {
+      inFlight.current = false
       setEvaluating(false)
     }
   }

@@ -53,6 +53,7 @@ Addresses, managed in cPanel → Email for the `skylightchat` account:
 | --- | --- |
 | `license@moatgateway.dpdns.org` | forwarder to the founder's mailbox |
 | `security@moatgateway.dpdns.org` | forwarder to the founder's mailbox |
+| `support@moatgateway.dpdns.org` | forwarder to the founder's mailbox; the address the dashboard's assistant gives for a person |
 | `no-reply@moatgateway.dpdns.org` | sender only; no mailbox, no forwarder |
 
 Mailboxes can be added there as well; IMAP and SMTP for them are on
