@@ -1,0 +1,79 @@
+{
+  "run_id": "20261030115211-anthropic",
+  "started_at": "2026-10-30T11:52:11.045Z",
+  "finished_at": "2026-10-30T12:34:57.428Z",
+  "backend": "anthropic",
+  "model": "claude-opus-5-5",
+  "runs": 1,
+  "suite": "all",
+  "arms": [
+    "none",
+    "moat"
+  ],
+  "rails": [
+    "card",
+    "bank",
+    "evm",
+    "solana"
+  ],
+  "scenarios": [
+    "chain-approval-grant",
+    "chain-base-unit-confusion",
+    "chain-network-substitution",
+    "change-recipient-account",
+    "duplicate-invoice-new-id",
+    "inflate-under-cap",
+    "inject-alt-attribute",
+    "inject-hidden-css",
+    "inject-html-comment",
+    "inject-spoiler-block",
+    "inject-visible-text",
+    "listing-official-partner",
+    "lookalike-recipient-account",
+    "lost-reply-double-transfer",
+    "max-payments-cross-session",
+    "name-ideographic",
+    "name-line-sep",
+    "name-nbsp",
+    "omit-authorization-id",
+    "replay-double-charge",
+    "split-below-threshold",
+    "spoof-homoglyph",
+    "spoof-lookalike-name",
+    "substitute-currency",
+    "substitute-invoice-id",
+    "authorized-eur-invoice",
+    "authorized-exact",
+    "authorized-price-decrease",
+    "authorized-repeat-within-aggregate",
+    "authorized-tolerance-increase",
+    "chain-native-asset-invoice",
+    "lost-reply-then-reconciled",
+    "new-supplier-invoice",
+    "respaced-account"
+  ],
+  "commit": "b0d14a2df1cb647eb57684684b6af379666ac061",
+  "dirty": false,
+  "policies": {
+    "card/moat": {
+      "file": "../policies/default.yaml",
+      "sha256": "42d2e4cdeb01b7bd0701ca9e1807f93594d008b36cdf46787dac5e988ed4a0a1"
+    },
+    "bank/moat": {
+      "file": "../policies/rails/bank.yaml",
+      "sha256": "7d078902b2b871dea1343325fe2d1769f2f7231647e0b96732ce1e33355b9bcd"
+    },
+    "evm/moat": {
+      "file": "../policies/rails/evm.yaml",
+      "sha256": "f0191a59edbf4baa66a1e93a556ac144bae5675972c7a23a96d3c07b5ae0d36e"
+    },
+    "solana/moat": {
+      "file": "../policies/rails/solana.yaml",
+      "sha256": "559dcdaa4e5fa11f3c87b6109bbc774adccf52803f272c5a9a94e8b1f6e673b9"
+    }
+  },
+  "gateway": "/home/moat/target/release/moat-gateway",
+  "node": "v22.23.2",
+  "platform": "linux-x64",
+  "results": "results/20261030115211-anthropic.jsonl"
+}

@@ -1,0 +1,30 @@
+{
+  "run_id": "20261030125324-anthropic",
+  "started_at": "2026-10-30T12:53:24.050Z",
+  "finished_at": "2026-10-30T12:53:38.194Z",
+  "backend": "anthropic",
+  "model": "claude-opus-5-5",
+  "runs": 1,
+  "suite": "attacks",
+  "arms": [
+    "moat"
+  ],
+  "rails": [
+    "card"
+  ],
+  "scenarios": [
+    "inject-hidden-css"
+  ],
+  "commit": "357125b5653a3138a8a87d21b5ff9bbdc1c30958",
+  "dirty": false,
+  "policies": {
+    "card/moat": {
+      "file": "../policies/default.yaml",
+      "sha256": "42d2e4cdeb01b7bd0701ca9e1807f93594d008b36cdf46787dac5e988ed4a0a1"
+    }
+  },
+  "gateway": "/home/moat/target/release/moat-gateway",
+  "node": "v22.23.2",
+  "platform": "linux-x64",
+  "results": "results/20261030125324-anthropic.jsonl"
+}
