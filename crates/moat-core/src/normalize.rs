@@ -38,19 +38,23 @@ impl Normalized {
     }
 }
 
-/// Trim, case-fold, collapse runs of whitespace to one space.
+/// Trim, case-fold, collapse runs of ASCII whitespace to one space.
 ///
 /// Nothing else is folded. A provider pays the merchant whose configured
 /// name is exactly the one it was given, so "Monitoring Pro Inc." and an
 /// Arabic name written with a tatweel can each be a different, look-alike
 /// merchant; folding them here would hand the look-alike the real one's
-/// provenance. Spelling variation is solved by approving an account, not by
-/// matching names more loosely.
+/// provenance. The same goes for the other Unicode spaces: a name with a
+/// no-break, ideographic or line-separator space where the real one has a
+/// space is a different string to the provider, so it stays one here (the
+/// arena's name-nbsp, name-ideographic and name-line-sep attacks). Spelling
+/// variation is solved by approving an account, not by matching names more
+/// loosely.
 pub fn normalize_text(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut pending_space = false;
-    for ch in s.trim().chars() {
-        if ch.is_whitespace() {
+    for ch in s.trim_matches(|c: char| c.is_ascii_whitespace()).chars() {
+        if ch.is_ascii_whitespace() {
             pending_space = true;
             continue;
         }
@@ -118,6 +122,9 @@ pub fn spelling_key(s: &str) -> String {
         .filter_map(|ch| match ch {
             '.' | '\u{0640}' | '\u{064B}'..='\u{065F}' | '\u{0670}' => None,
             ',' | '\u{060C}' | '-' | '_' => Some(' '),
+            // The Unicode spaces normalize_text keeps distinct are one
+            // spelling here; this key is only trusted with the account pinned.
+            c if c.is_whitespace() => Some(' '),
             '\u{0622}' | '\u{0623}' | '\u{0625}' | '\u{0671}' => Some('\u{0627}'),
             '\u{0629}' => Some('\u{0647}'),
             '\u{0649}' | '\u{06CC}' => Some('\u{064A}'),
@@ -241,7 +248,8 @@ mod tests {
             ("   ", ""),
             ("Straße", "straße"),
             ("İstanbul", "i̇stanbul"),
-            ("a\u{00A0}b", "a b"),
+            ("a\u{00A0}b", "a\u{00a0}b"),
+            ("\u{00A0}a\u{3000}", "\u{00a0}a\u{3000}"),
         ];
         for (input, want) in cases {
             assert_eq!(normalize_text(input), want, "input {input:?}");
@@ -261,6 +269,8 @@ mod tests {
             ("مؤسسة عسـير", "مؤسسه عسير"),
             ("أحمد", "احمد"),
             ("علی", "علي"),
+            ("Monitoring Pro\u{00A0}Inc", "Monitoring Pro Inc"),
+            ("Monitoring Pro\u{3000}Inc", "Monitoring Pro Inc"),
         ];
         for (a, b) in same {
             assert_eq!(spelling_key(a), spelling_key(b), "{a} / {b}");
@@ -292,6 +302,21 @@ mod tests {
                 "M\u{043E}nitoring Pro Inc",
                 "Monitoring Pro Inc",
                 "Cyrillic o",
+            ),
+            (
+                "Monitoring Pro\u{00A0}Inc",
+                "Monitoring Pro Inc",
+                "no-break space",
+            ),
+            (
+                "Monitoring Pro\u{3000}Inc",
+                "Monitoring Pro Inc",
+                "ideographic space",
+            ),
+            (
+                "Monitoring Pro\u{2028}Inc",
+                "Monitoring Pro Inc",
+                "line separator",
             ),
         ];
         for (a, b, what) in pairs {
