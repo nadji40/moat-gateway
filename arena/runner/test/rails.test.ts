@@ -72,6 +72,8 @@ describe("rail registry", () => {
         destination: "to_address",
         currency: "token",
         network: "network",
+        // The one argument the two chains name differently.
+        assetContract: id === "evm" ? "token_address" : "mint",
       });
       expect(chain.destinationRequired, id).toBe(true);
       // The chain is half of the address, so a call has to name one.

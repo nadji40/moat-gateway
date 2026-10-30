@@ -87,6 +87,8 @@ export const AuthorizationSchema = z.object({
   recipient_account_id: z.string().min(1).optional(),
   /** Bound on rails with more than one chain; supplied by expansion. */
   network: z.string().min(1).optional(),
+  /** The token's contract or mint; supplied by expansion on token rails. */
+  asset_contract: z.string().min(1).optional(),
   invoice_fingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/).optional(),
   require_invoice_fingerprint: z.boolean().default(false),
   aggregate_limit: Amount.optional(),
@@ -325,6 +327,16 @@ function boundToRail(spec: RailSpec, auth: AttackAuthorization): AttackAuthoriza
   if (spec.networkRequired && out.network === undefined) {
     out.network = spec.fixtures.network;
   }
+  // A token mandate names its contract as well, or the gateway refuses it:
+  // the right ticker in another contract is a different asset.
+  const contract = spec.fixtures.asset_contract;
+  if (
+    contract !== undefined &&
+    out.asset_contract === undefined &&
+    out.currency.toUpperCase() === spec.fixtures.asset.toUpperCase()
+  ) {
+    out.asset_contract = contract;
+  }
   return out;
 }
 
@@ -374,6 +386,19 @@ function adaptCalls(
     if (spec.networkRequired && out[spec.args.network] === undefined) {
       out[spec.args.network] = spec.fixtures.network ?? "";
     }
+    // A token payment names the contract it is in, as a careful wallet
+    // client does and as the gateway requires against a token mandate. Only
+    // for the rail's own token: the chain's coin has no contract.
+    const contractArg = spec.args.assetContract;
+    const contract = spec.fixtures.asset_contract;
+    if (
+      contractArg !== undefined &&
+      contract !== undefined &&
+      out[contractArg] === undefined &&
+      String(call.currency).toUpperCase() === spec.fixtures.asset.toUpperCase()
+    ) {
+      out[contractArg] = contract;
+    }
     // An approval is granted to a spender, not sent to a recipient. The
     // scenario writes it as a payment because that is what it costs you.
     if (call.tool === "approve") {
@@ -384,8 +409,15 @@ function adaptCalls(
   });
 }
 
+/**
+ * Whether two payee names are the same company, as the gateway's
+ * normalize_text decides it: case and runs of ASCII whitespace fold, nothing
+ * else. A name with a no-break or ideographic space is a different
+ * registered company, so a call to it goes to that company's own account.
+ */
 function sameName(a: string, b: string): boolean {
-  const fold = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const fold = (s: string): string =>
+    s.replace(/^[ \t\n\f\r]+|[ \t\n\f\r]+$/g, "").toLowerCase().replace(/[ \t\n\f\r]+/g, " ");
   return fold(a) === fold(b);
 }
 

@@ -54,6 +54,7 @@
     "alt_asset": "ETH",
     "symbol": "$",
     "decimals": 6,
+    "asset_contract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
     "network": "eip155:84532",
     "alt_network": "eip155:1",
     "authorized": {
@@ -80,6 +81,7 @@
     "alt_asset": "SOL",
     "symbol": "$",
     "decimals": 6,
+    "asset_contract": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
     "network": "solana:devnet",
     "alt_network": "solana:mainnet",
     "authorized": {

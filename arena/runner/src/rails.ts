@@ -87,6 +87,8 @@ export interface RailSpec {
     readonly currency: string;
     /** What it calls the chain, on rails that have more than one. */
     readonly network: string;
+    /** What it calls the token's contract or mint, on rails with tokens. */
+    readonly assetContract?: string;
   };
   /**
    * Whether a call has to name a destination. A card payment identifies a
@@ -181,6 +183,7 @@ function chainRail(id: "evm" | "solana"): RailSpec {
       destination: "to_address",
       currency: "token",
       network: "network",
+      assetContract: id === "evm" ? "token_address" : "mint",
     },
     destinationRequired: true,
     networkRequired: true,

@@ -51,6 +51,13 @@ export interface RailFixtures {
   /** Minor-unit exponent of `asset`, used to compare amounts exactly. */
   readonly decimals: number;
   /**
+   * The contract or mint `asset` lives in, on rails where the asset is a
+   * token. A ticker is a label any contract can wear, so the gateway refuses
+   * a token authorization that does not name one. The same address as the
+   * mock chain's wallet holds (mock-chain/src/chain.ts).
+   */
+  readonly asset_contract?: string;
+  /**
    * The network this rail's destinations live on, where the rail has more
    * than one. Absent on rails where an account identifies itself: an IBAN
    * carries its own country, a provider account exists in one place only.
