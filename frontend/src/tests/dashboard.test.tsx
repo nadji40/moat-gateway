@@ -210,7 +210,7 @@ describe('the dashboard', () => {
     const tabbar = document.querySelector<HTMLElement>('.tabbar')!
     // Live keys (not revoked, not expired) and recent verdicts are counted.
     await waitFor(() => expect(within(tabbar).getAllByRole('button').map((t) => t.textContent))
-      .toEqual(['Usage', '2API keys', 'Connect', 'Playground', '2Verdicts']))
+      .toEqual(['Playground', 'Usage', '2API keys', 'Connect', '2Verdicts']))
     expect(within(tabbar).getByRole('button', { name: /Usage/ })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(within(tabbar).getByRole('button', { name: /Verdicts/ }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Verdicts' })).toBeInTheDocument()

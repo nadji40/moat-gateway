@@ -13,10 +13,12 @@ interface SidebarProps {
 }
 
 export const TABS: { pane: PaneId; icon: string; label: string; count?: 'keys' | 'verdicts' }[] = [
+  // The playground leads: it is where a workspace opens and the first thing
+  // to do in one.
+  { pane: 'pane-playground', icon: 'playground.svg', label: L('Playground', 'ساحة التجربة') },
   { pane: 'pane-usage', icon: 'Usage.svg', label: L('Usage', 'الاستخدام') },
   { pane: 'pane-keys', icon: 'Key.svg', label: L('API keys', 'مفاتيح API'), count: 'keys' },
   { pane: 'pane-connect', icon: 'connect.svg', label: L('Connect', 'الربط') },
-  { pane: 'pane-playground', icon: 'playground.svg', label: L('Playground', 'ساحة التجربة') },
   { pane: 'pane-verdicts', icon: 'Verdicts.svg', label: L('Verdicts', 'الأحكام'), count: 'verdicts' },
 ]
 
