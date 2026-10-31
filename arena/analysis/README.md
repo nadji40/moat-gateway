@@ -161,7 +161,15 @@ Each run writes two files into `arena/results/`:
 
 - `<run_id>.jsonl` — one line per scenario × arm × iteration
 - `<run_id>.manifest.json` — commit, dirty flag, policy files and their SHA-256,
-  backend, model, runs, suite, arms, scenario list, Node version, platform
+  backend, model, runs, suite, arms, scenario list, Node version, platform, and
+  the gateway binary: its path, when it was built, the newest source change,
+  whether it is stale, and whether `MOAT_GATEWAY_BIN` chose it
+
+The runner takes the newest `moat-gateway` under `target/`, release or debug,
+and refuses one built before the newest change under `crates/`: a release
+binary left over from an earlier week once outranked the day's debug build and
+measured code that was not in the tree. `MOAT_GATEWAY_BIN` names a binary on
+purpose, and the manifest then still says whether it is stale.
 
 A row without a manifest is not reproducible and should not go into the report.
 

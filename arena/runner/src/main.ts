@@ -37,7 +37,7 @@ import { NullBackend } from "./backends/null.js";
 import { DEFAULT_MODEL, OpenAIBackend } from "./backends/openai.js";
 import { ClaudeModel, DEFAULT_CLAUDE_MODEL } from "./backends/anthropicModel.js";
 import type { AgentBackend, AgentTrace } from "./backends/types.js";
-import { gatewayBinary } from "./gateway.js";
+import { assertCurrent, gatewayBuild, type GatewayBuild } from "./gateway.js";
 import {
   parseRails,
   railSpec,
@@ -69,7 +69,11 @@ interface RunManifest {
    * and mean the card rail.
    */
   policies: Record<string, { file: string; sha256: string }>;
-  gateway: string | null;
+  /**
+   * The binary that ran, when and from what it was built, and how it was
+   * chosen. Manifests written before this carry the path alone.
+   */
+  gateway: GatewayBuild | null;
   node: string;
   platform: string;
   results: string;
@@ -346,7 +350,9 @@ async function main(): Promise<void> {
     commit: git("rev-parse HEAD") ?? "unknown",
     dirty: (git("status --porcelain") ?? "").length > 0,
     policies,
-    gateway: needsGateway ? gatewayBinary(ARENA_ROOT) : null,
+    // Refused here, before the first run, when the build is older than the
+    // sources: a table from a stale binary is worse than no table.
+    gateway: needsGateway ? assertCurrent(gatewayBuild(ARENA_ROOT)) : null,
     node: process.version,
     platform: `${process.platform}-${process.arch}`,
     results: relative(ARENA_ROOT, out).split("\\").join("/"),
