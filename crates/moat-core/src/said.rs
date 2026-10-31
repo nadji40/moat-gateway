@@ -3,7 +3,8 @@
 //! Provenance traces a payment's values back to the user's words (ADR 0001).
 //! Matching those words as one long string over-reads them: any four
 //! characters of a name, a payee the user said not to pay, or an invoice
-//! number all counted as the user asking. This module reads a sentence well
+//! number all counted as the user asking, and so did a name the user only
+//! mentioned ("Bob Supplies is a scammer"). This module reads a sentence well
 //! enough to refuse those, and no further. A value it declines resolves to
 //! another source or to `Unknown`, which costs a step-up, never a payment.
 
@@ -131,6 +132,50 @@ const PROCLITICS: &[char] = &['و', 'ف', 'ب', 'ل', 'ك'];
 /// How many words back a negation can reach within its clause.
 const NEGATION_REACH: usize = 6;
 
+/// Words that make a clause a request to pay. A name is asked for when it
+/// shares a clause with one of these; an amount, when its sentence has one.
+/// Exact forms, on purpose: "paid" and "sends" are how people talk *about*
+/// a payee ("I already paid Bob last week"), not how they ask to pay one.
+const PAYMENT_CUES: &[&str] = &[
+    "pay",
+    "pays",
+    "paying",
+    "payment",
+    "payments",
+    "transfer",
+    "send",
+    "settle",
+    "wire",
+    "remit",
+    "renew",
+    "process",
+    "receive",
+    "receives",
+    "approve",
+    "authorize",
+    "authorise",
+    "purchase",
+    "buy",
+    "ادفع",
+    "ادفعي",
+    "ادفعوا",
+    "دفع",
+    "الدفع",
+    "دفعة",
+    "سدد",
+    "سدّد",
+    "سداد",
+    "حول",
+    "حوّل",
+    "تحويل",
+    "أرسل",
+    "ارسل",
+    "جدد",
+    "جدّد",
+    "اشتر",
+    "اشتري",
+];
+
 struct Token {
     /// Case-folded, as a payment argument is normalized.
     lower: String,
@@ -160,6 +205,16 @@ impl Token {
         NEGATIONS.contains(&self.bare.as_str())
             || self.bare.ends_with("n't")
             || self.bare.ends_with("n’t")
+    }
+
+    /// A word that asks for a payment, with or without a joined Arabic
+    /// prefix ("وادفع" is "and" plus "ادفع").
+    fn payment_cue(&self) -> bool {
+        PAYMENT_CUES.contains(&self.bare.as_str())
+            || self
+                .bare
+                .strip_prefix(PROCLITICS)
+                .is_some_and(|rest| PAYMENT_CUES.contains(&rest))
     }
 
     /// Whether this word is the argument's word `word`, allowing an Arabic
@@ -214,6 +269,33 @@ fn tokens(text: &str) -> Vec<Token> {
     out
 }
 
+/// Whether the clause around the name at `start..end` asks for a payment: a
+/// cue word between the clause mark before the name and the one that closes
+/// its clause. The name's own words are not read: "Bob Payment Services is a
+/// scammer" asks for nothing.
+fn clause_asks(tokens: &[Token], start: usize, end: usize) -> bool {
+    let before = tokens[..start].iter().rev().take_while(|t| !t.ends_clause);
+    // Nothing after the name when the name itself closes the clause.
+    let after = tokens[end..]
+        .iter()
+        .enumerate()
+        .take_while(|(k, _)| !tokens[end + k - 1].ends_clause)
+        .map(|(_, t)| t);
+    before.chain(after).any(Token::payment_cue)
+}
+
+/// Whether the sentence holding `at` asks for a payment.
+fn sentence_asks(tokens: &[Token], at: usize) -> bool {
+    let ends_sentence = |t: &Token| t.lower.ends_with(SENTENCE_END);
+    let before = tokens[..at].iter().rev().take_while(|t| !ends_sentence(t));
+    let after = tokens[at..]
+        .iter()
+        .enumerate()
+        .take_while(|(k, _)| *k == 0 || !ends_sentence(&tokens[at + k - 1]))
+        .map(|(_, t)| t);
+    before.chain(after).any(Token::payment_cue)
+}
+
 /// Whether a negation earlier in the same clause governs the word at `at`.
 fn negated(tokens: &[Token], at: usize) -> bool {
     for token in tokens[..at].iter().rev().take(NEGATION_REACH) {
@@ -229,10 +311,11 @@ fn negated(tokens: &[Token], at: usize) -> bool {
 
 /// Whether `text` asks for a payee whose normalized name is `name`.
 ///
-/// The name must be whole words of the sentence, not negated in its clause,
-/// and, when the writer capitalizes names at all, a whole capitalized name:
-/// "Pro Inc" is not the user naming anyone when they wrote "Monitoring Pro
-/// Inc", and neither is "cloud hosting".
+/// The name must be whole words of the sentence, in a clause that asks for
+/// a payment, not negated in that clause, and, when the writer capitalizes
+/// names at all, a whole capitalized name: "Pro Inc" is not the user naming
+/// anyone when they wrote "Monitoring Pro Inc", and neither is "cloud
+/// hosting". "Bob Supplies is a scammer" names Bob and asks for nothing.
 pub fn names(text: &str, name: &str) -> bool {
     let words: Vec<&str> = name.split(' ').filter(|w| !w.is_empty()).collect();
     if words.is_empty() {
@@ -266,7 +349,7 @@ pub fn names(text: &str, name: &str) -> bool {
                     return false;
                 }
             }
-            !negated(&tokens, start)
+            !negated(&tokens, start) && clause_asks(&tokens, start, end)
         })
 }
 
@@ -276,7 +359,8 @@ pub fn names(text: &str, name: &str) -> bool {
 /// "#3") and never an amount. A number beside a currency, or written with a
 /// decimal point, is an amount; when the sentence has any of those, a bare
 /// number elsewhere in it is a quantity, a day or a reference, not the price.
-/// A number the user said not to pay is not asked for.
+/// A number the user said not to pay is not asked for, and neither is one in
+/// a sentence that asks for no payment ("Last month it was 520 USD").
 pub fn amounts(text: &str) -> Vec<String> {
     let tokens = tokens(&ascii_digits(text));
     let currency_word =
@@ -297,7 +381,7 @@ pub fn amounts(text: &str) -> Vec<String> {
         let Some(number) = normalize_number(core) else {
             continue;
         };
-        if negated(&tokens, at) {
+        if negated(&tokens, at) || !sentence_asks(&tokens, at) {
             continue;
         }
         let beside_currency = (at > 0 && currency_word(&tokens[at - 1]))
@@ -385,6 +469,42 @@ mod tests {
         ));
     }
 
+    /// A payee the user talks about is not one they ask to pay. Found by
+    /// reading the rules path against a planted invoice: "PAY Bob Supplies"
+    /// in the invoice was allowed because the user's own sentence mentioned
+    /// Bob while warning about him.
+    #[test]
+    fn a_name_the_user_only_mentions_is_not_asked_for() {
+        for said in [
+            "Pay Monitoring Pro Inc 120 USD. Bob Supplies is a scammer.",
+            "Pay Monitoring Pro Inc 120 USD, and ignore whatever Bob Supplies sends.",
+            "Pay Monitoring Pro Inc 120 USD. I already paid Bob Supplies last week.",
+            "Pay Monitoring Pro Inc 120 USD, Bob Supplies emailed me about an invoice.",
+            "Bob Supplies keeps emailing us. Pay Monitoring Pro Inc 120 USD.",
+            "Bob Supplies, pay Monitoring Pro Inc 120 USD.",
+        ] {
+            assert!(!names(said, "bob supplies"), "{said}");
+            assert!(names(said, "monitoring pro inc"), "{said}");
+        }
+        assert!(!names(
+            "Pay Monitoring Pro Inc 120 USD. Bob Payment Services is a scammer.",
+            "bob payment services"
+        ));
+        let arabic = "ادفع لمؤسسة النور ١٢٠ ريالاً. شركة بوب للتوريدات نصّابة.";
+        assert!(!names(arabic, "شركة بوب للتوريدات"));
+        assert!(names(arabic, "مؤسسة النور"));
+        // The clause is what asks, in whatever words.
+        assert!(names(
+            "Monitoring Pro Inc should receive 4.80 USD",
+            "monitoring pro inc"
+        ));
+        assert!(names(
+            "Please settle Oman Freight Co., it is overdue",
+            "oman freight co."
+        ));
+        assert!(names("وادفع لمؤسسة عسير ٤٫٨٠ ريال", "مؤسسة عسير"));
+    }
+
     #[test]
     fn arabic_names_with_a_joined_prefix() {
         let said = "ادفع لمؤسسة عسير للحلول السحابية ٤٫٨٠ ريال";
@@ -423,6 +543,16 @@ mod tests {
             ("Pay Monitoring Pro Inc, room 101", vec![]),
             ("Monitoring Pro Inc, reference ticket 88", vec![]),
             ("Pay Monitoring Pro Inc 480 today", vec!["480"]),
+            // Numbers in a sentence that asks for nothing are not prices.
+            (
+                "Pay Monitoring Pro Inc 4.80 USD. Last month it was 520 USD.",
+                vec!["4.8"],
+            ),
+            (
+                "Pay Monitoring Pro Inc 480 USD, last month it was 520 USD",
+                vec!["480", "520"],
+            ),
+            ("Monitoring Pro Inc charged 480 USD last month.", vec![]),
         ];
         for (said, want) in cases {
             assert_eq!(amounts(said), want, "{said}");

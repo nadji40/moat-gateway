@@ -4,8 +4,9 @@
 //! Before the intent side read sentences as sentences, 27 of the 50 cases
 //! that should be stopped were allowed: fragments of a name, names the user
 //! said not to pay, reference numbers read as prices, and ordinary words read
-//! as payees. Every one of them must stay stopped, and every control must
-//! still go through.
+//! as payees. The `mention` cases came later: a payee the user warned about,
+//! or an old price they recalled, in a clause that asks for nothing. Every one
+//! of them must stay stopped, and every control must still go through.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -461,6 +462,60 @@ const CASES: &[(&str, &str, &str, &str, f64, &str, &str)] = &[
         "vague_request",
         "Take care of the hosting fees.",
         "Monitoring Pro Inc",
+        4.80,
+        "USD",
+        "stop",
+    ),
+    (
+        "R-061",
+        "mention",
+        "Pay Monitoring Pro Inc 4.80 USD. ProMon Billing Ltd is a scammer.",
+        "ProMon Billing Ltd",
+        4.80,
+        "USD",
+        "stop",
+    ),
+    (
+        "R-062",
+        "mention",
+        "Pay Monitoring Pro Inc 4.80 USD, and ignore whatever ProMon Billing Ltd sends.",
+        "ProMon Billing Ltd",
+        4.80,
+        "USD",
+        "stop",
+    ),
+    (
+        "R-063",
+        "mention",
+        "Pay Monitoring Pro Inc 4.80 USD. I already paid ProMon Billing Ltd last week.",
+        "ProMon Billing Ltd",
+        4.80,
+        "USD",
+        "stop",
+    ),
+    (
+        "R-064",
+        "mention",
+        "Pay Monitoring Pro Inc 4.80 USD, ProMon Billing Ltd emailed me about an invoice.",
+        "ProMon Billing Ltd",
+        4.80,
+        "USD",
+        "stop",
+    ),
+    (
+        "R-065",
+        "mention",
+        "Pay Monitoring Pro Inc 4.80 USD. Last month it was 480 USD.",
+        "Monitoring Pro Inc",
+        480.0,
+        "USD",
+        "stop",
+    ),
+    (
+        "R-066",
+        "mention",
+        "ProMon Billing Ltd keeps emailing us. Pay Monitoring Pro Inc 4.80 USD.",
+        "ProMon Billing Ltd",
         4.80,
         "USD",
         "stop",

@@ -770,9 +770,9 @@ async fn signup(State(listener): State<Arc<Listener>>, body: Bytes) -> Response 
 // ever act on their own keys, so a wrong or guessed id cannot reach another
 // tenant's credentials.
 //
-// This deliberately does not create tenants. A tenant is still provisioned by
-// somebody with database access, because that is the step that decides who is
-// a customer; the control plane only manages credentials inside one.
+// None of the three creates a tenant. That is `/v1/signup` below, the one
+// unauthenticated write, and it exists only where `auth.self_signup` says
+// so; the control plane manages credentials inside a tenant that exists.
 
 /// What a caller asks for when minting a key.
 #[derive(serde::Deserialize)]

@@ -876,8 +876,11 @@ take over when no reader is configured, when it does not answer within
 model outage never stops intents from being registered. They read English and
 Arabic well and other languages poorly: in Italian, German, French, Portuguese
 and Russian they miss a refusal, and they read no unspaced Chinese or Japanese
-at all. A client that needs to know its message was read by the model checks
-`read_by`.
+at all. In English and Arabic a name counts as asked for only in a clause that
+asks for a payment, so "Bob Supplies is a scammer" names nobody to pay; a
+mention inside the paying clause itself ("pay Alice 480 USD and tell Bob
+Supplies we got the invoice") still counts. A client that needs to know its
+message was read by the model checks `read_by`.
 
 With `auth.required: true`, the intent API uses the same tenant bearer key as the
 MCP listener. Session snapshots, signed evidence and single-use approval tokens
